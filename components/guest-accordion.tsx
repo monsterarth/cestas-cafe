@@ -46,13 +46,10 @@ export function GuestAccordion({
       if (personIndex < persons.length - 1) {
         const nextAccordionEl = accordionRefs.current[personIndex + 1]
         if (nextAccordionEl) {
-          const headerOffset = 80 // Altura aproximada do header fixo para não cobrir o título
-          const elementPosition = nextAccordionEl.getBoundingClientRect().top
-          const offsetPosition = elementPosition + window.pageYOffset - headerOffset
-
-          window.scrollTo({
-            top: offsetPosition,
+          // A opção 'center' é mais robusta contra headers fixos
+          nextAccordionEl.scrollIntoView({
             behavior: "smooth",
+            block: "center",
           })
         }
       }
