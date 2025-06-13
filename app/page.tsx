@@ -68,7 +68,6 @@ export default function Home() {
     }))
   }
 
-<<<<<<< HEAD
   const handleSelectNoHotDish = (personIndex: number) => {
     setOrderState((prev) => {
       const personToUpdate = prev.persons[personIndex]
@@ -86,8 +85,6 @@ export default function Home() {
     })
   }
 
-=======
->>>>>>> 1d22fe5cf22b4c09aa815806604097a5880b7d00
   const handleNotesChange = (notes: string) => {
     setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
   }
