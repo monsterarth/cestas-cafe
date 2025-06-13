@@ -51,6 +51,7 @@ export interface AppConfig {
   textoAgradecimento: string
   corPrimaria: string
   corSecundaria: string
+  caloriasMediasPorPessoa?: number
 }
 
 export interface OrderState {

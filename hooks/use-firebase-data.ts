@@ -19,6 +19,7 @@ export function useFirebaseData() {
     textoAgradecimento: 'Agradecemos sua colaboração para evitarmos o desperdício. Para iniciar, clique em "Próximo".',
     corPrimaria: "#97A25F",
     corSecundaria: "#4B4F36",
+    caloriasMediasPorPessoa: 600,
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -64,19 +65,17 @@ export function useFirebaseData() {
 
       // Carregar configurações do app (logo, textos, cores)
       const appConfigDoc = await getDoc(doc(db, "configuracoes", "app"))
-      if (appConfigDoc.exists()) {
-        const appConfigData = appConfigDoc.data()
-        setAppConfig((prev) => ({
-          ...prev,
-          logoUrl: appConfigData.logoUrl || undefined,
-          nomeFazenda: appConfigData.nomeFazenda || prev.nomeFazenda,
-          subtitulo: appConfigData.subtitulo || prev.subtitulo,
-          textoIntroducao: appConfigData.textoIntroducao || prev.textoIntroducao,
-          textoAgradecimento: appConfigData.textoAgradecimento || prev.textoAgradecimento,
-          corPrimaria: appConfigData.corPrimaria || prev.corPrimaria,
-          corSecundaria: appConfigData.corSecundaria || prev.corSecundaria,
-        }))
-      }
+if (appConfigDoc.exists()) {
+  const appConfigData = appConfigDoc.data()
+  setAppConfig((prev) => ({
+    ...prev,
+    // ... (outras propriedades)
+    textoAgradecimento: appConfigData.textoAgradecimento || prev.textoAgradecimento,
+    corPrimaria: appConfigData.corPrimaria || prev.corPrimaria,
+    corSecundaria: appConfigData.corSecundaria || prev.corSecundaria, 
+    caloriasMediasPorPessoa: appConfigData.caloriasMediasPorPessoa || prev.caloriasMediasPorPessoa,
+  }))
+}
 
       // Carregar cardápio
       const dishes: HotDish[] = []

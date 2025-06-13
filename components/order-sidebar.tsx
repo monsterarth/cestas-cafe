@@ -5,9 +5,9 @@ interface OrderSidebarProps {
   orderState: OrderState
   hotDishes: HotDish[]
   accompaniments: Record<string, AccompanimentCategory>
+  appConfig: AppConfig
 }
 
-const AVG_CALORIES_PER_PERSON = 600
 
 export function OrderSidebar({ orderState, hotDishes, accompaniments }: OrderSidebarProps) {
   const calculateTotalCalories = () => {
@@ -41,7 +41,7 @@ export function OrderSidebar({ orderState, hotDishes, accompaniments }: OrderSid
   }
 
   const totalCalories = calculateTotalCalories()
-  const maxCalories = (orderState.guestInfo.people || 1) * AVG_CALORIES_PER_PERSON
+  const maxCalories = (orderState.guestInfo.people || 1) * (appConfig.caloriasMediasPorPessoa || 600)
   const caloriePercentage = maxCalories > 0 ? (totalCalories / maxCalories) * 100 : 0
 
   let barColor = "bg-stone-400"

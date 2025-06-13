@@ -240,9 +240,11 @@ export default function Home() {
 
           {!orderSubmitted && (
             <div className="hidden lg:block lg:col-span-1">
-              <OrderSidebar orderState={orderState} hotDishes={hotDishes} accompaniments={accompaniments} />
-            </div>
-          )}
+              <OrderSidebar orderState={orderState} hotDishes={hotDishes} accompaniments={accompaniments} 
+      appConfig={appConfig}
+    />
+  </div>
+)}
         </div>
       </main>
     </div>

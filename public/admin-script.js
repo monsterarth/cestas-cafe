@@ -480,6 +480,7 @@ function renderSettings(geralConfig, appConfig) {
                     <div><label class="font-medium">Subtítulo</label><input type="text" id="app-subtitulo" class="w-full mt-1 border-gray-300 rounded-lg p-2" value="${appConfig.subtitulo || ''}"></div>
                     <div><label class="font-medium">Texto de Introdução</label><textarea id="app-textoIntroducao" class="w-full mt-1 border-gray-300 rounded-lg p-2" rows="4">${appConfig.textoIntroducao || ''}</textarea></div>
                     <div><label class="font-medium">Texto de Agradecimento</label><textarea id="app-textoAgradecimento" class="w-full mt-1 border-gray-300 rounded-lg p-2" rows="2">${appConfig.textoAgradecimento || ''}</textarea></div>
+                    <div><label class="font-medium">Total de Calorias Ideal por Pessoa</label><input type="number" id="app-caloriasMedias" class="w-full mt-1 border-gray-300 rounded-lg p-2" value="${appConfig.caloriasMediasPorPessoa || 600}"></div>
                     <div class="grid grid-cols-2 gap-4">
                         <div><label class="font-medium">Cor Primária (Destaque)</label><input type="color" id="app-corPrimaria" class="w-full h-10 mt-1 border-gray-300 rounded-lg p-1" value="${appConfig.corPrimaria || '#97A25F'}"></div>
                         <div><label class="font-medium">Cor Secundária (Texto)</label><input type="color" id="app-corSecundaria" class="w-full h-10 mt-1 border-gray-300 rounded-lg p-1" value="${appConfig.corSecundaria || '#4B4F36'}"></div>
@@ -550,6 +551,8 @@ window.saveAppConfig = async () => {
         nomeFazenda: document.getElementById('app-nomeFazenda').value,
         subtitulo: document.getElementById('app-subtitulo').value,
         textoIntroducao: document.getElementById('app-textoIntroducao').value,
+        caloriasMediasPorPessoa: parseInt(document.getElementById('app-caloriasMedias').value) || 600,
+
         textoAgradecimento: document.getElementById('app-textoAgradecimento').value,
         corPrimaria: document.getElementById('app-corPrimaria').value,
         corSecundaria: document.getElementById('app-corSecundaria').value,
