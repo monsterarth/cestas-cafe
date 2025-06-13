@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { ChevronDown, User, Check } from "lucide-react"
 import type { HotDish, Person } from "@/types"
 
@@ -9,6 +9,7 @@ interface GuestAccordionProps {
   hotDishes: HotDish[]
   onSelectDish: (personIndex: number, dishId: string) => void
   onSelectFlavor: (personIndex: number, flavorId: string) => void
+  onUpdateNotes: (personIndex: number, notes: string) => void
 }
 
 export function GuestAccordion({
@@ -18,6 +19,7 @@ export function GuestAccordion({
   onSelectFlavor,
 }: GuestAccordionProps) {
   const [openAccordions, setOpenAccordions] = useState<number[]>([0])
+  const accordionRefs = useRef<(HTMLDivElement | null)[]>([])
 
   const toggleAccordion = (index: number) => {
     setOpenAccordions((prev) => (prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]))
@@ -25,27 +27,36 @@ export function GuestAccordion({
 
   const handleSelectDish = (personIndex: number, dishId: string) => {
     onSelectDish(personIndex, dishId)
-    // Mantém o acordeão aberto para seleção do sabor
   }
 
   const handleSelectFlavor = (personIndex: number, flavorId: string) => {
     onSelectFlavor(personIndex, flavorId)
 
-    // Fecha o acordeão atual e abre o próximo, se houver
     setTimeout(() => {
+      // Abre o próximo acordeão e fecha o atual
       setOpenAccordions((prev) => {
-        // Remove o atual da lista de abertos
         const accordionsSemOAtual = prev.filter((i) => i !== personIndex)
-
-        // Se não for o último hóspede, adiciona o próximo à lista de abertos
         if (personIndex < persons.length - 1) {
           return [...accordionsSemOAtual, personIndex + 1]
         }
-
-        // Se for o último, apenas retorna a lista sem o atual (todos fechados)
         return accordionsSemOAtual
       })
-    }, 300) // Tempo de espera para a transição
+
+      // Rola a página para o próximo hóspede
+      if (personIndex < persons.length - 1) {
+        const nextAccordionEl = accordionRefs.current[personIndex + 1]
+        if (nextAccordionEl) {
+          const headerOffset = 80 // Altura aproximada do header fixo para não cobrir o título
+          const elementPosition = nextAccordionEl.getBoundingClientRect().top
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: "smooth",
+          })
+        }
+      }
+    }, 300)
   }
 
   return (
@@ -58,6 +69,7 @@ export function GuestAccordion({
         return (
           <div
             key={person.id}
+            ref={(el) => (accordionRefs.current[index] = el)}
             className={`
               border-2 transition-all duration-200 rounded-lg
               ${isComplete ? "border-green-300 bg-green-50/50" : "border-stone-200 bg-[#F7FDF2]"}
