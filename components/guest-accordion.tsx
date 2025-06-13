@@ -120,8 +120,13 @@ export function GuestAccordion({
                         onClick={() => handleSelectDish(index, dish.id)}
                       >
                         <div className="flex flex-col items-center text-center space-y-3 md:space-y-4">
-                          <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl flex items-center justify-center text-3xl md:text-5xl shadow-inner bg-[#E9D9CD]">
-                            {dish.emoji || "🍽️"}
+                          <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl flex items-center justify-center text-3xl md:text-5xl shadow-inner bg-[#E9D9CD] overflow-hidden">
+                            {dish.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={dish.imageUrl} alt={dish.nomeItem} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-3xl md:text-5xl">{dish.emoji || "🍽️"}</span>
+                            )}
                           </div>
                           <div className="space-y-2 md:space-y-3 w-full">
                             <h4 className="font-bold text-sm md:text-lg text-[#4B4F36]">{dish.nomeItem}</h4>

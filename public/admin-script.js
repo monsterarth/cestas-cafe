@@ -463,7 +463,7 @@ function loadSettings() {
 
     Promise.all([geralPromise, appPromise]).then(([geralDoc, appDoc]) => {
         const geralConfig = geralDoc.exists ? geralDoc.data() : { cabanas: [], horariosEntrega: [] };
-        const appConfig = appDoc.exists ? appDoc.data() : { nomeFazenda: '', subtitulo: '', textoIntroducao: '', textoAgradecimento: '', corPrimaria: '#97A25F', corSecundaria: '#4B4F36' };
+        const appConfig = appDoc.exists ? appDoc.data() : { nomeFazenda: '', subtitulo: '', textoIntroducao: '', textoAgradecimento: '', corPrimaria: '#97A25F', corSecundaria: '#4B4F36', logoUrl: '' };
         renderSettings(geralConfig, appConfig);
     }).catch(error => console.error("Error loading settings:", error));
 }
@@ -476,6 +476,7 @@ function renderSettings(geralConfig, appConfig) {
                 <h4 class="text-lg font-semibold mb-4">Personalização do Aplicativo</h4>
                 <div class="space-y-4">
                     <div><label class="font-medium">Nome da Fazenda</label><input type="text" id="app-nomeFazenda" class="w-full mt-1 border-gray-300 rounded-lg p-2" value="${appConfig.nomeFazenda || ''}"></div>
+                    <div><label class="font-medium">URL do Logo</label><input type="text" id="app-logoUrl" class="w-full mt-1 border-gray-300 rounded-lg p-2" value="${appConfig.logoUrl || ''}" placeholder="https://exemplo.com/logo.png"></div>
                     <div><label class="font-medium">Subtítulo</label><input type="text" id="app-subtitulo" class="w-full mt-1 border-gray-300 rounded-lg p-2" value="${appConfig.subtitulo || ''}"></div>
                     <div><label class="font-medium">Texto de Introdução</label><textarea id="app-textoIntroducao" class="w-full mt-1 border-gray-300 rounded-lg p-2" rows="4">${appConfig.textoIntroducao || ''}</textarea></div>
                     <div><label class="font-medium">Texto de Agradecimento</label><textarea id="app-textoAgradecimento" class="w-full mt-1 border-gray-300 rounded-lg p-2" rows="2">${appConfig.textoAgradecimento || ''}</textarea></div>
@@ -548,10 +549,10 @@ function initializeSettingsSortablesAndButtons() {
 window.saveAppConfig = async () => {
     const configData = {
         nomeFazenda: document.getElementById('app-nomeFazenda').value,
+        logoUrl: document.getElementById('app-logoUrl').value,
         subtitulo: document.getElementById('app-subtitulo').value,
         textoIntroducao: document.getElementById('app-textoIntroducao').value,
         caloriasMediasPorPessoa: parseInt(document.getElementById('app-caloriasMedias').value) || 600,
-
         textoAgradecimento: document.getElementById('app-textoAgradecimento').value,
         corPrimaria: document.getElementById('app-corPrimaria').value,
         corSecundaria: document.getElementById('app-corSecundaria').value,
@@ -671,7 +672,7 @@ window.deleteCategory = (id) => {
 };
 
 window.openMenuItemModal = async (categoryId, itemId = null) => {
-    let item = { nomeItem: '', descricaoPorcao: '', emoji: '', calorias: 0, disponivel: true, sabores: [] };
+    let item = { nomeItem: '', descricaoPorcao: '', emoji: '', calorias: 0, disponivel: true, sabores: [], imageUrl: '' };
     if (itemId) {
         const doc = await db.collection('cardapio').doc(categoryId).collection('itens').doc(itemId).get();
         if(doc.exists) {
@@ -690,6 +691,7 @@ window.openMenuItemModal = async (categoryId, itemId = null) => {
                 <h3 class="text-2xl font-bold mb-6">${itemId ? 'Editar' : 'Adicionar'} Item</h3>
                 <form id="menu-item-form" class="space-y-4">
                     <div><label class="font-medium">Nome do Item</label><input type="text" name="nomeItem" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2" value="${item.nomeItem}" required></div>
+                    ${showSabores ? `<div><label class="font-medium">URL da Imagem do Prato</label><input type="text" name="imageUrl" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2" value="${item.imageUrl || ''}" placeholder="https://exemplo.com/imagem.jpg"></div>` : ''}
                     <div><label class="font-medium">Descrição da Porção</label><input type="text" name="descricaoPorcao" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2" value="${item.descricaoPorcao || ''}"></div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div><label class="font-medium">Emoji</label><input type="text" name="emoji" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2" value="${item.emoji || ''}"></div>
@@ -741,7 +743,8 @@ window.saveMenuItem = async (modalId, categoryId, itemId) => {
         descricaoPorcao: form.descricaoPorcao.value,
         emoji: form.emoji.value,
         disponivel: form.disponivel.checked,
-        calorias: parseInt(form.calorias.value) || 0
+        calorias: parseInt(form.calorias.value) || 0,
+        imageUrl: form.imageUrl ? form.imageUrl.value : ''
     };
 
     let itemRef;
