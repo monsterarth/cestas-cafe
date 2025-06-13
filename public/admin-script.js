@@ -20,21 +20,6 @@ let sortableInstances = [];
 let activeCharts = [];
 window.menuData = []; // Cache do cardápio para categorização rápida
 
-// Expõe as funções necessárias para o escopo global, permitindo o uso de 'onclick' no HTML.
-window.closeModal = closeModal;
-window.openOrderDetailModal = openOrderDetailModal;
-window.updateOrderStatus = updateOrderStatus;
-window.printOpenOrdersSummary = printOpenOrdersSummary;
-window.printElement = printElement;
-window.openCategoryModal = openCategoryModal;
-window.saveCategory = saveCategory;
-window.deleteCategory = deleteCategory;
-window.openMenuItemModal = openMenuItemModal;
-window.saveMenuItem = saveMenuItem;
-window.deleteMenuItem = deleteMenuItem;
-window.saveAppConfig = saveAppConfig;
-window.saveList = saveList;
-
 // Funções Utilitárias
 window.closeModal = (id) => {
     const modal = document.getElementById(id);
@@ -804,3 +789,17 @@ window.deleteMenuItem = (categoryId, itemId) => {
         }
     });
 };
+// Expõe as funções necessárias para o escopo global, permitindo o uso de 'onclick' no HTML.
+window.closeModal = closeModal;
+window.openOrderDetailModal = openOrderDetailModal;
+window.updateOrderStatus = updateOrderStatus;
+window.printOpenOrdersSummary = printOpenOrdersSummary;
+window.printElement = printElement;
+window.openCategoryModal = openCategoryModal;
+window.saveCategory = saveCategory;
+window.deleteCategory = deleteCategory;
+window.openMenuItemModal = openMenuItemModal;
+window.saveMenuItem = saveMenuItem;
+window.deleteMenuItem = deleteMenuItem;
+window.saveAppConfig = saveAppConfig;
+window.saveList = saveList;
