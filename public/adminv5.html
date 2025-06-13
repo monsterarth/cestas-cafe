@@ -3,116 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Administrativo - Fazenda do Rosa</title>
+    <title>Painel de Administração - Pedidos de Café da Manhã</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        .sidebar-link { transition: all 0.2s ease-in-out; }
-        .sidebar-link:hover, .sidebar-link.active { background-color: #3b82f6; color: white; }
-        .modal-overlay { transition: opacity 0.3s ease-in-out; }
-        .modal-content { transition: transform 0.3s ease-in-out; }
-        .content-section { display: none; }
-        .content-section.active { display: block; animation: fadeIn 0.5s; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        .sortable-ghost { background: #dbeafe; opacity: 0.5; }
-        .drag-handle { cursor: grab; }
-        .drag-handle:active { cursor: grabbing; }
+        /* Paleta de cores extraída do seu projeto Next.js para manter a consistência visual */
+        :root {
+            --background: hsl(224, 71.4%, 4.1%);
+            --foreground: hsl(210, 20%, 98%);
+            --card: hsl(215, 27.9%, 16.9%);
+            --card-foreground: hsl(210, 20%, 98%);
+            --primary: hsl(47.9, 95.8%, 53.1%);
+            --primary-foreground: hsl(26, 83.3%, 14.1%);
+            --secondary: hsl(215, 27.9%, 16.9%);
+            --secondary-foreground: hsl(210, 20%, 98%);
+            --border: hsl(215, 27.9%, 16.9%);
+            --ring: hsl(47.9, 95.8%, 53.1%);
+            --radius: 0.5rem;
+        }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body {
+            background-color: var(--background);
+            color: var(--foreground);
+            font-family: 'Inter', sans-serif;
+        }
 
+        .card {
+            background-color: var(--card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: var(--primary-foreground);
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary:hover {
+            background-color: hsl(47.9, 95.8%, 63.1%);
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: var(--secondary-foreground);
+            border: 1px solid var(--border);
+            transition: background-color 0.3s;
+        }
+
+        .btn-secondary:hover {
+             background-color: hsl(215, 27.9%, 26.9%);
+        }
+
+        .modal-content {
+             background-color: var(--background);
+        }
+
+        /* Estilos para a impressão */
         @media print {
-            body * { visibility: hidden; }
-            .printable-area, .printable-area * { visibility: visible; }
-            .printable-area { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; font-size: 12px; }
-            .no-print, .no-print * { display: none !important; }
-            .page-break { page-break-after: always; }
-            h1, h2, h3, h4, h5, h6 { font-weight: bold; }
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            h1, h2, h3, h4, p, div, span {
+                color: #000 !important;
+            }
+            .resumo, .item-categoria {
+                margin-bottom: 1rem;
+                border-bottom: 1px solid #ccc;
+                padding-bottom: 1rem;
+            }
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="p-4 md:p-8">
 
-    <div id="login-view" class="flex justify-center items-center h-screen bg-slate-100 no-print">
-        <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg">
-            <h2 class="text-3xl font-bold text-center text-slate-800 mb-2">Painel Administrativo</h2>
-            <p class="text-center text-slate-500 mb-8">Fazenda do Rosa</p>
-            <div id="login-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6 hidden" role="alert"></div>
-            <div class="space-y-6">
-                <div>
-                    <label for="email" class="block text-sm font-medium text-slate-600">Email</label>
-                    <input type="email" id="email" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" value="admin@fazenda.com">
-                </div>
-                <div>
-                    <label for="password" class="block text-sm font-medium text-slate-600">Senha</label>
-                    <input type="password" id="password" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" value="123456">
-                </div>
-                <button id="login-btn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    Entrar
-                </button>
+    <div class="container mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8">
+            <div>
+                <h1 class="text-4xl font-bold text-primary">Painel de Pedidos</h1>
+                <p class="text-lg text-gray-400">Café da Manhã - Cabanas</p>
             </div>
+            <div class="flex space-x-4 mt-4 md:mt-0">
+                <button id="btn-comanda-geral" class="btn-primary font-bold py-2 px-6 rounded-lg">Gerar Comanda Geral</button>
+            </div>
+        </header>
+
+        <main id="pedidos-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Os cards de pedidos serão inseridos aqui via JavaScript -->
+        </main>
+    </div>
+
+    <!-- Modal para Detalhes do Pedido -->
+    <div id="pedido-modal" class="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center hidden z-50">
+        <div id="modal-content" class="modal-content card p-8 rounded-lg w-11/12 md:w-2/3 lg:w-1/2 max-w-4xl max-h-[90vh] overflow-y-auto relative">
+             <button id="btn-fechar-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white text-3xl">&times;</button>
+            <!-- Conteúdo do modal inserido via JavaScript -->
         </div>
     </div>
     
-    <div id="app-view" class="hidden">
-        <div class="flex h-screen bg-slate-100">
-            <aside class="w-64 bg-slate-800 text-slate-200 flex flex-col no-print">
-                <div class="h-20 flex items-center justify-center border-b border-slate-700">
-                    <h1 class="text-2xl font-bold">Fazenda do Rosa</h1>
-                </div>
-                <nav class="flex-1 px-4 py-4 space-y-2">
-                    <a href="#" class="sidebar-link flex items-center px-4 py-2 rounded-lg" data-target="orders">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                        Pedidos
-                    </a>
-                    <a href="#" class="sidebar-link flex items-center px-4 py-2 rounded-lg" data-target="menu">
-                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                        Cardápio
-                    </a>
-                    <a href="#" class="sidebar-link flex items-center px-4 py-2 rounded-lg" data-target="settings">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        Configurações
-                    </a>
-                </nav>
-                <div class="mt-auto p-4">
-                     <a href="#" id="logout-btn" class="sidebar-link flex items-center px-4 py-2 rounded-lg hover:bg-red-500">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                        Sair
-                    </a>
-                </div>
-            </aside>
+    <!-- Área de impressão invisível -->
+    <div id="print-area" class="hidden"></div>
 
-            <main class="flex-1 flex flex-col overflow-hidden">
-                <header class="h-20 bg-white flex items-center justify-between px-8 border-b no-print">
-                    <h2 id="main-title" class="text-2xl font-semibold text-slate-700"></h2>
-                    <div class="flex items-center">
-                        <span id="user-email" class="mr-4 text-slate-600"></span>
-                        <div class="w-10 h-10 bg-slate-300 rounded-full flex items-center justify-center text-slate-500">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                        </div>
-                    </div>
-                </header>
-                <div class="flex-1 p-4 md:p-8 overflow-y-auto">
-                    <section id="orders" class="content-section"></section>
-                    <section id="menu" class="content-section"></section>
-                    <section id="settings" class="content-section"></section>
-                </div>
-            </main>
-        </div>
-    </div>
-    
-    <div id="modal-container" class="no-print"></div>
-    <div id="print-container"></div>
-
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
     <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Mantenha suas credenciais do Firebase aqui
         const firebaseConfig = {
             apiKey: "AIzaSyAjAUVa7_4cAHtFqm8xBuzDVzxDknPMYJM",
             authDomain: "cafe-da-fazenda-a2ec3.firebaseapp.com",
@@ -121,697 +128,244 @@
             messagingSenderId: "604485035435",
             appId: "1:604485035435:web:876f003565cec1ac4a5eee"
         };
-        
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-        let activeListeners = [];
-        let sortableInstances = [];
 
-        // --- GLOBAL HELPER FUNCTIONS ---
-        window.closeModal = (id) => {
-            const modal = document.getElementById(id);
-            if(modal) modal.remove();
-        }
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-        function showLoader(elementId) {
-            const container = document.getElementById(elementId);
-            if (container) {
-                container.innerHTML = `<div class="flex justify-center items-center h-64"><div class="loader"></div></div>`;
-            }
-        }
-        
-        function showConfirmModal(message, onConfirm) {
-            const modalId = `confirm-modal-${Date.now()}`;
-            const modalHTML = `
-            <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4 modal-overlay">
-                <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md modal-content">
-                    <h3 class="text-xl font-bold mb-4">Confirmação</h3>
-                    <p class="text-slate-600 mb-6">${message}</p>
-                    <div class="flex justify-end gap-4">
-                        <button id="cancel-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
-                        <button id="confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Confirmar Exclusão</button>
-                    </div>
-                </div>
-            </div>`;
-            document.getElementById('modal-container').insertAdjacentHTML('beforeend', modalHTML);
+        let pedidosData = []; // Cache local para os dados dos pedidos
 
-            document.getElementById('confirm-btn').onclick = () => {
-                onConfirm();
-                closeModal(modalId);
-            };
-            document.getElementById('cancel-btn').onclick = () => closeModal(modalId);
-        }
-
-        function clearListeners() {
-            activeListeners.forEach(unsubscribe => unsubscribe());
-            activeListeners = [];
-            sortableInstances.forEach(sortable => sortable.destroy());
-            sortableInstances = [];
-        }
-
-        // --- AUTHENTICATION ---
-        auth.onAuthStateChanged(user => {
-            clearListeners();
-            if (user) {
-                document.getElementById('login-view').classList.add('hidden');
-                document.getElementById('app-view').classList.remove('hidden');
-                document.getElementById('user-email').textContent = user.email;
-                initializeApp();
-            } else {
-                document.getElementById('login-view').classList.remove('hidden');
-                document.getElementById('app-view').classList.add('hidden');
-            }
-        });
-
-        document.getElementById('login-btn').addEventListener('click', async () => {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const loginError = document.getElementById('login-error');
-            try {
-                await auth.signInWithEmailAndPassword(email, password);
-            } catch (error) {
-                loginError.textContent = "Erro: " + error.message;
-                loginError.classList.remove('hidden');
-            }
-        });
-        document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
-
-        // --- APP INITIALIZATION & NAVIGATION ---
-        function initializeApp() {
-            const sidebarLinks = document.querySelectorAll('.sidebar-link');
-            
-            function navigateTo(targetId) {
-                clearListeners();
-                document.querySelectorAll('.content-section').forEach(section => section.style.display = 'none');
-                const targetSection = document.getElementById(targetId);
-                targetSection.style.display = 'block';
-
-                sidebarLinks.forEach(link => {
-                    link.classList.remove('active');
-                    if (link.dataset.target === targetId) {
-                        link.classList.add('active');
-                        document.getElementById('main-title').textContent = link.textContent.trim();
-                    }
-                });
-
-                switch(targetId) {
-                    case 'orders': loadOrders(); break;
-                    case 'menu': loadMenu(); break;
-                    case 'settings': loadSettings(); break;
-                }
-            }
-
-            sidebarLinks.forEach(link => {
-                if (link.id !== 'logout-btn') {
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        navigateTo(e.currentTarget.dataset.target);
-                    });
-                }
-            });
-            
-            navigateTo('orders');
-        }
-
-        // --- ORDERS LOGIC ---
-        function loadOrders() {
-            showLoader('orders');
-            const unsubscribe = db.collection('pedidos').orderBy('timestampPedido', 'desc').onSnapshot(snapshot => {
-                const orders = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-                renderOrders(orders);
-            }, error => console.error("Error loading orders:", error));
-            activeListeners.push(unsubscribe);
-        }
-
-        function renderOrders(orders) {
-            const statusColors = { 'Novo': 'bg-blue-100 text-blue-800', 'Em Preparação': 'bg-amber-100 text-amber-800', 'Entregue': 'bg-green-100 text-green-800', 'Cancelado': 'bg-red-100 text-red-800' };
-            const ordersHTML = `
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                    <div>
-                        <h3 class="text-xl font-semibold text-slate-600">Pedidos Recebidos</h3>
-                        <p class="text-slate-500 mt-1">A lista é atualizada em tempo real.</p>
-                    </div>
-                    <button onclick="printOpenOrdersSummary()" class="mt-4 sm:mt-0 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2 px-4 rounded-lg flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm7-8a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                        Imprimir Resumo da Cozinha
-                    </button>
-                </div>
-                <div class="bg-white p-2 sm:p-4 rounded-xl shadow-sm border border-slate-200">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead><tr class="border-b bg-slate-50"><th class="p-3">Data/Hora</th><th class="p-3">Cabana</th><th class="p-3">Hóspede</th><th class="p-3">Entrega</th><th class="p-3">Status</th></tr></thead>
-                            <tbody>${orders.map(order => `<tr class="border-b hover:bg-slate-50 cursor-pointer" onclick="openOrderDetailModal('${order.id}')">
-                                <td class="p-3 whitespace-nowrap">${order.timestampPedido?.toDate().toLocaleString('pt-BR') || 'N/A'}</td>
-                                <td class="p-3 font-medium">${order.cabanaNumero}</td><td class="p-3">${order.hospedeNome}</td><td class="p-3">${order.horarioEntrega}</td>
-                                <td class="p-3"><span class="font-medium px-2.5 py-0.5 rounded-full ${statusColors[order.status] || 'bg-slate-100 text-slate-800'}">${order.status}</span></td></tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>`;
-            document.getElementById('orders').innerHTML = ordersHTML;
-        }
-
-        window.openOrderDetailModal = async (orderId) => {
-            const doc = await db.collection('pedidos').doc(orderId).get();
-            if (!doc.exists) return;
-            const order = { id: doc.id, ...doc.data() };
-            const modalId = `order-detail-modal-${orderId}`;
-            
-            const modalHTML = `
-                <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4 modal-overlay">
-                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl modal-content flex flex-col">
-                        <div id="printable-order-${orderId}" class="p-8 printable-area flex-grow">
-                            <h3 class="text-2xl font-bold mb-2">Comanda - Pedido #${order.id.substring(0,6)}</h3>
-                            <div class="grid grid-cols-2 gap-x-8 text-base border-b pb-4 mb-4">
-                                <p><strong>Cabana:</strong> ${order.cabanaNumero}</p>
-                                <p><strong>Hóspede:</strong> ${order.hospedeNome}</p>
-                                <p><strong>Horário Entrega:</strong> ${order.horarioEntrega}</p>
-                                <p><strong>Nº Pessoas:</strong> ${order.numeroPessoas}</p>
-                            </div>
-                            <h4 class="font-bold text-lg mb-2">Itens do Pedido:</h4>
-                            <ul class="list-disc list-inside space-y-1 mb-4">
-                                ${order.itensPedido.map(item => `<li><strong>${item.quantidade}x</strong> ${item.nomeItem} ${item.observacao ? `<em class="text-slate-600">- Obs: ${item.observacao}</em>` : ''}</li>`).join('')}
-                            </ul>
-                            ${order.observacoesGerais ? `<h4 class="font-bold text-lg mb-2">Observações Gerais:</h4><p>${order.observacoesGerais}</p>` : ''}
-                        </div>
-                        <div class="bg-slate-50 p-4 border-t rounded-b-xl flex justify-between items-center no-print">
-                             <div>
-                                <label for="status-select" class="mr-2 font-medium">Status:</label>
-                                <select id="status-select" class="border-slate-300 rounded-lg">
-                                    <option value="Novo" ${order.status === 'Novo' ? 'selected' : ''}>Novo</option>
-                                    <option value="Em Preparação" ${order.status === 'Em Preparação' ? 'selected' : ''}>Em Preparação</option>
-                                    <option value="Entregue" ${order.status === 'Entregue' ? 'selected' : ''}>Entregue</option>
-                                    <option value="Cancelado" ${order.status === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
-                                </select>
-                            </div>
-                            <div class="flex gap-4">
-                                <button class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg" onclick="closeModal('${modalId}')">Fechar</button>
-                                <button onclick="printElement('printable-order-${orderId}')" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Imprimir</button>
-                                <button onclick="updateOrderStatus('${orderId}')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Salvar</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            document.getElementById('modal-container').innerHTML = modalHTML;
-        }
-
-        window.updateOrderStatus = async (orderId) => {
-            const newStatus = document.getElementById('status-select').value;
-            await db.collection('pedidos').doc(orderId).update({ status: newStatus });
-            closeModal(`order-detail-modal-${orderId}`);
+        // --- MELHORIA: Mapeamento de itens para categorias ---
+        const itemCategories = {
+            'Pão Francês': 'Pães', 'Pão de Queijo': 'Pães', 'Croissant': 'Pães', 'Pão Integral': 'Pães',
+            'Queijo': 'Frios', 'Presunto': 'Frios', 'Peito de Peru': 'Frios', 'Salame': 'Frios',
+            'Mamão': 'Frutas', 'Melão': 'Frutas', 'Uva': 'Frutas', 'Morango': 'Frutas', 'Laranja': 'Frutas', 'Abacaxi': 'Frutas',
+            'Café': 'Bebidas Quentes', 'Leite': 'Bebidas Quentes', 'Chocolate Quente': 'Bebidas Quentes', 'Chá': 'Bebidas Quentes',
+            'Suco de Laranja': 'Bebidas Frias', 'Suco de Uva': 'Bebidas Frias', 'Água': 'Bebidas Frias', 'Iogurte': 'Bebidas Frias',
+            'Ovos Mexidos': 'Pratos Quentes', 'Bacon': 'Pratos Quentes', 'Salsicha': 'Pratos Quentes', 'Panquecas': 'Pratos Quentes',
+            'Granola': 'Cereais', 'Aveia': 'Cereais', 'Sucrilhos': 'Cereais',
+            'Bolo de Chocolate': 'Doces', 'Bolo de Laranja': 'Doces', 'Bolo de Fubá': 'Doces', 'Geléia': 'Doces', 'Mel': 'Doces', 'Manteiga': 'Doces',
         };
 
-        window.printOpenOrdersSummary = async () => {
-            const snapshot = await db.collection('pedidos').where('status', 'in', ['Novo', 'Em Preparação']).get();
-            const openOrders = snapshot.docs.map(doc => doc.data());
+        const categoryOrder = [
+            "Pratos Quentes", "Pães", "Frios", "Frutas", "Bebidas Quentes", "Bebidas Frias", "Cereais", "Doces", "Outros"
+        ];
 
-            if (openOrders.length === 0) {
-                alert("Nenhum pedido em aberto para imprimir.");
+        function getCategory(itemName) {
+            return itemCategories[itemName] || 'Outros';
+        }
+
+        const pedidosContainer = document.getElementById('pedidos-container');
+        const modal = document.getElementById('pedido-modal');
+        const modalContent = document.getElementById('modal-content');
+
+        onSnapshot(collection(db, "pedidosCafe"), (snapshot) => {
+            pedidosData = [];
+            snapshot.forEach((doc) => {
+                pedidosData.push({ id: doc.id, ...doc.data() });
+            });
+            // Ordena por data (mais recente primeiro) e depois por status (novos primeiro)
+            pedidosData.sort((a, b) => {
+                if (a.impresso !== b.impresso) {
+                    return a.impresso ? 1 : -1;
+                }
+                return b.timestamp.seconds - a.timestamp.seconds;
+            });
+            renderPedidos();
+        });
+
+        function renderPedidos() {
+            pedidosContainer.innerHTML = '';
+            if (pedidosData.length === 0) {
+                pedidosContainer.innerHTML = '<p class="text-gray-400 col-span-full text-center">Nenhum pedido encontrado.</p>';
                 return;
             }
-            
-            const summary = {};
-            openOrders.forEach(order => {
-                order.itensPedido.forEach(item => {
-                    summary[item.nomeItem] = (summary[item.nomeItem] || 0) + item.quantidade;
-                });
-            });
 
-            const printId = 'kitchen-summary';
-            const printHTML = `
-                <div id="${printId}" class="printable-area">
-                    <h2 class="text-2xl font-bold mb-4">Resumo da Cozinha - ${new Date().toLocaleDateString('pt-BR')}</h2>
-                    <table class="w-full text-left border-collapse">
-                        <thead><tr class="border-b"><th class="p-2">Item</th><th class="p-2 text-right">Quantidade Total</th></tr></thead>
-                        <tbody>
-                            ${Object.entries(summary).sort((a,b) => a[0].localeCompare(b[0])).map(([name, qty]) => `
-                                <tr class="border-b"><td class="p-2">${name}</td><td class="p-2 text-right font-bold">${qty}</td></tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>`;
-            document.getElementById('print-container').innerHTML = printHTML;
-            printElement(printId);
-        }
-
-        window.printElement = (elementId) => {
-            const contentToPrint = document.getElementById(elementId).innerHTML;
-            const printContainer = document.getElementById('print-container');
-            printContainer.innerHTML = `<div class="printable-area">${contentToPrint}</div>`;
-            window.print();
-            printContainer.innerHTML = '';
-        }
-
-        // --- MENU LOGIC (UPDATED) ---
-        function loadMenu() {
-            showLoader('menu');
-            const unsubscribe = db.collection('cardapio').onSnapshot(async snapshot => {
-                const categoryBatch = db.batch();
-                let categoriesNeedUpdate = false;
-
-                let categories = snapshot.docs.map((doc, index) => {
-                    const data = doc.data();
-                    if (data.posicao === undefined) {
-                        categoryBatch.update(doc.ref, { posicao: index });
-                        categoriesNeedUpdate = true;
-                        return { id: doc.id, ...data, posicao: index };
-                    }
-                    return { id: doc.id, ...data };
-                });
-
-                if (categoriesNeedUpdate) {
-                    await categoryBatch.commit().catch(e => console.error("Failed to update category positions:", e));
-                }
+            pedidosData.forEach(pedido => {
+                const card = document.createElement('div');
+                card.className = `card p-5 flex flex-col justify-between transition-transform transform hover:scale-105 ${pedido.impresso ? 'opacity-50 border-gray-600' : 'border-primary'}`;
                 
-                categories.sort((a, b) => (a.posicao || 0) - (b.posicao || 0));
+                const dataPedido = new Date(pedido.timestamp.seconds * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric'});
+                const horaPedido = new Date(pedido.timestamp.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit'});
 
-                const categoriesWithItems = await Promise.all(categories.map(async (cat) => {
-                    const itemsSnapshot = await db.collection('cardapio').doc(cat.id).collection('itens').get();
-                    const itemBatch = db.batch();
-                    let itemsNeedUpdate = false;
-
-                    let items = itemsSnapshot.docs.map((itemDoc, itemIndex) => {
-                        const itemData = itemDoc.data();
-                        if (itemData.posicao === undefined) {
-                            itemBatch.update(itemDoc.ref, { posicao: itemIndex });
-                            itemsNeedUpdate = true;
-                            return { id: itemDoc.id, ...itemData, posicao: itemIndex };
-                        }
-                        return { id: itemDoc.id, ...itemData };
-                    });
-                    
-                    if(itemsNeedUpdate) {
-                       await itemBatch.commit().catch(e => console.error(`Failed to update item positions for ${cat.id}:`, e));
-                    }
-                    
-                    items.sort((a, b) => (a.posicao || 0) - (b.posicao || 0));
-
-                    return { ...cat, items: items };
-                }));
-
-                renderMenu(categoriesWithItems);
-
-            }, error => {
-                console.error("Error loading menu:", error);
-                document.getElementById('menu').innerHTML = `<p class="text-red-500">Erro ao carregar o cardápio. Verifique o console para mais detalhes.</p>`;
-            });
-            activeListeners.push(unsubscribe);
-        }
-
-        function renderMenu(categories) {
-            const menuHTML = `
-                <div class="flex justify-between items-center mb-6">
+                card.innerHTML = `
                     <div>
-                        <h3 class="text-xl font-semibold text-slate-600">Gestão de Cardápio</h3>
-                        <p class="text-slate-500 mt-1">Arraste para reordenar. As mudanças são salvas em tempo real.</p>
+                        <div class="flex justify-between items-center mb-2">
+                            <h2 class="text-2xl font-bold text-primary">Cabana ${pedido.numeroCabana}</h2>
+                            <span class="text-sm font-medium py-1 px-3 rounded-full ${pedido.impresso ? 'bg-gray-700 text-gray-300' : 'bg-primary text-primary-foreground animate-pulse'}">
+                                ${pedido.impresso ? 'Impresso' : 'Novo'}
+                            </span>
+                        </div>
+                        <p class="text-gray-300 font-medium">${pedido.nomeHospede}</p>
+                        <p class="text-sm text-gray-400">${dataPedido} às ${horaPedido}</p>
                     </div>
-                    <button onclick="openCategoryModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Nova Categoria</button>
+                    <div class="mt-6 flex flex-col space-y-2">
+                        <button class="btn-detalhes btn-primary w-full text-center font-semibold py-2 px-4 rounded-md" data-id="${pedido.id}">Ver Detalhes</button>
+                    </div>
+                `;
+                pedidosContainer.appendChild(card);
+            });
+        }
+
+        function abrirModalDetalhes(pedido) {
+            // --- MELHORIA: Agrupamento de itens por categoria ---
+            const groupedItems = {};
+            (pedido.itens || []).forEach(item => {
+                const category = getCategory(item.name);
+                if (!groupedItems[category]) {
+                    groupedItems[category] = [];
+                }
+                groupedItems[category].push(item);
+            });
+
+            let itensHtml = '';
+            categoryOrder.forEach(category => {
+                if (groupedItems[category]) {
+                    itensHtml += `<h4 class="text-lg font-semibold mt-4 mb-2 text-primary border-b border-border pb-1">${category}</h4>`;
+                    itensHtml += groupedItems[category].map(item => `
+                        <div class="flex justify-between py-1 ml-2">
+                            <span>- ${item.name}</span>
+                            <span class="font-medium">${item.quantity}x</span>
+                        </div>
+                    `).join('');
+                }
+            });
+
+            const dataPedido = new Date(pedido.timestamp.seconds * 1000);
+            modalContent.innerHTML = `
+                 <button id="btn-fechar-modal-inner" class="absolute top-4 right-4 text-gray-400 hover:text-white text-3xl">&times;</button>
+                <div id="comanda-individual-content">
+                    <h3 class="text-3xl font-bold mb-2 text-primary">Cabana ${pedido.numeroCabana}</h3>
+                    <p class="mb-4 text-gray-400">Pedido de ${pedido.nomeHospede}</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <p><strong>Data:</strong> ${dataPedido.toLocaleDateString()}</p>
+                        <p><strong>Hora:</strong> ${dataPedido.toLocaleTimeString()}</p>
+                        <p><strong>Hóspedes:</strong> ${pedido.numeroHospedes}</p>
+                    </div>
+
+                    <div class="mt-4">
+                        <h4 class="text-2xl font-bold mb-3">Itens do Pedido</h4>
+                        ${itensHtml.length > 0 ? itensHtml : '<p>Nenhum item neste pedido.</p>'}
+                    </div>
+
+                    <div class="mt-6">
+                        <h4 class="text-2xl font-bold mb-3">Observações</h4>
+                        <p class="p-3 border border-border rounded-md min-h-[60px] bg-secondary">${pedido.observacoes || 'Nenhuma observação.'}</p>
+                    </div>
                 </div>
-                <div id="categories-list" class="space-y-6">
-                ${categories.map(cat => `
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200" data-id="${cat.id}">
-                        <div class="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
-                            <div class="flex items-center gap-4">
-                                <svg class="w-5 h-5 text-slate-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                                <h4 class="text-lg font-semibold text-slate-700">${cat.nomeCategoria}</h4>
-                            </div>
-                            <div class="space-x-4">
-                                <button onclick="openMenuItemModal('${cat.id}')" class="text-sm font-medium text-blue-600 hover:text-blue-800">Adicionar Item</button>
-                                <button onclick="openCategoryModal('${cat.id}', '${cat.nomeCategoria}')" class="text-sm font-medium text-slate-500 hover:text-slate-700">Editar</button>
-                            </div>
-                        </div>
-                        <div class="p-2">
-                           <table class="w-full">
-                               <tbody class="item-list" data-category-id="${cat.id}">
-                                ${(cat.items || []).map(item => `
-                                    <tr class="rounded-lg" data-id="${item.id}">
-                                        <td class="p-3 w-10 text-center"><svg class="w-5 h-5 text-slate-300 drag-handle inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg></td>
-                                        <td class="p-3">
-                                            <span class="font-medium">${item.nomeItem}</span>
-                                            <span class="text-slate-500 text-sm ml-2">(${item.calorias || 0} kcal)</span>
-                                        </td>
-                                        <td class="p-3"><span class="text-sm font-medium px-2.5 py-0.5 rounded-full ${item.disponivel ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${item.disponivel ? 'Ativo' : 'Inativo'}</span></td>
-                                        <td class="p-3 text-right space-x-4"><button onclick="openMenuItemModal('${cat.id}', '${item.id}')" class="text-slate-500 hover:text-blue-600">Editar</button><button onclick="deleteMenuItem('${cat.id}', '${item.id}')" class="text-slate-500 hover:text-red-600">Excluir</button></td>
-                                    </tr>`).join('')}
-                                </tbody>
-                           </table>
-                        </div>
-                    </div>`).join('')}
-                </div>`;
-            document.getElementById('menu').innerHTML = menuHTML;
-            initializeMenuSortables();
-        }
 
-        // --- SETTINGS LOGIC ---
-        function loadSettings() {
-            showLoader('settings');
-            const unsubscribe = db.collection('configuracoes').doc('geral').onSnapshot(doc => {
-                if (doc.exists) {
-                    renderSettings(doc.data());
-                } else {
-                    document.getElementById('settings').innerHTML = '<p>Documento de configurações não encontrado. Criando um novo...</p>';
-                    db.collection('configuracoes').doc('geral').set({ cabanas: [], horariosEntrega: [], welcomeText: "Bem-vindo!" });
-                }
-            }, error => console.error("Error loading settings:", error));
-            activeListeners.push(unsubscribe);
-        }
-
-        function renderSettings(config) {
-            const settingsHTML = `
-                 <div class="mb-6"><h3 class="text-xl font-semibold text-slate-600">Configurações Gerais</h3><p class="text-slate-500 mt-1">Gerencie os parâmetros do sistema. Arraste para reordenar e clique em salvar.</p></div>
-                 <div class="space-y-8">
-                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <h4 class="text-lg font-semibold mb-4 text-slate-700">Texto de Boas-Vindas (App)</h4>
-                        <textarea id="welcome-text-area" class="w-full border-slate-300 rounded-lg p-3" rows="4">${config.welcomeText || ''}</textarea>
-                        <div class="text-right mt-4"><button onclick="saveWelcomeText()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Salvar Texto</button></div>
-                     </div>
-                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                         <h4 class="text-lg font-semibold mb-4 text-slate-700">Gerenciar Cabanas</h4>
-                         <div id="cabanas-list" class="space-y-2 mb-4">${(config.cabanas || []).map((c, i) => `
-                             <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg" data-id="${i}" data-name="${c.nomeCabana}" data-capacity="${c.capacidadeMaxima}">
-                                 <div class="flex items-center gap-3">
-                                     <svg class="w-5 h-5 text-slate-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                                     <span>${c.nomeCabana} (Cap: ${c.capacidadeMaxima})</span>
-                                 </div>
-                                 <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button>
-                             </div>`).join('')}
-                         </div>
-                         <div class="flex flex-col sm:flex-row gap-2 mb-4">
-                            <input type="text" id="new-cabana-name" placeholder="Nome da Cabana" class="flex-grow border border-slate-300 rounded-lg px-3 py-2">
-                            <input type="number" id="new-cabana-capacity" placeholder="Cap." class="w-full sm:w-24 border border-slate-300 rounded-lg px-3 py-2">
-                            <button id="add-cabana-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg">Adicionar</button>
-                         </div>
-                         <div class="text-right"><button onclick="saveList('cabanas')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Salvar Ordem das Cabanas</button></div>
-                    </div>
-                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <h4 class="text-lg font-semibold mb-4 text-slate-700">Gerenciar Horários de Entrega</h4>
-                         <div id="horarios-list" class="space-y-2 mb-4">${(config.horariosEntrega || []).map((h, i) => `
-                             <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg" data-id="${i}" data-value="${h}">
-                                 <div class="flex items-center gap-3">
-                                     <svg class="w-5 h-5 text-slate-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                                     <span>${h}</span>
-                                 </div>
-                                 <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button>
-                             </div>`).join('')}
-                         </div>
-                         <div class="flex flex-col sm:flex-row gap-2 mb-4">
-                            <input type="text" id="new-horario" placeholder="Novo Horário (HH:MM)" class="flex-grow border border-slate-300 rounded-lg px-3 py-2">
-                            <button id="add-horario-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg">Adicionar</button>
-                         </div>
-                         <div class="text-right"><button onclick="saveList('horariosEntrega')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Salvar Ordem dos Horários</button></div>
-                    </div>
-                 </div>`;
-            document.getElementById('settings').innerHTML = settingsHTML;
-            initializeSettingsSortablesAndButtons();
-        }
-
-        function initializeSettingsSortablesAndButtons() {
-            const cabanasList = document.getElementById('cabanas-list');
-            if(cabanasList) sortableInstances.push(new Sortable(cabanasList, { handle: '.drag-handle', animation: 150 }));
-            const horariosList = document.getElementById('horarios-list');
-            if(horariosList) sortableInstances.push(new Sortable(horariosList, { handle: '.drag-handle', animation: 150 }));
-
-            document.getElementById('add-cabana-btn').onclick = () => {
-                const name = document.getElementById('new-cabana-name').value;
-                const capacity = document.getElementById('new-cabana-capacity').value;
-                if (!name || !capacity) { alert("Preencha nome e capacidade."); return; }
-                const newHTML = `<div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg" data-name="${name}" data-capacity="${capacity}"><div class="flex items-center gap-3"><svg class="w-5 h-5 text-slate-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg><span>${name} (Cap: ${capacity})</span></div><button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button></div>`;
-                cabanasList.insertAdjacentHTML('beforeend', newHTML);
-                document.getElementById('new-cabana-name').value = '';
-                document.getElementById('new-cabana-capacity').value = '';
-            };
-            document.getElementById('add-horario-btn').onclick = () => {
-                const horario = document.getElementById('new-horario').value;
-                if (!horario.match(/^\d{2}:\d{2}$/)) { alert('Use o formato HH:MM.'); return; }
-                const newHTML = `<div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg" data-value="${horario}"><div class="flex items-center gap-3"><svg class="w-5 h-5 text-slate-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg><span>${horario}</span></div><button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button></div>`;
-                horariosList.insertAdjacentHTML('beforeend', newHTML);
-                document.getElementById('new-horario').value = '';
-            };
-        }
-        
-        window.saveWelcomeText = async () => {
-            const newText = document.getElementById('welcome-text-area').value;
-            try {
-                await db.collection('configuracoes').doc('geral').update({ welcomeText: newText });
-                alert('Texto de boas-vindas salvo com sucesso!');
-            } catch (e) {
-                alert('Erro ao salvar texto.');
-                console.error(e);
-            }
-        }
-
-        window.saveList = async (type) => {
-            const docRef = db.collection('configuracoes').doc('geral');
-            let dataArray;
-            if(type === 'cabanas') {
-                dataArray = [...document.querySelectorAll('#cabanas-list > div')].map(el => ({ nomeCabana: el.dataset.name, capacidadeMaxima: parseInt(el.dataset.capacity)}));
-            } else { // horarios
-                dataArray = [...document.querySelectorAll('#horarios-list > div')].map(el => el.dataset.value);
-            }
-            try {
-                await docRef.update({ [type]: dataArray });
-                alert('Lista salva com sucesso!');
-            } catch (error) {
-                console.error("Error saving list:", error);
-                alert("Erro ao salvar lista.");
-            }
-        };
-
-        function initializeMenuSortables() {
-            const categoriesList = document.getElementById('categories-list');
-            if (categoriesList) {
-                sortableInstances.push(new Sortable(categoriesList, {
-                    handle: '.drag-handle',
-                    animation: 150,
-                    onEnd: async (evt) => {
-                        const batch = db.batch();
-                        const items = Array.from(evt.target.children);
-                        items.forEach((item, index) => {
-                            const docRef = db.collection('cardapio').doc(item.dataset.id);
-                            batch.update(docRef, { posicao: index });
-                        });
-                        await batch.commit();
-                    }
-                }));
-            }
-            document.querySelectorAll('.item-list').forEach(list => {
-                sortableInstances.push(new Sortable(list, {
-                    handle: '.drag-handle',
-                    animation: 150,
-                    onEnd: async (evt) => {
-                        const categoryId = evt.target.dataset.categoryId;
-                        const batch = db.batch();
-                        const items = Array.from(evt.target.children);
-                        items.forEach((item, index) => {
-                            const docRef = db.collection('cardapio').doc(categoryId).collection('itens').doc(item.dataset.id);
-                            batch.update(docRef, { posicao: index });
-                        });
-                        await batch.commit();
-                    }
-                }));
-            });
-        }
-        
-        // --- FULLY IMPLEMENTED MENU MODAL FUNCTIONS ---
-
-        window.openCategoryModal = (id = null, name = '') => {
-            const modalId = `category-modal-${id || 'new'}`;
-            const modalHTML = `
-                <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4 modal-overlay">
-                    <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-lg modal-content">
-                        <h3 class="text-2xl font-bold mb-6">${id ? 'Editar' : 'Adicionar'} Categoria</h3>
-                        <form id="category-form" class="space-y-4">
-                            <div>
-                                <label for="category-name" class="font-medium">Nome da Categoria</label>
-                                <input type="text" id="category-name" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2" value="${name}" required>
-                            </div>
-                        </form>
-                        <div class="mt-8 flex justify-between">
-                            <div>
-                                ${id ? `<button onclick="deleteCategory('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 font-bold py-2 px-4 rounded-lg">Excluir</button>` : ''}
-                            </div>
-                            <div class="flex gap-4">
-                                <button class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg" onclick="closeModal('${modalId}')">Cancelar</button>
-                                <button onclick="saveCategory('${modalId}', ${id ? `'${id}'` : 'null'})" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Salvar</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            document.getElementById('modal-container').innerHTML = modalHTML;
-        };
-
-        window.saveCategory = async (modalId, id) => {
-            const name = document.getElementById('category-name').value;
-            if (!name) { alert('O nome da categoria é obrigatório.'); return; }
-            try {
-                if (id) {
-                    await db.collection('cardapio').doc(id).update({ nomeCategoria: name });
-                } else {
-                    const snapshot = await db.collection('cardapio').get();
-                    const newPosition = snapshot.size;
-                    await db.collection('cardapio').add({ nomeCategoria: name, posicao: newPosition });
-                }
-                alert('Categoria salva com sucesso!');
-                closeModal(modalId);
-            } catch (error) {
-                console.error("Error saving category:", error);
-                alert("Erro ao salvar categoria.");
-            }
-        };
-
-        window.deleteCategory = (id) => {
-            showConfirmModal('Tem certeza que deseja excluir esta categoria? TODOS OS ITENS nela serão perdidos. Esta ação não pode ser desfeita.', async () => {
-                 try {
-                    const batch = db.batch();
-                    const itemsSnapshot = await db.collection('cardapio').doc(id).collection('itens').get();
-                    
-                    for (const itemDoc of itemsSnapshot.docs) {
-                        const saboresSnapshot = await itemDoc.ref.collection('sabores').get();
-                        saboresSnapshot.forEach(saborDoc => batch.delete(saborDoc.ref));
-                        batch.delete(itemDoc.ref);
-                    }
-                    batch.delete(db.collection('cardapio').doc(id));
-                    await batch.commit();
-                    alert('Categoria e todos os seus itens foram excluídos!');
-                    closeModal(`category-modal-${id}`);
-                } catch (error) {
-                    console.error("Error deleting category:", error);
-                    alert("Erro ao excluir categoria.");
-                }
-            });
-        };
-
-        window.openMenuItemModal = async (categoryId, itemId = null) => {
-            let item = { nomeItem: '', descricaoPorcao: '', emoji: '', calorias: 0, disponivel: true, sabores: [] };
-            if (itemId) {
-                const doc = await db.collection('cardapio').doc(categoryId).collection('itens').doc(itemId).get();
-                const saboresSnapshot = await doc.ref.collection('sabores').get();
-                item = { id: doc.id, ...doc.data(), sabores: saboresSnapshot.docs.map(s => ({id: s.id, ...s.data()})) };
-            }
-            const showSabores = categoryId === 'pratos_quentes'; // Simplified check
-
-            const modalId = `menu-item-modal-${categoryId}-${itemId || 'new'}`;
-            const modalHTML = `
-                <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4 modal-overlay">
-                    <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-2xl modal-content overflow-y-auto max-h-[90vh]">
-                        <h3 class="text-2xl font-bold mb-6">${itemId ? 'Editar' : 'Adicionar'} Item</h3>
-                        <form id="menu-item-form" class="space-y-4">
-                            <div><label class="font-medium">Nome do Item</label><input type="text" name="nomeItem" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2" value="${item.nomeItem}" required></div>
-                            <div><label class="font-medium">Descrição da Porção</label><input type="text" name="descricaoPorcao" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2" value="${item.descricaoPorcao || ''}"></div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div><label class="font-medium">Emoji</label><input type="text" name="emoji" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2" value="${item.emoji || ''}"></div>
-                                <div><label class="font-medium">Calorias (kcal)</label><input type="number" name="calorias" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2" value="${item.calorias || 0}"></div>
-                            </div>
-                            <div class="flex items-center justify-between pt-2"><label class="font-medium">Disponível</label><input type="checkbox" name="disponivel" class="h-6 w-6 text-blue-600 border-slate-300 rounded focus:ring-blue-500" ${item.disponivel ? 'checked' : ''}></div>
-                            ${showSabores ? `
-                            <div id="sabores-section" class="border-t pt-4 mt-4">
-                                <h4 class="font-semibold text-slate-800 mb-2">Sabores / Tipos de Preparo</h4>
-                                <div id="sabores-list" class="space-y-2 mb-4">
-                                    ${(item.sabores || []).map(sabor => `
-                                    <div class="flex items-center justify-between p-2 bg-slate-100 rounded sabor-item" data-id="${sabor.id}" data-name="${sabor.nomeSabor}" data-calories="${sabor.calorias || 0}" data-disponivel="${sabor.disponivel}">
-                                        <span>${sabor.nomeSabor} <span class="text-slate-500 text-sm">(${sabor.calorias || 0} kcal)</span></span>
-                                        <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button>
-                                    </div>`).join('')}
-                                </div>
-                                <div class="flex flex-col sm:flex-row gap-2 p-2 border rounded-lg">
-                                    <input type="text" id="new-sabor-name" placeholder="Nome do Sabor" class="flex-grow border-0 focus:ring-0 bg-transparent">
-                                    <input type="number" id="new-sabor-calories" placeholder="Calorias" class="w-full sm:w-24 border-0 focus:ring-0 bg-transparent">
-                                    <button type="button" id="add-sabor-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1 rounded-lg font-medium">Adicionar Sabor</button>
-                                </div>
-                            </div>` : ''}
-                        </form>
-                        <div class="mt-8 flex justify-end gap-4">
-                            <button class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg" onclick="closeModal('${modalId}')">Cancelar</button>
-                            <button onclick="saveMenuItem('${modalId}', '${categoryId}', ${itemId ? `'${itemId}'` : 'null'})" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Salvar</button>
-                        </div>
-                    </div>
-                </div>`;
-            document.getElementById('modal-container').innerHTML = modalHTML;
+                <div class="mt-8 flex flex-col md:flex-row gap-4">
+                     <button id="btn-imprimir-individual" class="btn-primary font-bold py-3 px-6 rounded-lg flex-1">Imprimir Comanda</button>
+                     <button id="btn-marcar-impresso" class="btn-secondary font-bold py-3 px-6 rounded-lg flex-1" data-id="${pedido.id}">Marcar como Impresso</button>
+                </div>
+            `;
+            modal.classList.remove('hidden');
             
-            if (document.getElementById('add-sabor-btn')) {
-                document.getElementById('add-sabor-btn').onclick = () => {
-                    const nameInput = document.getElementById('new-sabor-name');
-                    const caloriesInput = document.getElementById('new-sabor-calories');
-                    if (nameInput.value.trim() === '') return;
-                    const newSaborHTML = `
-                        <div class="flex items-center justify-between p-2 bg-slate-100 rounded sabor-item" data-name="${nameInput.value.trim()}" data-calories="${parseInt(caloriesInput.value) || 0}" data-disponivel="true">
-                            <span>${nameInput.value.trim()} <span class="text-slate-500 text-sm">(${parseInt(caloriesInput.value) || 0} kcal)</span></span>
-                            <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button>
-                        </div>`;
-                    document.getElementById('sabores-list').insertAdjacentHTML('beforeend', newSaborHTML);
-                    nameInput.value = ''; caloriesInput.value = '';
-                };
-            }
-        };
+            document.getElementById('btn-marcar-impresso').addEventListener('click', () => marcarComoImpresso(pedido.id));
+            document.getElementById('btn-imprimir-individual').addEventListener('click', () => gerarComandaIndividual());
+            document.getElementById('btn-fechar-modal-inner').addEventListener('click', fecharModal);
 
-        window.saveMenuItem = async (modalId, categoryId, itemId) => {
-            const form = document.getElementById('menu-item-form');
-            if (!form.nomeItem.value) { alert('O nome do item é obrigatório.'); return; }
-            const data = {
-                nomeItem: form.nomeItem.value,
-                descricaoPorcao: form.descricaoPorcao.value,
-                emoji: form.emoji.value,
-                disponivel: form.disponivel.checked,
-                calorias: parseInt(form.calorias.value) || 0
-            };
-
-            let itemRef;
-            if (itemId) {
-                itemRef = db.collection('cardapio').doc(categoryId).collection('itens').doc(itemId);
-            } else {
-                itemRef = db.collection('cardapio').doc(categoryId).collection('itens').doc();
-                const itemsSnapshot = await db.collection('cardapio').doc(categoryId).collection('itens').get();
-                data.posicao = itemsSnapshot.size;
-            }
+        }
+        
+        function fecharModal() {
+            modal.classList.add('hidden');
+        }
+        
+        async function marcarComoImpresso(id) {
             try {
-                const batch = db.batch();
-                batch.set(itemRef, data, { merge: true });
-                if (document.getElementById('sabores-section')) {
-                    const existingSaboresSnapshot = await itemRef.collection('sabores').get();
-                    const existingSaboresIds = existingSaboresSnapshot.docs.map(doc => doc.id);
-                    const currentSaboresElements = Array.from(document.querySelectorAll('.sabor-item'));
-                    const currentSaboresOnUI_Ids = currentSaboresElements.map(el => el.dataset.id).filter(Boolean);
-                    
-                    const saboresToDelete = existingSaboresIds.filter(id => !currentSaboresOnUI_Ids.includes(id));
-                    saboresToDelete.forEach(id => batch.delete(itemRef.collection('sabores').doc(id)));
-
-                    currentSaboresElements.forEach(el => {
-                        const saborData = { 
-                            nomeSabor: el.dataset.name, 
-                            calorias: parseInt(el.dataset.calories) || 0,
-                            disponivel: el.dataset.disponivel === 'true'
-                        };
-                        const saborRef = el.dataset.id ? itemRef.collection('sabores').doc(el.dataset.id) : itemRef.collection('sabores').doc();
-                        batch.set(saborRef, saborData, { merge: true });
-                    });
-                }
-                await batch.commit();
-                alert('Item salvo com sucesso!');
-                closeModal(modalId);
+                const pedidoRef = doc(db, "pedidosCafe", id);
+                await updateDoc(pedidoRef, { impresso: true });
+                alert('Pedido marcado como impresso!');
+                fecharModal();
             } catch (error) {
-                console.error("Error saving menu item:", error);
-                alert("Erro ao salvar o item.");
+                console.error("Erro ao marcar como impresso: ", error);
+                alert('Ocorreu um erro. Tente novamente.');
             }
-        };
+        }
 
-        window.deleteMenuItem = (categoryId, itemId) => {
-            showConfirmModal('Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.', async () => {
-                try {
-                    const itemRef = db.collection('cardapio').doc(categoryId).collection('itens').doc(itemId);
-                    const batch = db.batch();
-                    const saboresSnapshot = await itemRef.collection('sabores').get();
-                    saboresSnapshot.forEach(doc => batch.delete(doc.ref));
-                    batch.delete(itemRef);
-                    await batch.commit();
-                    alert('Item excluído com sucesso!');
-                } catch (error) {
-                    console.error("Error deleting menu item:", error);
-                    alert("Erro ao excluir o item.");
+        // --- MELHORIA: Comanda Geral com resumo e totalização de itens ---
+        function gerarComandaGeral() {
+            const pedidosNovos = pedidosData.filter(p => !p.impresso);
+            if (pedidosNovos.length === 0) {
+                alert("Não há pedidos novos para imprimir.");
+                return;
+            }
+
+            const cabanasComPedidos = new Set(pedidosNovos.map(p => p.numeroCabana));
+            const cabanasArray = [...cabanasComPedidos].sort((a, b) => a - b);
+
+            let resumoHtml = `
+                <div class="resumo">
+                    <h2>Resumo de Pedidos Novos</h2>
+                    <p><strong>Total de cabanas com pedidos:</strong> ${cabanasArray.length}</p>
+                    <p><strong>Cabanas:</strong> ${cabanasArray.join(', ')}</p>
+                </div>
+                <hr style="margin: 20px 0; border-style: dashed;">
+            `;
+
+            const todosItens = {};
+            pedidosNovos.forEach(pedido => {
+                (pedido.itens || []).forEach(item => {
+                    const chave = `${getCategory(item.name)}|${item.name}`;
+                    if (!todosItens[chave]) {
+                        todosItens[chave] = 0;
+                    }
+                    todosItens[chave] += item.quantity;
+                });
+            });
+            
+            const itensAgrupados = {};
+            Object.entries(todosItens).forEach(([chave, quantidade]) => {
+                const [categoria, nome] = chave.split('|');
+                if(!itensAgrupados[categoria]) {
+                    itensAgrupados[categoria] = [];
+                }
+                itensAgrupados[categoria].push({name: nome, quantity: quantidade});
+            });
+
+
+            let itensHtml = '<h2>Total de Itens</h2>';
+            categoryOrder.forEach(cat => {
+                if(itensAgrupados[cat]) {
+                    itensHtml += `<div class="item-categoria"><h4>${cat}</h4>`;
+                    itensAgrupados[cat].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+                         itensHtml += `<p>${item.name}: <strong>${item.quantity}x</strong></p>`;
+                    });
+                    itensHtml += `</div>`;
                 }
             });
-        };
 
+            const comandaFinalHtml = `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h1>Comanda Geral - ${new Date().toLocaleString('pt-BR')}</h1>
+                    ${resumoHtml}
+                    ${itensHtml}
+                </div>
+            `;
+            
+            document.getElementById('print-area').innerHTML = comandaFinalHtml;
+            window.print();
+        }
+
+        function gerarComandaIndividual() {
+            const conteudo = document.getElementById('comanda-individual-content').innerHTML;
+            document.getElementById('print-area').innerHTML = `<div style="font-family: Arial, sans-serif; padding: 20px;">${conteudo}</div>`;
+            window.print();
+        }
+
+        // --- Event Listeners ---
+        document.getElementById('btn-comanda-geral').addEventListener('click', gerarComandaGeral);
+        document.getElementById('btn-fechar-modal').addEventListener('click', fecharModal);
+        
+        pedidosContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn-detalhes')) {
+                const pedidoId = e.target.getAttribute('data-id');
+                const pedido = pedidosData.find(p => p.id === pedidoId);
+                if (pedido) {
+                    abrirModalDetalhes(pedido);
+                }
+            }
+        });
     </script>
 </body>
 </html>
