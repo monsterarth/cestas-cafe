@@ -9,8 +9,7 @@ interface OrderSidebarProps {
 }
 
 
-export function OrderSidebar({ orderState, hotDishes, accompaniments }: OrderSidebarProps) {
-  const calculateTotalCalories = () => {
+export function OrderSidebar({ orderState, hotDishes, accompaniments, appConfig }: OrderSidebarProps) {  const calculateTotalCalories = () => {
     let totalCalories = 0
 
     // Calorias dos pratos quentes
