@@ -68,6 +68,26 @@ export default function Home() {
     }))
   }
 
+<<<<<<< HEAD
+  const handleSelectNoHotDish = (personIndex: number) => {
+    setOrderState((prev) => {
+      const personToUpdate = prev.persons[personIndex]
+      // Se o usuário já tinha optado por "não quero", a seleção é resetada (volta para null).
+      // Caso contrário, a seleção é marcada como "NONE".
+      const newHotDishState =
+        personToUpdate?.hotDish?.typeId === "NONE" ? null : { typeId: "NONE", flavorId: "NONE" }
+
+      return {
+        ...prev,
+        persons: prev.persons.map((person, index) =>
+          index === personIndex ? { ...person, hotDish: newHotDishState } : person,
+        ),
+      }
+    })
+  }
+
+=======
+>>>>>>> 1d22fe5cf22b4c09aa815806604097a5880b7d00
   const handleNotesChange = (notes: string) => {
     setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
   }

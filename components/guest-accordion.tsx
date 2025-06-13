@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, User, Check, X } from "lucide-react"
+import { ChevronDown, User, Check, X, ArrowLeft } from "lucide-react"
 import type { HotDish, Person } from "@/types"
 import { Button } from "@/components/ui/button"
 
@@ -31,9 +31,10 @@ export function GuestAccordion({
     onSelectDish(personIndex, dishId)
   }
 
-  // Função para fechar o acordeão atual e abrir o próximo
-  const openNextAccordion = (personIndex: number) => {
+  // Função para fechar o acordeão atual, abrir o próximo e rolar para o topo
+  const advanceToNext = (personIndex: number) => {
     setTimeout(() => {
+      // Abre o próximo acordeão
       setOpenAccordions((prev) => {
         const accordionsSemOAtual = prev.filter((i) => i !== personIndex)
         if (personIndex < persons.length - 1) {
@@ -41,17 +42,28 @@ export function GuestAccordion({
         }
         return accordionsSemOAtual
       })
+      // Rola a página para o topo
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      })
     }, 300)
   }
 
   const handleSelectFlavor = (personIndex: number, flavorId: string) => {
     onSelectFlavor(personIndex, flavorId)
-    openNextAccordion(personIndex)
+    advanceToNext(personIndex)
   }
 
-  const handleNoDishSelected = (personIndex: number) => {
+  const handleNoDishToggle = (personIndex: number) => {
+    const isUndoing = persons[personIndex]?.hotDish?.typeId === "NONE"
     onSelectNoHotDish(personIndex)
-    openNextAccordion(personIndex)
+
+    // A rolagem só acontece se o usuário estiver optando por NÃO querer o prato.
+    // Se ele estiver revertendo a escolha, a tela permanece no lugar.
+    if (!isUndoing) {
+      advanceToNext(personIndex)
+    }
   }
 
   return (
@@ -115,14 +127,31 @@ export function GuestAccordion({
             >
               <div className="overflow-hidden space-y-6 md:space-y-8 p-4 md:p-6 pt-4 border-t border-stone-200">
                 <div className="border-b border-stone-200 pb-6 mb-6">
-                  <p className="text-sm text-stone-600 mb-2">Se preferir, pule a escolha do prato quente:</p>
+                  <p className="text-sm text-stone-600 mb-2">
+                    {noDishSelected
+                      ? "Você optou por não receber um prato quente. Deseja escolher um agora?"
+                      : "Se preferir, pule a escolha do prato quente:"}
+                  </p>
                   <Button
-                    variant={noDishSelected ? "destructive" : "outline"}
-                    className={noDishSelected ? "bg-stone-600 hover:bg-stone-700 w-full" : "border-[#ADA192] w-full"}
-                    onClick={() => handleNoDishSelected(index)}
+                    variant={"outline"}
+                    className={
+                      noDishSelected
+                        ? "border-amber-600 text-amber-800 hover:bg-amber-50 hover:text-amber-900 w-full"
+                        : "border-[#ADA192] w-full"
+                    }
+                    onClick={() => handleNoDishToggle(index)}
                   >
-                    <X className="mr-2 h-4 w-4" />
-                    Não, obrigado. Não quero prato quente.
+                    {noDishSelected ? (
+                      <>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Mudei de ideia, quero escolher um prato
+                      </>
+                    ) : (
+                      <>
+                        <X className="mr-2 h-4 w-4" />
+                        Não quero prato quente
+                      </>
+                    )}
                   </Button>
                 </div>
 
