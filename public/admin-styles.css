@@ -23,35 +23,47 @@ body { font-family: 'Inter', sans-serif; background-color: var(--branco-esverdea
 
 /* Estilos de Impressão */
 @media print {
-    body * { visibility: hidden; }
-    #print-area, #print-area * { visibility: visible; }
+    /* Define o tamanho da página e remove margens que causam páginas em branco */
+    @page {
+        size: auto;   /* O tamanho da página se ajusta ao conteúdo */
+        margin: 4mm;  /* Define uma margem pequena para a bobina */
+    }
+
+    body {
+        margin: 0;
+    }
+
+    body * {
+        visibility: hidden;
+    }
+
+    #print-area, #print-area * {
+        visibility: visible;
+    }
+
     #print-area {
         position: absolute;
         left: 0;
         top: 0;
         width: 100%;
-        padding: 0; /* Reduz o padding para a bobina */
-        font-size: 11px;
-        color: black;
     }
 
-    /* REGRAS NOVAS PARA A COMANDA TÉRMICA */
+    /* REGRAS ATUALIZADAS PARA A COMANDA TÉRMICA */
     .receipt-format {
-        font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada para melhor alinhamento */
-        width: 80mm; /* Largura comum de bobina. Ajuste se necessário (ex: 58mm) */
+        font-family: 'Courier New', Courier, monospace;
+        width: 80mm; 
         max-width: 80mm;
-        font-size: 13px; /* Fonte menor para caber mais informação */
-        line-height: 1.4;
+        font-size: 12px;
+        font-weight: bold; /* <<< DEIXA TODA A FONTE EM NEGRITO >>> */
+        line-height: 1.5;  /* Melhora o espaçamento entre linhas */
+        color: black;
     }
     .receipt-format p, .receipt-format span, .receipt-format div {
-        margin: 0 0 2px 0;
-        padding: 0;
-        word-wrap: break-word; /* Quebra palavras longas para não estourar a largura */
+        word-wrap: break-word;
         text-align: left;
     }
     .receipt-format h3, .receipt-format h4, .receipt-format h5 {
-        text-align: center;
-        margin-bottom: 1px;
+        margin-bottom: 5px;
     }
     .receipt-format hr {
         border: 0;
@@ -59,8 +71,16 @@ body { font-family: 'Inter', sans-serif; background-color: var(--branco-esverdea
         margin: 10px 0;
         -webkit-print-color-adjust: exact;
     }
-    .no-print, .no-print * { display: none !important; }
-    .page-break { page-break-after: always; }
-    h1, h2, h3, h4 { font-weight: bold; }
-    .comanda-header { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; }
+    /* FIM DAS REGRAS ATUALIZADAS */
+
+    .no-print, .no-print * {
+        display: none !important;
+    }
+    .page-break {
+        page-break-after: always;
+    }
+    .comanda-header {
+        background-color: #f3f4f6 !important;
+        -webkit-print-color-adjust: exact;
+    }
 }

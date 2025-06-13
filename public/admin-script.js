@@ -868,8 +868,8 @@ const printOrderReceipt = async (orderId) => {
                 </div>
             ` : ''}
 
-             <hr>
-             <p style="text-align: center; font-size: 0.8em; margin-top: 15px;">.</p>
+              <hr>
+             <p style="text-align: center; font-size: 0.8em; margin: 5px 0 0 0;">.</p>
         </div>
     `;
     
