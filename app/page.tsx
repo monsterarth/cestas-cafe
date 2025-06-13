@@ -20,7 +20,7 @@ import { StepReview } from "@/components/step-review"
 import { StepSuccess } from "@/components/step-success"
 
 export default function Home() {
-  const { hotDishes, cabinData, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData()
+  const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData()
   const [currentStep, setCurrentStep] = useState(1)
   const [orderState, setOrderState] = useState<OrderState>({
     guestInfo: {
@@ -70,6 +70,21 @@ export default function Home() {
   }
 
   const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number) => {
+    const categoryName = accompaniments[categoryId]?.name.toLowerCase();
+
+    // Regra para limitar pães
+    if (categoryName === 'pães' && change > 0) {
+        const paoCategory = accompaniments[categoryId];
+        const currentPaoCount = paoCategory.items.reduce((total, currentItem) => {
+            return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0);
+        }, 0);
+
+        if (currentPaoCount >= orderState.guestInfo.people) {
+            alert(`Você pode selecionar no máximo ${orderState.guestInfo.people} opção(ões) de pães para ${orderState.guestInfo.people} hóspede(s).`);
+            return;
+        }
+    }
+
     setOrderState((prev) => {
       const newAccompaniments = { ...prev.accompaniments }
 
@@ -81,7 +96,6 @@ export default function Home() {
       let newCount = currentCount + change
 
       if (newCount < 0) newCount = 0
-      if (newCount > (prev.guestInfo.people || 1)) newCount = prev.guestInfo.people || 1
 
       if (newCount === 0) {
         delete newAccompaniments[categoryId][itemId]
@@ -128,7 +142,7 @@ export default function Home() {
             {currentStep === 2 && !orderSubmitted && (
               <StepDetails
                 orderState={orderState}
-                cabinData={cabinData}
+                cabins={cabins}
                 deliveryTimes={deliveryTimes}
                 onUpdateOrderState={updateOrderState}
                 onNext={() => setCurrentStep(3)}
