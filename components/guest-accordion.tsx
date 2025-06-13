@@ -31,10 +31,9 @@ export function GuestAccordion({
     onSelectDish(personIndex, dishId)
   }
 
-  const scrollAndOpenNext = (personIndex: number) => {
-    // Após 300ms para o usuário ver a seleção...
+  // Função para fechar o acordeão atual e abrir o próximo
+  const openNextAccordion = (personIndex: number) => {
     setTimeout(() => {
-      // 1. Abre o acordeão do próximo hóspede
       setOpenAccordions((prev) => {
         const accordionsSemOAtual = prev.filter((i) => i !== personIndex)
         if (personIndex < persons.length - 1) {
@@ -42,23 +41,17 @@ export function GuestAccordion({
         }
         return accordionsSemOAtual
       })
-
-      // 2. Rola a página para o topo
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      })
     }, 300)
   }
 
   const handleSelectFlavor = (personIndex: number, flavorId: string) => {
     onSelectFlavor(personIndex, flavorId)
-    scrollAndOpenNext(personIndex)
+    openNextAccordion(personIndex)
   }
 
   const handleNoDishSelected = (personIndex: number) => {
     onSelectNoHotDish(personIndex)
-    scrollAndOpenNext(personIndex)
+    openNextAccordion(personIndex)
   }
 
   return (
