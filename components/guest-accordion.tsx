@@ -93,9 +93,9 @@ export function GuestAccordion({
 
             <div
               className={`
-                overflow-hidden transition-all duration-300 ease-in-out
-                ${isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"}
-              `}
+              grid transition-all duration-300 ease-in-out
+            ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}
+            `}
             >
               <div className="space-y-6 md:space-y-8 p-4 md:p-6 pt-0 border-t border-stone-200">
                 <div>
