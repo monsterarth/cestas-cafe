@@ -9,7 +9,6 @@ interface GuestAccordionProps {
   hotDishes: HotDish[]
   onSelectDish: (personIndex: number, dishId: string) => void
   onSelectFlavor: (personIndex: number, flavorId: string) => void
-  onUpdateNotes: (personIndex: number, notes: string) => void
 }
 
 export function GuestAccordion({
@@ -17,7 +16,6 @@ export function GuestAccordion({
   hotDishes,
   onSelectDish,
   onSelectFlavor,
-  onUpdateNotes,
 }: GuestAccordionProps) {
   const [openAccordions, setOpenAccordions] = useState<number[]>([0])
 
@@ -32,10 +30,22 @@ export function GuestAccordion({
 
   const handleSelectFlavor = (personIndex: number, flavorId: string) => {
     onSelectFlavor(personIndex, flavorId)
-    // Fecha o acordeão automaticamente após seleção do sabor
+
+    // Fecha o acordeão atual e abre o próximo, se houver
     setTimeout(() => {
-      setOpenAccordions((prev) => prev.filter((i) => i !== personIndex))
-    }, 800)
+      setOpenAccordions((prev) => {
+        // Remove o atual da lista de abertos
+        const accordionsSemOAtual = prev.filter((i) => i !== personIndex)
+
+        // Se não for o último hóspede, adiciona o próximo à lista de abertos
+        if (personIndex < persons.length - 1) {
+          return [...accordionsSemOAtual, personIndex + 1]
+        }
+
+        // Se for o último, apenas retorna a lista sem o atual (todos fechados)
+        return accordionsSemOAtual
+      })
+    }, 300) // Tempo de espera para a transição
   }
 
   return (
@@ -93,11 +103,11 @@ export function GuestAccordion({
 
             <div
               className={`
-              grid transition-all duration-300 ease-in-out
-            ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}
-            `}
+                grid transition-all duration-300 ease-in-out
+                ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}
+              `}
             >
-              <div className="space-y-6 md:space-y-8 p-4 md:p-6 pt-0 border-t border-stone-200">
+              <div className="overflow-hidden space-y-6 md:space-y-8 p-4 md:p-6 pt-4 border-t border-stone-200">
                 <div>
                   <label className="text-base md:text-lg font-bold text-stone-800 mb-4 md:mb-6 block flex items-center gap-2">
                     <span className="w-5 h-5 md:w-6 md:h-6 bg-[#97A25F] text-white rounded-full flex items-center justify-center text-xs md:text-sm font-bold">
@@ -187,22 +197,6 @@ export function GuestAccordion({
                     </div>
                   </div>
                 )}
-
-                <div>
-                  <label className="text-base md:text-lg font-bold text-stone-800 mb-2 block flex items-center gap-2">
-                    <span className="w-5 h-5 md:w-6 md:h-6 bg-[#97A25F] text-white rounded-full flex items-center justify-center text-xs md:text-sm font-bold">
-                      3
-                    </span>
-                    Observações (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={person.notes || ""}
-                    onChange={(e) => onUpdateNotes(index, e.target.value)}
-                    className="w-full p-2 border border-[#ADA192] rounded-lg bg-[#F7FDF2] focus:border-[#97A25F] focus:outline-none"
-                    placeholder="Ex: sem cebola, ovo bem passado..."
-                  />
-                </div>
               </div>
             </div>
           </div>
