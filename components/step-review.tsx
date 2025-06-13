@@ -56,10 +56,12 @@ export function StepReview({
       return false
     }
 
-    // Verifica se todos os hóspedes selecionaram pratos
-    const allHotDishesSelected = orderState.persons.every((p) => p.hotDish?.typeId && p.hotDish?.flavorId)
+    // Verifica se todos os hóspedes fizeram uma escolha (prato ou nenhum prato)
+    const allHotDishesSelected = orderState.persons.every(
+      (p) => (p.hotDish?.typeId && p.hotDish?.flavorId) || p.hotDish?.typeId === "NONE",
+    )
     if (!allHotDishesSelected) {
-      setError("Todos os hóspedes devem selecionar um prato quente e sabor.")
+      setError("Todos os hóspedes devem escolher um prato quente ou selecionar a opção 'Não quero prato quente'.")
       onNavigateToStep(3)
       return false
     }
@@ -173,14 +175,21 @@ export function StepReview({
             <strong className="text-stone-700">Pratos Quentes:</strong>
             <div className="ml-4 space-y-2 mt-2">
               {orderState.persons.map((person) => {
-                const dish = person.hotDish ? hotDishes.find((d) => d.id === person.hotDish?.typeId) : null
-                const flavor = dish ? dish.sabores.find((f) => f.id === person.hotDish?.flavorId) : null
-                const selection = flavor ? `${dish.nomeItem} - ${flavor.nomeSabor}` : "Não selecionado."
+                let selectionText = "Não selecionado."
+                if (person.hotDish?.typeId === "NONE") {
+                  selectionText = "Nenhum prato quente."
+                } else if (person.hotDish?.typeId && person.hotDish?.flavorId) {
+                  const dish = hotDishes.find((d) => d.id === person.hotDish.typeId)
+                  const flavor = dish?.sabores.find((f) => f.id === person.hotDish.flavorId)
+                  if (dish && flavor) {
+                    selectionText = `${dish.nomeItem} - ${flavor.nomeSabor}`
+                  }
+                }
 
                 return (
                   <div key={person.id} className="text-sm">
-                    <p className={selection === "Não selecionado." ? "text-red-600" : ""}>
-                      <strong>Hóspede {person.id}:</strong> {selection}
+                    <p className={selectionText === "Não selecionado." ? "text-red-600" : ""}>
+                      <strong>Hóspede {person.id}:</strong> {selectionText}
                     </p>
                     {person.notes && <p className="ml-4 text-xs italic text-stone-600">Obs: {person.notes}</p>}
                   </div>

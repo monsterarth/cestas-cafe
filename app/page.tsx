@@ -68,6 +68,24 @@ export default function Home() {
     }))
   }
 
+  const handleSelectNoHotDish = (personIndex: number) => {
+    setOrderState((prev) => ({
+      ...prev,
+      persons: prev.persons.map((person, index) =>
+        index === personIndex ? { ...person, hotDish: { typeId: "NONE", flavorId: "NONE" } } : person,
+      ),
+    }))
+  }
+
+  const handleSelectNoHotDish = (personIndex: number) => {
+    setOrderState((prev) => ({
+      ...prev,
+      persons: prev.persons.map((person, index) =>
+        index === personIndex ? { ...person, hotDish: { typeId: "NONE", flavorId: "NONE" } } : person,
+      ),
+    }))
+  }
+
   const handleNotesChange = (notes: string) => {
     setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
   }
@@ -174,6 +192,7 @@ export default function Home() {
                     onSelectDish={handleSelectDish}
                     onSelectFlavor={handleSelectFlavor}
                     onUpdateNotes={handleUpdateNotes}
+                    onSelectNoHotDish={handleSelectNoHotDish}
                   />
 
                   <div className="pt-6 md:pt-8 border-t border-[#ADA192]">

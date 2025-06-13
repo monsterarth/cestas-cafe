@@ -118,16 +118,27 @@ export function OrderSidebar({ orderState, hotDishes, accompaniments, appConfig 
               <div>
                 <h5 className="font-semibold text-stone-600 mb-2">Pratos Quentes</h5>
                 {orderState.persons.map((person) => {
-                  if (!person.hotDish?.typeId || !person.hotDish?.flavorId) return null
+                  if (!person.hotDish?.typeId) return null
 
-                  const dish = hotDishes.find((d) => d.id === person.hotDish?.typeId)
-                  const flavor = dish?.sabores?.find((f) => f.id === person.hotDish?.flavorId)
+                  if (person.hotDish.typeId === "NONE") {
+                    return (
+                      <div key={person.id} className="text-sm p-3 bg-stone-100 border border-stone-200 rounded-lg">
+                        <strong>Hóspede {person.id}:</strong> Sem prato quente
+                      </div>
+                    )
+                  }
 
-                  return (
-                    <div key={person.id} className="text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <strong>Hóspede {person.id}:</strong> {dish?.emoji || ""} {flavor?.nomeSabor || ""}
-                    </div>
-                  )
+                  if (person.hotDish.flavorId) {
+                    const dish = hotDishes.find((d) => d.id === person.hotDish.typeId)
+                    const flavor = dish?.sabores?.find((f) => f.id === person.hotDish.flavorId)
+                    return (
+                      <div key={person.id} className="text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <strong>Hóspede {person.id}:</strong> {dish?.emoji || ""} {flavor?.nomeSabor || ""}
+                      </div>
+                    )
+                  }
+
+                  return null
                 })}
               </div>
             )}
