@@ -23,7 +23,7 @@ import { StepSuccess } from "@/components/step-success"
 export default function Home() {
   // A linha abaixo é crucial. Garante que `appConfig` seja criado corretamente.
   const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData()
-  
+
   const [currentStep, setCurrentStep] = useState(1)
   const [orderState, setOrderState] = useState<OrderState>({
     guestInfo: {
@@ -68,42 +68,26 @@ export default function Home() {
     }))
   }
 
-  const handleSelectNoHotDish = (personIndex: number) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) =>
-        index === personIndex ? { ...person, hotDish: { typeId: "NONE", flavorId: "NONE" } } : person,
-      ),
-    }))
-  }
-
-  const handleSelectNoHotDish = (personIndex: number) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) =>
-        index === personIndex ? { ...person, hotDish: { typeId: "NONE", flavorId: "NONE" } } : person,
-      ),
-    }))
-  }
-
   const handleNotesChange = (notes: string) => {
     setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
   }
 
   const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number) => {
-    const categoryName = accompaniments[categoryId]?.name.toLowerCase();
-    const isLimitedCategory = categoryName === 'pães' || categoryName === 'bolos';
+    const categoryName = accompaniments[categoryId]?.name.toLowerCase()
+    const isLimitedCategory = categoryName === "pães" || categoryName === "bolos"
 
     if (isLimitedCategory && change > 0) {
-        const categoryData = accompaniments[categoryId];
-        const currentCountInCategory = categoryData.items.reduce((total, currentItem) => {
-            return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0);
-        }, 0);
+      const categoryData = accompaniments[categoryId]
+      const currentCountInCategory = categoryData.items.reduce((total, currentItem) => {
+        return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0)
+      }, 0)
 
-        if (currentCountInCategory >= orderState.guestInfo.people) {
-            alert(`Você pode selecionar no máximo ${orderState.guestInfo.people} opção(ões) de ${categoryName} para ${orderState.guestInfo.people} hóspede(s).`);
-            return;
-        }
+      if (currentCountInCategory >= orderState.guestInfo.people) {
+        alert(
+          `Você pode selecionar no máximo ${orderState.guestInfo.people} opção(ões) de ${categoryName} para ${orderState.guestInfo.people} hóspede(s).`,
+        )
+        return
+      }
     }
 
     setOrderState((prev) => {
@@ -127,6 +111,15 @@ export default function Home() {
     setOrderState((prev) => ({ ...prev, specialRequests: requests }))
   }
 
+  const handleSelectNoHotDish = (personIndex: number) => {
+    setOrderState((prev) => ({
+      ...prev,
+      persons: prev.persons.map((person, index) =>
+        index === personIndex ? { ...person, hotDish: { typeId: "NONE", flavorId: "NONE" } } : person,
+      ),
+    }))
+  }
+
   // Verificações de segurança
   if (loading) {
     return <LoadingScreen />
@@ -142,7 +135,7 @@ export default function Home() {
       </div>
     )
   }
-  
+
   // Guarda de segurança que adicionamos no passo anterior
   if (!appConfig) {
     return <LoadingScreen message="Aguardando configurações..." />
@@ -157,9 +150,7 @@ export default function Home() {
       <main className="container mx-auto p-2 md:p-4 lg:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
           <div className="lg:col-span-2">
-            {currentStep === 1 && !orderSubmitted && (
-              <StepWelcome config={appConfig} onNext={() => setCurrentStep(2)} />
-            )}
+            {currentStep === 1 && !orderSubmitted && <StepWelcome config={appConfig} onNext={() => setCurrentStep(2)} />}
 
             {currentStep === 2 && !orderSubmitted && (
               <StepDetails
