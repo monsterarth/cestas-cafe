@@ -138,7 +138,7 @@
     <!-- Contêiner de Modais -->
     <div id="modal-container" class="no-print"></div>
     <!-- Contêiner de Impressão (oculto) -->
-    <div id="print-area" class="hidden"></div>
+    <div id="print-area"></div>
 
     <!-- Scripts Firebase e Chart.js -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
@@ -541,14 +541,18 @@
                      `).join('')}
                 </div>`;
             
-            document.getElementById('print-area').innerHTML = printHTML;
-            window.print();
+            printElement(printHTML, true);
         }
 
-        function printElement(elementId) {
-            const contentToPrint = document.getElementById(elementId);
-            if (!contentToPrint) return;
-            document.getElementById('print-area').innerHTML = contentToPrint.innerHTML;
+        function printElement(content, isHtmlString = false) {
+            const printArea = document.getElementById('print-area');
+            if (isHtmlString) {
+                printArea.innerHTML = content;
+            } else {
+                const contentToPrint = document.getElementById(content);
+                if (!contentToPrint) return;
+                printArea.innerHTML = contentToPrint.innerHTML;
+            }
             window.print();
         }
 
@@ -734,6 +738,7 @@
                             batch.update(db.collection('cardapio').doc(item.dataset.id), { posicao: index });
                         });
                         await batch.commit();
+                        cacheMenuData();
                     }
                 }));
             }
@@ -747,6 +752,7 @@
                             batch.update(db.collection('cardapio').doc(categoryId).collection('itens').doc(item.dataset.id), { posicao: index });
                         });
                         await batch.commit();
+                        cacheMenuData();
                     }
                 }));
             });
@@ -787,7 +793,8 @@
                     await db.collection('cardapio').add({ nomeCategoria: name, posicao: snapshot.size });
                 }
                 closeModal(modalId);
-                cacheMenuData(); // Atualiza o cache
+                await cacheMenuData();
+                loadMenu();
             } catch (error) {
                 console.error("Error saving category:", error); alert("Erro ao salvar categoria.");
             }
@@ -802,7 +809,8 @@
                     batch.delete(db.collection('cardapio').doc(id));
                     await batch.commit();
                     closeModal(`category-modal-${id}`);
-                    cacheMenuData(); // Atualiza o cache
+                    await cacheMenuData();
+                    loadMenu();
                 } catch (error) {
                     console.error("Error deleting category:", error); alert("Erro ao excluir categoria.");
                 }
@@ -865,7 +873,7 @@
                     const nameInput = document.getElementById('new-sabor-name');
                     const caloriesInput = document.getElementById('new-sabor-calories');
                     if (nameInput.value.trim() === '') return;
-                    const newSaborHTML = `<div class="flex items-center justify-between p-2 bg-gray-100 rounded sabor-item" data-name="${nameInput.value.trim()}" data-calories="${parseInt(caloriesInput.value) || 0}" data-disponivel="true"><span...`;
+                    const newSaborHTML = `<div class="flex items-center justify-between p-2 bg-gray-100 rounded sabor-item" data-name="${nameInput.value.trim()}" data-calories="${parseInt(caloriesInput.value) || 0}" data-disponivel="true"><span>${nameInput.value.trim()} <span class="text-gray-500 text-sm">(${parseInt(caloriesInput.value) || 0} kcal)</span></span><button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button></div>`;
                     document.getElementById('sabores-list').insertAdjacentHTML('beforeend', newSaborHTML);
                     nameInput.value = ''; caloriesInput.value = '';
                 };
@@ -907,7 +915,8 @@
                 }
                 await batch.commit();
                 closeModal(modalId);
-                cacheMenuData(); // Atualiza o cache
+                await cacheMenuData();
+                loadMenu();
             } catch (error) {
                 console.error("Error saving menu item:", error); alert("Erro ao salvar o item.");
             }
@@ -922,7 +931,8 @@
                     saboresSnapshot.forEach(doc => batch.delete(doc.ref));
                     batch.delete(itemRef);
                     await batch.commit();
-                    cacheMenuData(); // Atualiza o cache
+                    await cacheMenuData();
+                    loadMenu();
                 } catch (error) {
                     console.error("Error deleting menu item:", error); alert("Erro ao excluir o item.");
                 }
