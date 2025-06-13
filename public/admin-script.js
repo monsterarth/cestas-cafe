@@ -330,8 +330,7 @@ window.openOrderDetailModal = async (orderId) => {
                     </div>
                     <div class="flex gap-4">
                         <button class="bg-gray-200 hover:bg-gray-300 font-bold py-2 px-4 rounded-lg" onclick="closeModal('${modalId}')">Fechar</button>
-                        <button onclick="printElement('printable-order-${orderId}')" class="bg-[var(--verde-escuro)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Imprimir</button>
-                        <button onclick="updateOrderStatus('${orderId}')" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar</button>
+                        <button onclick="printOrderReceipt('${order.id}')" class="bg-[var(--verde-escuro)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Imprimir Comanda</button>                        <button onclick="updateOrderStatus('${orderId}')" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar</button>
                     </div>
                 </div>
             </div>
@@ -792,6 +791,91 @@ window.deleteMenuItem = (categoryId, itemId) => {
         }
     });
 };
+
+// NOVA FUNÇÃO PARA IMPRESSÃO TÉRMICA
+const printOrderReceipt = async (orderId) => {
+    const doc = await db.collection('pedidos').doc(orderId).get();
+    if (!doc.exists) {
+        alert("Pedido não encontrado.");
+        return;
+    }
+    const order = { id: doc.id, ...doc.data() };
+
+    // Lógica de categorização de itens (reutilizada do modal)
+    const categoryOrder = ["pratos quentes", "bebidas", "pães", "outros"];
+    const categorizedItems = {};
+    categoryOrder.forEach(cat => categorizedItems[cat] = []);
+
+    (order.itensPedido || []).forEach(item => {
+        let foundCategory = false;
+        for (const category of window.menuData) {
+            const categoryName = category.nomeCategoria.toLowerCase();
+            if (category.items.some(menuItem => menuItem.nomeItem.startsWith(item.nomeItem.split(' - ')[0]))) {
+                const targetCategory = categoryOrder.includes(categoryName) ? categoryName : 'outros';
+                categorizedItems[targetCategory].push(item);
+                foundCategory = true;
+                break;
+            }
+        }
+        if (!foundCategory) { categorizedItems['outros'].push(item); }
+    });
+
+    // HTML formatado para impressora térmica (layout de coluna única)
+    const receiptHTML = `
+        <div class="receipt-format">
+            <div style="text-align: center; margin-bottom: 10px;">
+                <h3 style="font-size: 1.2em; font-weight: bold; margin: 0;">FAZENDA DO ROSA</h3>
+                <p style="font-size: 0.9em; margin: 0;">Comanda de Café da Manhã</p>
+            </div>
+            <p><strong>CABANA:</strong> ${order.cabanaNumero}</p>
+            <p><strong>HÓSPEDE:</strong> ${order.hospedeNome}</p>
+            <p><strong>ENTREGA:</strong> ${order.horarioEntrega}</p>
+            <p><strong>PESSOAS:</strong> ${order.numeroPessoas}</p>
+            <p><strong>PEDIDO:</strong> #${order.id.substring(0,6)}</p>
+            <p><strong>DATA:</strong> ${order.timestampPedido?.toDate().toLocaleString('pt-BR')}</p>
+            
+            <hr>
+
+            ${Object.keys(categorizedItems).map(categoryKey => {
+                const items = categorizedItems[categoryKey];
+                if (!items || items.length === 0) return '';
+                return `
+                <div>
+                    <h4 style="font-weight: bold; text-transform: uppercase; margin: 8px 0 4px 0;">-- ${categoryKey.replace(/-/g, ' ')} --</h4>
+                    ${items.map(item => `
+                        <div style="margin-bottom: 2px;">
+                            <span><strong>${item.quantidade}x</strong> ${item.nomeItem}</span>
+                            ${item.observacao ? `<br><span style="padding-left: 15px; font-style: italic;">Obs: ${item.observacao}</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                `;
+            }).join('')}
+
+            ${order.observacoesPratosQuentes ? `
+                <hr>
+                <div>
+                    <h5 style="font-weight: bold; text-transform: uppercase;">Obs. Pratos Quentes</h5>
+                    <p>${order.observacoesPratosQuentes}</p>
+                </div>
+            ` : ''}
+
+            ${order.observacoesGerais ? `
+                <hr>
+                <div>
+                    <h4 style="font-weight: bold; text-transform: uppercase;">Obs. Gerais</h4>
+                    <p>${order.observacoesGerais}</p>
+                </div>
+            ` : ''}
+
+             <hr>
+             <p style="text-align: center; font-size: 0.8em; margin-top: 15px;">.</p>
+        </div>
+    `;
+    
+    printElement(receiptHTML, true);
+};
+
 // Expõe as funções necessárias para o escopo global, permitindo o uso de 'onclick' no HTML.
 window.closeModal = closeModal;
 window.openOrderDetailModal = openOrderDetailModal;
@@ -806,3 +890,5 @@ window.saveMenuItem = saveMenuItem;
 window.deleteMenuItem = deleteMenuItem;
 window.saveAppConfig = saveAppConfig;
 window.saveList = saveList;
+window.printOrderReceipt = printOrderReceipt; // Adiciona a nova função ao escopo global
+window.printOrderReceipt = printOrderReceipt;

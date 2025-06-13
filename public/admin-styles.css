@@ -30,9 +30,34 @@ body { font-family: 'Inter', sans-serif; background-color: var(--branco-esverdea
         left: 0;
         top: 0;
         width: 100%;
-        padding: 10px;
+        padding: 0; /* Reduz o padding para a bobina */
         font-size: 11px;
         color: black;
+    }
+
+    /* REGRAS NOVAS PARA A COMANDA TÉRMICA */
+    .receipt-format {
+        font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada para melhor alinhamento */
+        width: 80mm; /* Largura comum de bobina. Ajuste se necessário (ex: 58mm) */
+        max-width: 80mm;
+        font-size: 10px; /* Fonte menor para caber mais informação */
+        line-height: 1.4;
+    }
+    .receipt-format p, .receipt-format span, .receipt-format div {
+        margin: 0 0 2px 0;
+        padding: 0;
+        word-wrap: break-word; /* Quebra palavras longas para não estourar a largura */
+        text-align: left;
+    }
+    .receipt-format h3, .receipt-format h4, .receipt-format h5 {
+        text-align: center;
+        margin-bottom: 5px;
+    }
+    .receipt-format hr {
+        border: 0;
+        border-top: 1px dashed black;
+        margin: 10px 0;
+        -webkit-print-color-adjust: exact;
     }
     .no-print, .no-print * { display: none !important; }
     .page-break { page-break-after: always; }
