@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth"
-import { collection, getDocs, doc, getDoc } from "firebase/firestore"
+import { collection, getDocs, doc, getDoc, orderBy, query } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import type { HotDish, Cabin, AccompanimentCategory, AppConfig } from "@/types"
 
 export function useFirebaseData() {
   const [hotDishes, setHotDishes] = useState<HotDish[]>([])
-  const [cabinData, setCabinData] = useState<Record<string, Cabin>>({})
+  const [cabins, setCabins] = useState<Cabin[]>([]) // Alterado de Record para Array
   const [deliveryTimes, setDeliveryTimes] = useState<string[]>([])
   const [accompaniments, setAccompaniments] = useState<Record<string, AccompanimentCategory>>({})
   const [appConfig, setAppConfig] = useState<AppConfig>({
@@ -52,14 +52,13 @@ export function useFirebaseData() {
         const configData = configDoc.data()
         setDeliveryTimes(configData.horariosEntrega || [])
 
+        // Mantém a ordem do banco de dados
         if (configData.cabanas && Array.isArray(configData.cabanas)) {
-          const cabins: Record<string, Cabin> = {}
-          configData.cabanas.forEach((c: any) => {
-            if (c.nomeCabana && typeof c.capacidadeMaxima !== "undefined") {
-              cabins[c.nomeCabana] = { name: c.nomeCabana, capacity: c.capacidadeMaxima }
-            }
-          })
-          setCabinData(cabins)
+          const cabinList: Cabin[] = configData.cabanas.map((c: any) => ({
+            name: c.nomeCabana,
+            capacity: c.capacidadeMaxima,
+          }))
+          setCabins(cabinList)
         }
       }
 
@@ -83,14 +82,15 @@ export function useFirebaseData() {
       const dishes: HotDish[] = []
       const accompanimentsData: Record<string, AccompanimentCategory> = {}
 
-      const menuSnapshot = await getDocs(collection(db, "cardapio"))
+      const menuQuery = query(collection(db, "cardapio"), orderBy("posicao"));
+      const menuSnapshot = await getDocs(menuQuery);
 
       for (const categoryDoc of menuSnapshot.docs) {
         const categoryData = categoryDoc.data()
+        const itemsQuery = query(collection(db, "cardapio", categoryDoc.id, "itens"), orderBy("posicao"));
+        const itemsSnapshot = await getDocs(itemsQuery);
 
-        if (categoryDoc.id === "pratos_quentes") {
-          const itemsSnapshot = await getDocs(collection(db, "cardapio", categoryDoc.id, "itens"))
-
+        if (categoryData.nomeCategoria?.toLowerCase().includes('pratos quentes')) {
           for (const itemDoc of itemsSnapshot.docs) {
             const itemData = itemDoc.data()
 
@@ -119,15 +119,14 @@ export function useFirebaseData() {
                   })
                 }
               })
-
-              dishes.push(dish)
+              if (dish.sabores.length > 0) {
+                 dishes.push(dish)
+              }
             }
           }
         } else {
           // Carregar acompanhamentos
-          const itemsSnapshot = await getDocs(collection(db, "cardapio", categoryDoc.id, "itens"))
           const categoryItems: any[] = []
-
           itemsSnapshot.forEach((itemDoc) => {
             const itemData = itemDoc.data()
             if (itemData.disponivel) {
@@ -165,7 +164,7 @@ export function useFirebaseData() {
 
   return {
     hotDishes,
-    cabinData,
+    cabins, // Alterado para a lista
     deliveryTimes,
     accompaniments,
     appConfig,

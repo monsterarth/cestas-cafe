@@ -8,7 +8,7 @@ import type { Cabin, OrderState } from "@/types"
 
 interface StepDetailsProps {
   orderState: OrderState
-  cabinData: Record<string, Cabin>
+  cabins: Cabin[] // Alterado de Record para Array
   deliveryTimes: string[]
   onUpdateOrderState: (updates: Partial<OrderState>) => void
   onNext: () => void
@@ -17,7 +17,7 @@ interface StepDetailsProps {
 
 export function StepDetails({
   orderState,
-  cabinData,
+  cabins,
   deliveryTimes,
   onUpdateOrderState,
   onNext,
@@ -34,7 +34,7 @@ export function StepDetails({
     if (!orderState.guestInfo.cabin) {
       newErrors.cabin = "Selecione a cabana."
     }
-    if (!orderState.guestInfo.people) {
+    if (!orderState.guestInfo.people || orderState.guestInfo.people === 0) {
       newErrors.people = "Selecione o nº de pessoas."
     }
     if (!orderState.guestInfo.time) {
@@ -48,14 +48,15 @@ export function StepDetails({
     }
   }
 
-  const handleCabinChange = (cabin: string) => {
+  const handleCabinChange = (cabinName: string) => {
+    const selectedCabin = cabins.find(c => c.name === cabinName) || null;
     onUpdateOrderState({
       guestInfo: {
         ...orderState.guestInfo,
-        cabin,
-        people: 0, // Reset people count when cabin changes
+        cabin: cabinName,
+        people: 0, 
       },
-      persons: [], // Reset persons array
+      persons: [],
     })
     setErrors({ ...errors, cabin: "" })
   }
@@ -77,7 +78,7 @@ export function StepDetails({
     setErrors({ ...errors, people: "" })
   }
 
-  const selectedCabin = cabinData[orderState.guestInfo.cabin]
+  const selectedCabin = cabins.find(c => c.name === orderState.guestInfo.cabin);
   const maxCapacity = selectedCabin?.capacity || 0
 
   return (
@@ -120,13 +121,11 @@ export function StepDetails({
               }`}
             >
               <option value="">Selecione...</option>
-              {Object.values(cabinData)
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((cabin) => (
-                  <option key={cabin.name} value={cabin.name}>
-                    {cabin.name}
-                  </option>
-                ))}
+              {cabins.map((cabin) => (
+                <option key={cabin.name} value={cabin.name}>
+                  {cabin.name}
+                </option>
+              ))}
             </select>
             {errors.cabin && <p className="text-red-600 text-sm mt-1">{errors.cabin}</p>}
           </div>
