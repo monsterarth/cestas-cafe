@@ -74,15 +74,16 @@ export default function Home() {
 
   const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number) => {
     const categoryName = accompaniments[categoryId]?.name.toLowerCase();
+    const isLimitedCategory = categoryName === 'pães' || categoryName === 'bolos';
 
-    if (categoryName === 'pães' && change > 0) {
-        const paoCategory = accompaniments[categoryId];
-        const currentPaoCount = paoCategory.items.reduce((total, currentItem) => {
+    if (isLimitedCategory && change > 0) {
+        const categoryData = accompaniments[categoryId];
+        const currentCountInCategory = categoryData.items.reduce((total, currentItem) => {
             return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0);
         }, 0);
 
-        if (currentPaoCount >= orderState.guestInfo.people) {
-            alert(`Você pode selecionar no máximo ${orderState.guestInfo.people} opção(ões) de pães para ${orderState.guestInfo.people} hóspede(s).`);
+        if (currentCountInCategory >= orderState.guestInfo.people) {
+            alert(`Você pode selecionar no máximo ${orderState.guestInfo.people} opção(ões) de ${categoryName} para ${orderState.guestInfo.people} hóspede(s).`);
             return;
         }
     }
