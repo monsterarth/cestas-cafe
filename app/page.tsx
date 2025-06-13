@@ -68,23 +68,6 @@ export default function Home() {
     }))
   }
 
-  const handleSelectNoHotDish = (personIndex: number) => {
-    setOrderState((prev) => {
-      const personToUpdate = prev.persons[personIndex]
-      // Se o usuário já tinha optado por "não quero", a seleção é resetada (volta para null).
-      // Caso contrário, a seleção é marcada como "NONE".
-      const newHotDishState =
-        personToUpdate?.hotDish?.typeId === "NONE" ? null : { typeId: "NONE", flavorId: "NONE" }
-
-      return {
-        ...prev,
-        persons: prev.persons.map((person, index) =>
-          index === personIndex ? { ...person, hotDish: newHotDishState } : person,
-        ),
-      }
-    })
-  }
-
   const handleNotesChange = (notes: string) => {
     setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
   }
@@ -129,12 +112,20 @@ export default function Home() {
   }
 
   const handleSelectNoHotDish = (personIndex: number) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) =>
-        index === personIndex ? { ...person, hotDish: { typeId: "NONE", flavorId: "NONE" } } : person,
-      ),
-    }))
+    setOrderState((prev) => {
+      const personToUpdate = prev.persons[personIndex]
+      // Se o usuário já tinha optado por "não quero", a seleção é resetada (volta para null).
+      // Caso contrário, a seleção é marcada como "NONE".
+      const newHotDishState =
+        personToUpdate?.hotDish?.typeId === "NONE" ? null : { typeId: "NONE", flavorId: "NONE" }
+
+      return {
+        ...prev,
+        persons: prev.persons.map((person, index) =>
+          index === personIndex ? { ...person, hotDish: newHotDishState } : person,
+        ),
+      }
+    })
   }
 
   // Verificações de segurança
@@ -271,7 +262,12 @@ export default function Home() {
 
           {!orderSubmitted && (
             <div className="hidden lg:block lg:col-span-1">
-              <OrderSidebar orderState={orderState} hotDishes={hotDishes} accompaniments={accompaniments} appConfig={appConfig} />
+              <OrderSidebar
+                orderState={orderState}
+                hotDishes={hotDishes}
+                accompaniments={accompaniments}
+                appConfig={appConfig}
+              />
             </div>
           )}
         </div>
