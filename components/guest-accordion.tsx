@@ -32,8 +32,9 @@ export function GuestAccordion({
   const handleSelectFlavor = (personIndex: number, flavorId: string) => {
     onSelectFlavor(personIndex, flavorId)
 
+    // O primeiro timeout dá tempo para o React começar a atualizar a UI
     setTimeout(() => {
-      // Abre o próximo acordeão e fecha o atual
+      // Atualiza o estado para abrir o próximo acordeão e fechar o atual
       setOpenAccordions((prev) => {
         const accordionsSemOAtual = prev.filter((i) => i !== personIndex)
         if (personIndex < persons.length - 1) {
@@ -42,17 +43,20 @@ export function GuestAccordion({
         return accordionsSemOAtual
       })
 
-      // Rola a página para o próximo hóspede
-      if (personIndex < persons.length - 1) {
-        const nextAccordionEl = accordionRefs.current[personIndex + 1]
-        if (nextAccordionEl) {
-          // A opção 'center' é mais robusta contra headers fixos
-          nextAccordionEl.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          })
+      // O segundo timeout (com delay zero) garante que a rolagem aconteça
+      // depois que o navegador já processou a atualização da UI, evitando
+      // que ele role para o lugar errado.
+      setTimeout(() => {
+        if (personIndex < persons.length - 1) {
+          const nextAccordionEl = accordionRefs.current[personIndex + 1]
+          if (nextAccordionEl) {
+            nextAccordionEl.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            })
+          }
         }
-      }
+      }, 0)
     }, 300)
   }
 
