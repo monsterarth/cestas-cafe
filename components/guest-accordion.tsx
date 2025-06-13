@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { ChevronDown, User, Check } from "lucide-react"
 import type { HotDish, Person } from "@/types"
 
@@ -19,7 +19,6 @@ export function GuestAccordion({
   onSelectFlavor,
 }: GuestAccordionProps) {
   const [openAccordions, setOpenAccordions] = useState<number[]>([0])
-  const accordionRefs = useRef<(HTMLDivElement | null)[]>([])
 
   const toggleAccordion = (index: number) => {
     setOpenAccordions((prev) => (prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]))
@@ -32,9 +31,9 @@ export function GuestAccordion({
   const handleSelectFlavor = (personIndex: number, flavorId: string) => {
     onSelectFlavor(personIndex, flavorId)
 
-    // O primeiro timeout dá tempo para o React começar a atualizar a UI
+    // Após 300ms para o usuário ver a seleção...
     setTimeout(() => {
-      // Atualiza o estado para abrir o próximo acordeão e fechar o atual
+      // 1. Abre o acordeão do próximo hóspede
       setOpenAccordions((prev) => {
         const accordionsSemOAtual = prev.filter((i) => i !== personIndex)
         if (personIndex < persons.length - 1) {
@@ -43,20 +42,11 @@ export function GuestAccordion({
         return accordionsSemOAtual
       })
 
-      // O segundo timeout (com delay zero) garante que a rolagem aconteça
-      // depois que o navegador já processou a atualização da UI, evitando
-      // que ele role para o lugar errado.
-      setTimeout(() => {
-        if (personIndex < persons.length - 1) {
-          const nextAccordionEl = accordionRefs.current[personIndex + 1]
-          if (nextAccordionEl) {
-            nextAccordionEl.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-            })
-          }
-        }
-      }, 0)
+      // 2. Rola a página para o topo
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      })
     }, 300)
   }
 
@@ -70,7 +60,6 @@ export function GuestAccordion({
         return (
           <div
             key={person.id}
-            ref={(el) => (accordionRefs.current[index] = el)}
             className={`
               border-2 transition-all duration-200 rounded-lg
               ${isComplete ? "border-green-300 bg-green-50/50" : "border-stone-200 bg-[#F7FDF2]"}
