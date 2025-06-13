@@ -1,7 +1,8 @@
+// app/page.tsx
+
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useFirebaseData } from "@/hooks/use-firebase-data"
 import { LoadingScreen } from "@/components/loading-screen"
@@ -20,7 +21,9 @@ import { StepReview } from "@/components/step-review"
 import { StepSuccess } from "@/components/step-success"
 
 export default function Home() {
+  // A linha abaixo é crucial. Garante que `appConfig` seja criado corretamente.
   const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData()
+  
   const [currentStep, setCurrentStep] = useState(1)
   const [orderState, setOrderState] = useState<OrderState>({
     guestInfo: {
@@ -72,7 +75,6 @@ export default function Home() {
   const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number) => {
     const categoryName = accompaniments[categoryId]?.name.toLowerCase();
 
-    // Regra para limitar pães
     if (categoryName === 'pães' && change > 0) {
         const paoCategory = accompaniments[categoryId];
         const currentPaoCount = paoCategory.items.reduce((total, currentItem) => {
@@ -87,22 +89,17 @@ export default function Home() {
 
     setOrderState((prev) => {
       const newAccompaniments = { ...prev.accompaniments }
-
       if (!newAccompaniments[categoryId]) {
         newAccompaniments[categoryId] = {}
       }
-
       const currentCount = newAccompaniments[categoryId][itemId] || 0
       let newCount = currentCount + change
-
       if (newCount < 0) newCount = 0
-
       if (newCount === 0) {
         delete newAccompaniments[categoryId][itemId]
       } else {
         newAccompaniments[categoryId][itemId] = newCount
       }
-
       return { ...prev, accompaniments: newAccompaniments }
     })
   }
@@ -111,6 +108,7 @@ export default function Home() {
     setOrderState((prev) => ({ ...prev, specialRequests: requests }))
   }
 
+  // Verificações de segurança
   if (loading) {
     return <LoadingScreen />
   }
@@ -124,6 +122,11 @@ export default function Home() {
         </Button>
       </div>
     )
+  }
+  
+  // Guarda de segurança que adicionamos no passo anterior
+  if (!appConfig) {
+    return <LoadingScreen message="Aguardando configurações..." />
   }
 
   return (
@@ -240,10 +243,9 @@ export default function Home() {
 
           {!orderSubmitted && (
             <div className="hidden lg:block lg:col-span-1">
-              <OrderSidebar orderState={orderState} hotDishes={hotDishes} accompaniments={accompaniments} appConfig={appConfig}
-    />
-  </div>
-)}
+              <OrderSidebar orderState={orderState} hotDishes={hotDishes} accompaniments={accompaniments} appConfig={appConfig} />
+            </div>
+          )}
         </div>
       </main>
     </div>
