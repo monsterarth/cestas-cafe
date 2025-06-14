@@ -21,17 +21,11 @@ import { StepReview } from "@/components/step-review"
 import { StepSuccess } from "@/components/step-success"
 
 export default function Home() {
-  // A linha abaixo é crucial. Garante que `appConfig` seja criado corretamente.
-  const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData()
+  const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error, refetch } = useFirebaseData()
 
   const [currentStep, setCurrentStep] = useState(1)
   const [orderState, setOrderState] = useState<OrderState>({
-    guestInfo: {
-      name: "",
-      cabin: "",
-      people: 0,
-      time: "",
-    },
+    guestInfo: { name: "", cabin: "", people: 0, time: "" },
     persons: [],
     accompaniments: {},
     globalHotDishNotes: "",
@@ -71,7 +65,9 @@ export default function Home() {
   const handleNotesChange = (notes: string) => {
     setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
   }
-      setOrderState((prev) => {
+
+  const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number) => {
+    setOrderState((prev) => {
       const newAccompaniments = { ...prev.accompaniments }
       if (!newAccompaniments[categoryId]) {
         newAccompaniments[categoryId] = {}
@@ -79,6 +75,7 @@ export default function Home() {
       const currentCount = newAccompaniments[categoryId][itemId] || 0
       let newCount = currentCount + change
       if (newCount < 0) newCount = 0
+      
       if (newCount === 0) {
         delete newAccompaniments[categoryId][itemId]
       } else {
@@ -95,8 +92,6 @@ export default function Home() {
   const handleSelectNoHotDish = (personIndex: number) => {
     setOrderState((prev) => {
       const personToUpdate = prev.persons[personIndex]
-      // Se o usuário já tinha optado por "não quero", a seleção é resetada (volta para null).
-      // Caso contrário, a seleção é marcada como "NONE".
       const newHotDishState =
         personToUpdate?.hotDish?.typeId === "NONE" ? null : { typeId: "NONE", flavorId: "NONE" }
 
@@ -109,7 +104,8 @@ export default function Home() {
     })
   }
 
-  // Verificações de segurança
+  // --- Renderização ---
+
   if (loading) {
     return <LoadingScreen />
   }
@@ -118,14 +114,13 @@ export default function Home() {
     return (
       <div className="fixed inset-0 flex flex-col justify-center items-center z-50 bg-[#F7FDF2]">
         <p className="text-red-600 p-4 text-center">{error}</p>
-        <Button onClick={() => window.location.reload()} className="mt-4">
+        <Button onClick={() => refetch()} className="mt-4">
           Tentar Novamente
         </Button>
       </div>
     )
   }
-
-  // Guarda de segurança que adicionamos no passo anterior
+  
   if (!appConfig) {
     return <LoadingScreen message="Aguardando configurações..." />
   }
