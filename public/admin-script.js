@@ -23,7 +23,7 @@ window.menuData = []; // Cache do cardápio para categorização rápida
 // --- Funções Utilitárias ---
 window.closeModal = (id) => {
     const modal = document.getElementById(id);
-    if(modal) modal.remove();
+    if (modal) modal.remove();
 }
 
 function showLoader(elementId) {
@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- Inicialização e Navegação do App ---
 async function initializeApp() {
     const sidebarLinks = document.querySelectorAll('.sidebar-link');
-    
+
     function navigateTo(targetId) {
         clearListeners();
         document.querySelectorAll('.content-section').forEach(section => section.style.display = 'none');
@@ -121,14 +121,14 @@ async function initializeApp() {
             }
         });
 
-        switch(targetId) {
+        switch (targetId) {
             case 'dashboard': loadDashboard(); break;
             case 'orders': loadOrders(); break;
             case 'menu': loadMenu(); break;
             case 'settings': loadSettings(); break;
         }
     }
-    
+
     await cacheMenuData();
 
     sidebarLinks.forEach(link => {
@@ -140,63 +140,194 @@ async function initializeApp() {
             });
         }
     });
-    
+
     navigateTo('dashboard');
 }
 
 // --- Cache de Dados do Cardápio ---
 async function cacheMenuData() {
-    // ... (código inalterado)
+    const menuQuery = db.collection('cardapio').orderBy('posicao');
+    const snapshot = await menuQuery.get();
+    const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    const categoriesWithItems = await Promise.all(categories.map(async (cat) => {
+        const itemsQuery = db.collection('cardapio').doc(cat.id).collection('itens').orderBy('posicao');
+        const itemsSnapshot = await itemsQuery.get();
+        const items = itemsSnapshot.docs.map(itemDoc => ({ id: itemDoc.id, ...itemDoc.data() }));
+        return { ...cat, items: items };
+    }));
+
+    window.menuData = categoriesWithItems;
 }
 
 // --- Seção Dashboard ---
 function loadDashboard() {
     showLoader('dashboard');
     const unsubscribe = db.collection('pedidos').orderBy('timestampPedido', 'desc').onSnapshot(snapshot => {
-        const orders = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderDashboard(orders);
     }, error => {
         console.error("Error loading dashboard data:", error);
-        document.getElementById('dashboard').innerHTML = `<p class="text-red-500">Erro ao carregar dados: ${error.message}</p>`;
+        document.getElementById('dashboard').innerHTML = `<p class="text-red-500 p-4"><b>Erro ao carregar dados do dashboard:</b> ${error.message}</p>`;
     });
     activeListeners.push(unsubscribe);
 }
 
 function renderDashboard(orders) {
-    // ... (código inalterado)
+    const newOrders = orders.filter(o => o.status === 'Novo').length;
+    const inPrepOrders = orders.filter(o => o.status === 'Em Preparação').length;
+    const deliveredToday = orders.filter(o => {
+        const orderDate = o.timestampPedido?.toDate();
+        const today = new Date();
+        return o.status === 'Entregue' && orderDate && orderDate.toDateString() === today.toDateString();
+    }).length;
+
+    const recentOpenOrders = orders.filter(o => ['Novo', 'Em Preparação'].includes(o.status)).slice(0, 5);
+
+    const itemCounts = {};
+    orders.forEach(order => {
+        (order.itensPedido || []).forEach(item => {
+            const itemName = item.nomeItem.split(' - ')[0];
+            itemCounts[itemName] = (itemCounts[itemName] || 0) + item.quantidade;
+        });
+    });
+    const topItems = Object.entries(itemCounts).sort(([, a], [, b]) => b - a).slice(0, 5);
+
+    const dashboardHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow border border-[var(--cinza-taupe)]"><h4 class="font-semibold text-[var(--cinza-taupe)]">Novos Pedidos</h4><p class="text-4xl font-bold mt-2">${newOrders}</p></div>
+            <div class="bg-white p-6 rounded-xl shadow border border-[var(--cinza-taupe)]"><h4 class="font-semibold text-[var(--cinza-taupe)]">Em Preparação</h4><p class="text-4xl font-bold mt-2">${inPrepOrders}</p></div>
+            <div class="bg-white p-6 rounded-xl shadow border border-[var(--cinza-taupe)]"><h4 class="font-semibold text-[var(--cinza-taupe)]">Entregues Hoje</h4><p class="text-4xl font-bold mt-2">${deliveredToday}</p></div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow border border-[var(--cinza-taupe)]">
+                <h4 class="text-lg font-bold mb-4">Pedidos em Aberto Recentes</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead><tr class="border-b"><th class="p-3">Hóspede</th><th class="p-3">Cabana</th><th class="p-3">Entrega</th><th class="p-3">Status</th></tr></thead>
+                        <tbody>
+                            ${recentOpenOrders.length > 0 ? recentOpenOrders.map(order => `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="openOrderDetailModal('${order.id}')">
+                                <td class="p-3 font-medium">${order.hospedeNome}</td>
+                                <td class="p-3">${order.cabanaNumero}</td>
+                                <td class="p-3">${order.horarioEntrega}</td>
+                                <td class="p-3"><span class="font-medium px-2.5 py-0.5 rounded-full ${order.status === 'Novo' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${order.status}</span></td>
+                            </tr>`).join('') : '<tr><td colspan="4" class="p-3 text-center text-gray-500">Nenhum pedido em aberto.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow border border-[var(--cinza-taupe)]">
+                <h4 class="text-lg font-bold mb-4">Itens Mais Pedidos</h4>
+                 <canvas id="top-items-chart"></canvas>
+            </div>
+        </div>`;
+    document.getElementById('dashboard').innerHTML = dashboardHTML;
+
+    if (topItems.length > 0) {
+        const ctx = document.getElementById('top-items-chart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: topItems.map(([name]) => name),
+                datasets: [{
+                    label: 'Quantidade',
+                    data: topItems.map(([, qty]) => qty),
+                    backgroundColor: 'rgba(151, 162, 95, 0.6)',
+                    borderColor: 'rgba(151, 162, 95, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+        });
+        activeCharts.push(chart);
+    }
 }
 
-// --- Seção de Pedidos e Impressão ---
+// --- Seção de Pedidos ---
 function loadOrders() {
     showLoader('orders');
     const unsubscribe = db.collection('pedidos').orderBy('timestampPedido', 'desc').onSnapshot(snapshot => {
-        const orders = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderOrders(orders);
     }, error => {
         console.error("Error loading orders:", error);
-        document.getElementById('orders').innerHTML = `<p class="text-red-500">Erro ao carregar pedidos: ${error.message}</p>`;
+        document.getElementById('orders').innerHTML = `<p class="text-red-500 p-4"><b>Erro ao carregar pedidos:</b> ${error.message}</p>`;
     });
     activeListeners.push(unsubscribe);
 }
 
 function renderOrders(orders) {
-    // ... (código inalterado)
+    const statusColors = { 'Novo': 'bg-blue-100 text-blue-800', 'Em Preparação': 'bg-amber-100 text-amber-800', 'Entregue': 'bg-green-100 text-green-800', 'Cancelado': 'bg-red-100 text-red-800' };
+    const ordersHTML = `
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+            <div>
+                <h3 class="text-xl font-semibold">Pedidos Recebidos</h3>
+                <p class="text-[var(--cinza-taupe)] mt-1">A lista é atualizada em tempo real.</p>
+            </div>
+            <button onclick="printOpenOrdersSummary()" class="mt-4 sm:mt-0 bg-white border border-[var(--cinza-taupe)] hover:bg-gray-50 font-bold py-2 px-4 rounded-lg flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm7-8a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                Imprimir Resumo da Cozinha
+            </button>
+        </div>
+        <div class="bg-white p-2 sm:p-4 rounded-xl shadow-sm border border-[var(--cinza-taupe)]">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead><tr class="border-b bg-gray-50"><th class="p-3">Data/Hora</th><th class="p-3">Cabana</th><th class="p-3">Hóspede</th><th class="p-3">Entrega</th><th class="p-3">Status</th></tr></thead>
+                    <tbody>${orders.map(order => `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="openOrderDetailModal('${order.id}')">
+                        <td class="p-3 whitespace-nowrap">${order.timestampPedido?.toDate().toLocaleString('pt-BR') || 'N/A'}</td>
+                        <td class="p-3 font-medium">${order.cabanaNumero}</td><td class="p-3">${order.hospedeNome}</td><td class="p-3">${order.horarioEntrega}</td>
+                        <td class="p-3"><span class="font-medium px-2.5 py-0.5 rounded-full ${statusColors[order.status] || 'bg-slate-100 text-slate-800'}">${order.status}</span></td></tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    document.getElementById('orders').innerHTML = ordersHTML;
 }
 
-// --- Modais e Impressão ---
-window.openOrderDetailModal = async (orderId) => { /* ... (código inalterado) ... */ };
-window.updateOrderStatus = async (orderId) => { /* ... (código inalterado) ... */ };
-window.printOpenOrdersSummary = async () => { /* ... (código inalterado) ... */ };
-function printElement(content, isHtmlString = false) { /* ... (código inalterado) ... */ };
+window.openOrderDetailModal = async (orderId) => {
+    // ... (o código desta função não precisa mudar) ...
+};
+window.updateOrderStatus = async (orderId) => {
+    // ... (o código desta função não precisa mudar) ...
+};
+window.printOpenOrdersSummary = async () => {
+    // ... (o código desta função não precisa mudar) ...
+};
+function printElement(content, isHtmlString = false) {
+    // ... (o código desta função não precisa mudar) ...
+};
+const printOrderReceipt = async (orderId) => {
+    // ... (o código desta função não precisa mudar) ...
+};
+
 
 // --- Seção de Cardápio ---
 function loadMenu() {
     showLoader('menu');
-    renderMenu(window.menuData); 
+    renderMenu(window.menuData);
 }
 function renderMenu(categories) {
-    // ... (código inalterado) ...
+    // ... (o código desta função não precisa mudar) ...
 }
+window.openCategoryModal = (id = null, name = '') => {
+    // ... (o código desta função não precisa mudar) ...
+};
+window.saveCategory = async (modalId, id) => {
+    // ... (o código desta função não precisa mudar) ...
+};
+window.deleteCategory = (id) => {
+    // ... (o código desta função não precisa mudar) ...
+};
+window.openMenuItemModal = async (categoryId, itemId = null) => {
+    // ... (o código desta função não precisa mudar) ...
+};
+window.saveMenuItem = async (modalId, categoryId, itemId) => {
+    // ... (o código desta função não precisa mudar) ...
+};
+window.deleteMenuItem = (categoryId, itemId) => {
+    // ... (o código desta função não precisa mudar) ...
+};
+
 
 // --- Seção de Configurações ---
 function loadSettings() {
@@ -224,49 +355,79 @@ function renderSettings(geralConfig, appConfig) {
             <div id="admin-feedback" class="mt-4 text-sm"></div>
         </div>
 
-        <div class="mb-6"><h3 class="text-xl font-semibold">Configurações Gerais</h3><p class="text-[var(--cinza-taupe)] mt-1">Gerencie os parâmetros do sistema e a aparência do aplicativo.</p></div>
-        <div class="space-y-8">
+        <div class="mb-6"><h3 class="text-xl font-semibold">Configurações Gerais</h3></div>
+         <div class="space-y-8">
              <div class="bg-white p-6 rounded-xl shadow-sm border border-[var(--cinza-taupe)]">
                 <h4 class="text-lg font-semibold mb-4">Personalização do Aplicativo</h4>
                 <div class="space-y-4">
-                    <!-- ... (resto do formulário de personalização) ... -->
+                    <div><label class="font-medium">Nome da Fazenda</label><input type="text" id="app-nomeFazenda" class="w-full mt-1 border-gray-300 rounded-lg p-2" value="${appConfig.nomeFazenda || ''}"></div>
+                    <div><label class="font-medium">URL do Logo</label><input type="text" id="app-logoUrl" class="w-full mt-1 border-gray-300 rounded-lg p-2" value="${appConfig.logoUrl || ''}" placeholder="https://exemplo.com/logo.png"></div>
+                    <div><label class="font-medium">Subtítulo</label><input type="text" id="app-subtitulo" class="w-full mt-1 border-gray-300 rounded-lg p-2" value="${appConfig.subtitulo || ''}"></div>
+                    <div><label class="font-medium">Texto de Introdução</label><textarea id="app-textoIntroducao" class="w-full mt-1 border-gray-300 rounded-lg p-2" rows="4">${appConfig.textoIntroducao || ''}</textarea></div>
+                    <div><label class="font-medium">Texto de Agradecimento</label><textarea id="app-textoAgradecimento" class="w-full mt-1 border-gray-300 rounded-lg p-2" rows="2">${appConfig.textoAgradecimento || ''}</textarea></div>
+                    <div><label class="font-medium">Total de Calorias Ideal por Pessoa</label><input type="number" id="app-caloriasMedias" class="w-full mt-1 border-gray-300 rounded-lg p-2" value="${appConfig.caloriasMediasPorPessoa || 600}"></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="font-medium">Cor Primária (Destaque)</label><input type="color" id="app-corPrimaria" class="w-full h-10 mt-1 border-gray-300 rounded-lg p-1" value="${appConfig.corPrimaria || '#97A25F'}"></div>
+                        <div><label class="font-medium">Cor Secundária (Texto)</label><input type="color" id="app-corSecundaria" class="w-full h-10 mt-1 border-gray-300 rounded-lg p-1" value="${appConfig.corSecundaria || '#4B4F36'}"></div>
+                    </div>
                 </div>
+                <div class="text-right mt-4"><button onclick="saveAppConfig()" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar Personalização</button></div>
              </div>
              <div class="bg-white p-6 rounded-xl shadow-sm border border-[var(--cinza-taupe)]">
                  <h4 class="text-lg font-semibold mb-4">Gerenciar Cabanas</h4>
-                 <!-- ... (resto do formulário de cabanas) ... -->
+                 <div id="cabanas-list" class="space-y-2 mb-4">${(geralConfig.cabanas || []).map((c, i) => `
+                     <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border" data-name="${c.nomeCabana}" data-capacity="${c.capacidadeMaxima}">
+                         <div class="flex items-center gap-3"><svg class="w-5 h-5 text-gray-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg><span>${c.nomeCabana} (Cap: ${c.capacidadeMaxima})</span></div>
+                         <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button>
+                     </div>`).join('')}
+                 </div>
+                 <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                    <input type="text" id="new-cabana-name" placeholder="Nome da Cabana" class="flex-grow border border-gray-300 rounded-lg px-3 py-2">
+                    <input type="number" id="new-cabana-capacity" placeholder="Cap." class="w-full sm:w-24 border border-gray-300 rounded-lg px-3 py-2">
+                    <button id="add-cabana-btn" class="bg-gray-200 hover:bg-gray-300 font-bold py-2 px-4 rounded-lg">Adicionar</button>
+                 </div>
+                 <div class="text-right"><button onclick="saveList('cabanas')" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar Cabanas</button></div>
             </div>
              <div class="bg-white p-6 rounded-xl shadow-sm border border-[var(--cinza-taupe)]">
                 <h4 class="text-lg font-semibold mb-4">Gerenciar Horários de Entrega</h4>
-                 <!-- ... (resto do formulário de horários) ... -->
+                 <div id="horarios-list" class="space-y-2 mb-4">${(geralConfig.horariosEntrega || []).map((h, i) => `
+                     <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border" data-value="${h}">
+                         <div class="flex items-center gap-3"><svg class="w-5 h-5 text-gray-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg><span>${h}</span></div>
+                         <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button>
+                     </div>`).join('')}
+                 </div>
+                 <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                    <input type="text" id="new-horario" placeholder="Novo Horário (HH:MM)" class="flex-grow border border-gray-300 rounded-lg px-3 py-2">
+                    <button id="add-horario-btn" class="bg-gray-200 hover:bg-gray-300 font-bold py-2 px-4 rounded-lg">Adicionar</button>
+                 </div>
+                 <div class="text-right"><button onclick="saveList('horariosEntrega')" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar Horários</button></div>
             </div>
-        </div>`;
+         </div>`;
     document.getElementById('settings').innerHTML = settingsHTML;
-    
-    // Adiciona os listeners para os botões de Configurações
+
     initializeSettingsSortablesAndButtons();
-    initializeAdminButton(); // <--- NOVA FUNÇÃO CHAMADA AQUI
+    initializeAdminButton();
 }
 
 function initializeAdminButton() {
     const addAdminBtn = document.getElementById('add-admin-btn');
-    if(addAdminBtn) {
+    if (addAdminBtn) {
         addAdminBtn.addEventListener('click', async () => {
             const emailInput = document.getElementById('new-admin-email');
             const feedbackDiv = document.getElementById('admin-feedback');
-    
+
             if (!emailInput || !feedbackDiv) return;
-    
+
             const email = emailInput.value;
             if (!email) {
                 feedbackDiv.textContent = 'Por favor, insira um e-mail.';
                 feedbackDiv.className = 'mt-4 text-sm text-red-600';
                 return;
             }
-    
+
             feedbackDiv.textContent = 'Processando...';
             feedbackDiv.className = 'mt-4 text-sm text-gray-500';
-    
+
             try {
                 if (firebase.functions) {
                     const addAdminRole = firebase.functions().httpsCallable('addAdminRole');
@@ -287,7 +448,34 @@ function initializeAdminButton() {
 }
 
 function initializeSettingsSortablesAndButtons() {
-    // ... (código inalterado) ...
+    const cabanasList = document.getElementById('cabanas-list');
+    if (cabanasList) sortableInstances.push(new Sortable(cabanasList, { handle: '.drag-handle', animation: 150 }));
+    const horariosList = document.getElementById('horarios-list');
+    if (horariosList) sortableInstances.push(new Sortable(horariosList, { handle: '.drag-handle', animation: 150 }));
+
+    document.getElementById('add-cabana-btn').onclick = () => {
+        // ... (código inalterado) ...
+    };
+    document.getElementById('add-horario-btn').onclick = () => {
+        // ... (código inalterado) ...
+    };
 }
 
-// ... (Resto do arquivo, funções para salvar, deletar, etc., sem alterações) ...
+window.saveAppConfig = async () => { /* ... (código inalterado) ... */ };
+window.saveList = async (type) => { /* ... (código inalterado) ... */ };
+
+// Expõe as funções globais
+window.closeModal = closeModal;
+window.openOrderDetailModal = openOrderDetailModal;
+window.updateOrderStatus = updateOrderStatus;
+window.printOpenOrdersSummary = printOpenOrdersSummary;
+window.printElement = printElement;
+window.openCategoryModal = openCategoryModal;
+window.saveCategory = saveCategory;
+window.deleteCategory = deleteCategory;
+window.openMenuItemModal = openMenuItemModal;
+window.saveMenuItem = saveMenuItem;
+window.deleteMenuItem = deleteMenuItem;
+window.saveAppConfig = saveAppConfig;
+window.saveList = saveList;
+window.printOrderReceipt = printOrderReceipt;
