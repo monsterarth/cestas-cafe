@@ -19,6 +19,7 @@ let activeListeners = [];
 let sortableInstances = [];
 let activeCharts = [];
 window.menuData = []; // Cache do cardápio para categorização rápida
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-functions-compat.js"></script>
 
 // Funções Utilitárias
 window.closeModal = (id) => {
@@ -69,6 +70,35 @@ auth.onAuthStateChanged(user => {
         document.getElementById('app-view').classList.remove('hidden');
         document.getElementById('user-email').textContent = user.email;
         initializeApp();
+        // NOVO: Código para chamar a Cloud Function de adicionar admin
+document.getElementById('add-admin-btn')?.addEventListener('click', async () => {
+    const emailInput = document.getElementById('new-admin-email');
+    const feedbackDiv = document.getElementById('admin-feedback');
+
+    if (!emailInput || !feedbackDiv) return;
+
+    const email = emailInput.value;
+    if (!email) {
+        feedbackDiv.textContent = 'Por favor, insira um e-mail.';
+        feedbackDiv.className = 'mt-4 text-sm text-red-600';
+        return;
+    }
+
+    feedbackDiv.textContent = 'Processando...';
+    feedbackDiv.className = 'mt-4 text-sm text-gray-500';
+
+    try {
+        const addAdminRole = firebase.functions().httpsCallable('addAdminRole');
+        const result = await addAdminRole({ email: email });
+        feedbackDiv.textContent = result.data.message;
+        feedbackDiv.className = 'mt-4 text-sm text-green-600';
+        emailInput.value = '';
+    } catch (error) {
+        console.error('Erro ao adicionar admin:', error);
+        feedbackDiv.textContent = 'Erro: ' + error.message;
+        feedbackDiv.className = 'mt-4 text-sm text-red-600';
+    }
+});
     } else {
         document.getElementById('login-view').classList.remove('hidden');
         document.getElementById('app-view').classList.add('hidden');
