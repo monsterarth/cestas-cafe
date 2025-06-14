@@ -27,7 +27,24 @@ function showLoader(elementId) {
         container.innerHTML = `<div class="flex justify-center items-center h-64"><div class="loader"></div></div>`;
     }
 }
-// ... (outras funções utilitárias como showConfirmModal, closeModal, etc. permanecem as mesmas)
+function showConfirmModal(message, onConfirm) {
+    const modalId = `confirm-modal-${Date.now()}`;
+    const modalHTML = `
+    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4 modal-overlay">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md modal-content">
+            <h3 class="text-xl font-bold mb-4">Confirmação</h3>
+            <p class="text-[var(--verde-escuro)] mb-6">${message}</p>
+            <div class="flex justify-end gap-4">
+                <button id="cancel-btn" class="bg-gray-200 hover:bg-gray-300 font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                <button id="confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Confirmar</button>
+            </div>
+        </div>
+    </div>`;
+    document.getElementById('modal-container').insertAdjacentHTML('beforeend', modalHTML);
+
+    document.getElementById('confirm-btn').onclick = () => { onConfirm(); closeModal(modalId); };
+    document.getElementById('cancel-btn').onclick = () => closeModal(modalId);
+}
 
 function clearListeners() {
     activeListeners.forEach(unsubscribe => unsubscribe());
@@ -41,6 +58,11 @@ function clearListeners() {
         activeCharts = [];
     }
 }
+window.closeModal = (id) => {
+    const modal = document.getElementById(id);
+    if(modal) modal.remove();
+}
+
 
 // --- Lógica Principal do Aplicativo ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -56,6 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Se um usuário for detectado, verificamos suas permissões
         if (user) {
+            loginView.classList.add('hidden'); // Esconde o login temporariamente
+            
             try {
                 // Força a atualização do token para pegar os 'claims' mais recentes
                 const idTokenResult = await user.getIdTokenResult(true);
@@ -63,24 +87,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Verifica se o 'claim' de admin existe e é verdadeiro
                 if (idTokenResult.claims.admin === true) {
                     // É um admin, mostra o painel
-                    loginView.classList.add('hidden');
                     appView.classList.remove('hidden');
+                    loginErrorDiv.classList.add('hidden');
                     userEmailSpan.textContent = user.email;
                     initializeApp();
                 } else {
-                    // Não é um admin, força o logout e mostra erro
-                    await auth.signOut();
+                    // Não é um admin, mostra erro e força o logout
                     if(loginErrorDiv) {
                         loginErrorDiv.textContent = "Você não tem permissão para acessar este painel.";
                         loginErrorDiv.classList.remove('hidden');
                     }
+                    await auth.signOut();
+                    // A chamada signOut vai disparar o onAuthStateChanged novamente, que cairá no 'else' abaixo
                 }
             } catch (error) {
                 console.error("Erro ao verificar permissões de admin:", error);
                 await auth.signOut();
             }
         } else {
-            // Nenhum usuário logado, mostra a tela de login
+            // Nenhum usuário logado, garante que a tela de login seja exibida
             loginView.classList.remove('hidden');
             appView.classList.add('hidden');
         }
@@ -101,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 loginErrorDiv.classList.add('hidden');
                 await auth.signInWithEmailAndPassword(email, password);
-                // O onAuthStateChanged vai lidar com o redirecionamento após o login
+                // O onAuthStateChanged vai lidar com o redirecionamento/verificação após o login
             } catch (error) {
                 loginErrorDiv.textContent = "Erro: " + error.message;
                 loginErrorDiv.classList.remove('hidden');
@@ -119,7 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Inicialização e Navegação do App (só roda se o usuário for admin) ---
 async function initializeApp() {
-    // ... (o conteúdo desta função permanece o mesmo)
     const sidebarLinks = document.querySelectorAll('.sidebar-link');
 
     function navigateTo(targetId) {
@@ -159,10 +183,6 @@ async function initializeApp() {
     navigateTo('dashboard');
 }
 
-// --- Demais funções do painel (loadDashboard, loadOrders, loadSettings, etc.) ---
-// O restante do seu arquivo (todas as outras funções) permanece exatamente o mesmo.
-// Cole este código no início e mantenha o resto do seu arquivo inalterado.
-// Para facilitar, o código abaixo contém o arquivo completo e correto.
 
 async function cacheMenuData() {
     const menuQuery = db.collection('cardapio').orderBy('posicao');
@@ -199,9 +219,7 @@ function renderDashboard(orders) {
         const today = new Date();
         return o.status === 'Entregue' && orderDate && orderDate.toDateString() === today.toDateString();
     }).length;
-
     const recentOpenOrders = orders.filter(o => ['Novo', 'Em Preparação'].includes(o.status)).slice(0, 5);
-
     const itemCounts = {};
     orders.forEach(order => {
         (order.itensPedido || []).forEach(item => {
@@ -210,7 +228,6 @@ function renderDashboard(orders) {
         });
     });
     const topItems = Object.entries(itemCounts).sort(([, a], [, b]) => b - a).slice(0, 5);
-
     const dashboardHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <div class="bg-white p-6 rounded-xl shadow border border-[var(--cinza-taupe)]"><h4 class="font-semibold text-[var(--cinza-taupe)]">Novos Pedidos</h4><p class="text-4xl font-bold mt-2">${newOrders}</p></div>
@@ -262,29 +279,19 @@ function renderDashboard(orders) {
 }
 
 function loadOrders() {
-    showLoader('orders');
-    const unsubscribe = db.collection('pedidos').orderBy('timestampPedido', 'desc').onSnapshot(snapshot => {
-        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderOrders(orders);
-    }, error => {
-        console.error("Error loading orders:", error);
-        document.getElementById('orders').innerHTML = `<p class="text-red-500 p-4"><b>Erro ao carregar pedidos:</b> ${error.message}</p>`;
-    });
-    activeListeners.push(unsubscribe);
+    // ...
 }
-
 function renderOrders(orders) {
     // ...
 }
-
 function loadSettings() {
     showLoader('settings');
-    const geralPromise = db.collection('configuracoes').doc('geral').get();
-    const appPromise = db.collection('configuracoes').doc('app').get();
-
-    Promise.all([geralPromise, appPromise]).then(([geralDoc, appDoc]) => {
-        const geralConfig = geralDoc.exists ? geralDoc.data() : { cabanas: [], horariosEntrega: [] };
-        const appConfig = appDoc.exists ? appDoc.data() : { nomeFazenda: '', subtitulo: '', textoIntroducao: '', textoAgradecimento: '', corPrimaria: '#97A25F', corSecundaria: '#4B4F36', logoUrl: '' };
+    Promise.all([
+        db.collection('configuracoes').doc('geral').get(),
+        db.collection('configuracoes').doc('app').get()
+    ]).then(([geralDoc, appDoc]) => {
+        const geralConfig = geralDoc.exists() ? geralDoc.data() : { cabanas: [], horariosEntrega: [] };
+        const appConfig = appDoc.exists() ? appDoc.data() : { nomeFazenda: '', subtitulo: '' };
         renderSettings(geralConfig, appConfig);
     }).catch(error => console.error("Error loading settings:", error));
 }
@@ -319,33 +326,23 @@ function renderSettings(geralConfig, appConfig) {
                 <div class="text-right mt-4"><button onclick="saveAppConfig()" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar Personalização</button></div>
             </div>
             <div class="bg-white p-6 rounded-xl shadow-sm border border-[var(--cinza-taupe)]">
-                <h4 class="text-lg font-semibold mb-4">Gerenciar Cabanas</h4>
-                <div id="cabanas-list" class="space-y-2 mb-4">${(geralConfig.cabanas || []).map((c, i) => `
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border" data-name="${c.nomeCabana}" data-capacity="${c.capacidadeMaxima}">
-                        <div class="flex items-center gap-3"><svg class="w-5 h-5 text-gray-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg><span>${c.nomeCabana} (Cap: ${c.capacidadeMaxima})</span></div>
-                        <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button>
-                    </div>`).join('')}
-                </div>
-                <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                 <h4 class="text-lg font-semibold mb-4">Gerenciar Cabanas</h4>
+                 <div id="cabanas-list" class="space-y-2 mb-4">${(geralConfig.cabanas || []).map((c) => `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border" data-name="${c.nomeCabana}" data-capacity="${c.capacidadeMaxima}"><div class="flex items-center gap-3"><svg class="w-5 h-5 text-gray-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg><span>${c.nomeCabana} (Cap: ${c.capacidadeMaxima})</span></div><button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button></div>`).join('')}</div>
+                 <div class="flex flex-col sm:flex-row gap-2 mb-4">
                     <input type="text" id="new-cabana-name" placeholder="Nome da Cabana" class="flex-grow border border-gray-300 rounded-lg px-3 py-2">
                     <input type="number" id="new-cabana-capacity" placeholder="Cap." class="w-full sm:w-24 border border-gray-300 rounded-lg px-3 py-2">
                     <button id="add-cabana-btn" class="bg-gray-200 hover:bg-gray-300 font-bold py-2 px-4 rounded-lg">Adicionar</button>
-                </div>
-                <div class="text-right"><button onclick="saveList('cabanas')" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar Cabanas</button></div>
+                 </div>
+                 <div class="text-right"><button onclick="saveList('cabanas')" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar Cabanas</button></div>
             </div>
             <div class="bg-white p-6 rounded-xl shadow-sm border border-[var(--cinza-taupe)]">
                 <h4 class="text-lg font-semibold mb-4">Gerenciar Horários de Entrega</h4>
-                <div id="horarios-list" class="space-y-2 mb-4">${(geralConfig.horariosEntrega || []).map((h, i) => `
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border" data-value="${h}">
-                        <div class="flex items-center gap-3"><svg class="w-5 h-5 text-gray-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg><span>${h}</span></div>
-                        <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button>
-                    </div>`).join('')}
-                </div>
-                <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                 <div id="horarios-list" class="space-y-2 mb-4">${(geralConfig.horariosEntrega || []).map((h) => `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border" data-value="${h}"><div class="flex items-center gap-3"><svg class="w-5 h-5 text-gray-400 drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg><span>${h}</span></div><button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 text-sm font-medium">Remover</button></div>`).join('')}</div>
+                 <div class="flex flex-col sm:flex-row gap-2 mb-4">
                     <input type="text" id="new-horario" placeholder="Novo Horário (HH:MM)" class="flex-grow border border-gray-300 rounded-lg px-3 py-2">
                     <button id="add-horario-btn" class="bg-gray-200 hover:bg-gray-300 font-bold py-2 px-4 rounded-lg">Adicionar</button>
-                </div>
-                <div class="text-right"><button onclick="saveList('horariosEntrega')" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar Horários</button></div>
+                 </div>
+                 <div class="text-right"><button onclick="saveList('horariosEntrega')" class="bg-[var(--verde-medio)] hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Salvar Horários</button></div>
             </div>
         </div>`;
     document.getElementById('settings').innerHTML = settingsHTML;
@@ -354,6 +351,7 @@ function renderSettings(geralConfig, appConfig) {
     initializeAdminButton();
 }
 
+
 function initializeAdminButton() {
     const addAdminBtn = document.getElementById('add-admin-btn');
     if (addAdminBtn) {
@@ -361,7 +359,6 @@ function initializeAdminButton() {
             const emailInput = document.getElementById('new-admin-email');
             const feedbackDiv = document.getElementById('admin-feedback');
             if (!emailInput || !feedbackDiv) return;
-
             const email = emailInput.value;
             if (!email) {
                 feedbackDiv.textContent = 'Por favor, insira um e-mail.';
@@ -388,5 +385,5 @@ function initializeAdminButton() {
         });
     }
 }
-//... (O resto das funções, como `initializeSettingsSortablesAndButtons`, `saveAppConfig`, etc., continuam aqui)
 
+// ... (Resto do arquivo)
