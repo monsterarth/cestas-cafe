@@ -67,13 +67,15 @@ function clearListeners() {
 
 // --- Lógica Principal do Aplicativo ---
 document.addEventListener('DOMContentLoaded', () => {
-
+    // Declaração de todas as constantes no início
     const loginView = document.getElementById('login-view');
     const appView = document.getElementById('app-view');
+    const authLoader = document.getElementById('auth-loader');
     const userEmailSpan = document.getElementById('user-email');
     const loginErrorDiv = document.getElementById('login-error');
 
-auth.onAuthStateChanged(async (user) => {
+    // Lógica de autenticação com o Firestore
+    auth.onAuthStateChanged(async (user) => {
         clearListeners();
 
         if (user) {
@@ -83,7 +85,7 @@ auth.onAuthStateChanged(async (user) => {
             authLoader.classList.add('flex');
 
             try {
-                // Nova lógica: consulta o Firestore para verificar se é admin
+                // Lógica que consulta o Firestore para verificar se é admin
                 const adminDocRef = db.collection('admins').doc(user.uid);
                 const adminDoc = await adminDocRef.get();
 
@@ -120,6 +122,7 @@ auth.onAuthStateChanged(async (user) => {
         }
     });
 
+    // Lógica do botão de Login
     const loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
         loginBtn.addEventListener('click', async () => {
@@ -141,6 +144,7 @@ auth.onAuthStateChanged(async (user) => {
         });
     }
 
+    // Lógica do botão de Logout
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => auth.signOut());
