@@ -71,26 +71,7 @@ export default function Home() {
   const handleNotesChange = (notes: string) => {
     setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
   }
-
-  const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number) => {
-    const categoryName = accompaniments[categoryId]?.name.toLowerCase()
-    const isLimitedCategory = categoryName === "pães" || categoryName === "bolos"
-
-    if (isLimitedCategory && change > 0) {
-      const categoryData = accompaniments[categoryId]
-      const currentCountInCategory = categoryData.items.reduce((total, currentItem) => {
-        return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0)
-      }, 0)
-
-      if (currentCountInCategory >= orderState.guestInfo.people) {
-        alert(
-          `Você pode selecionar no máximo ${orderState.guestInfo.people} opção(ões) de ${categoryName} para ${orderState.guestInfo.people} hóspede(s).`,
-        )
-        return
-      }
-    }
-
-    setOrderState((prev) => {
+      setOrderState((prev) => {
       const newAccompaniments = { ...prev.accompaniments }
       if (!newAccompaniments[categoryId]) {
         newAccompaniments[categoryId] = {}

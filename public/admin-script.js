@@ -894,4 +894,3 @@ window.deleteMenuItem = deleteMenuItem;
 window.saveAppConfig = saveAppConfig;
 window.saveList = saveList;
 window.printOrderReceipt = printOrderReceipt; // Adiciona a nova função ao escopo global
-window.printOrderReceipt = printOrderReceipt;
