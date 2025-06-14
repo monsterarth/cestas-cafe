@@ -13,12 +13,12 @@ export function useFirebaseData() {
   const [cabins, setCabins] = useState<Cabin[]>([])
   const [deliveryTimes, setDeliveryTimes] = useState<string[]>([])
   const [accompaniments, setAccompaniments] = useState<Record<string, AccompanimentCategory>>({})
-  const [appConfig, setAppConfig] = useState<AppConfig | null>(null) // Iniciar como null para garantir que os dados foram carregados
+  const [appConfig, setAppConfig] = useState<AppConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const initAuth = () => {
+    const initAuthAndLoadData = () => {
       onAuthStateChanged(auth, (user) => {
         if (user) {
           loadData()
@@ -30,31 +30,25 @@ export function useFirebaseData() {
         }
       })
     }
-    initAuth()
+    initAuthAndLoadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadData = async () => {
-    // Não reinicie o loading aqui para evitar piscar a tela
-    // setLoading(true) 
+    setLoading(true) 
 
     try {
-      // Usamos um objeto temporário para construir a configuração final
-      let finalAppConfig: AppConfig = {
-        nomeFazenda: "Fazenda do Rosa",
-        subtitulo: "Cesta de Café da Manhã Personalizada",
-        textoIntroducao: "Preparamos tudo com muito carinho...",
-        textoAgradecimento: 'Agradecemos sua colaboração...',
-        corPrimaria: "#97A25F",
-        corSecundaria: "#4B4F36",
-        caloriasMediasPorPessoa: 600,
-      };
-
-      // Carregar configurações gerais
-      const configDoc = await getDoc(doc(db, "configuracoes", "geral"))
-      if (configDoc.exists()) {
-        const configData = configDoc.data()
+      // Executa buscas independentes em paralelo
+      const [configGeralDoc, appConfigDoc, menuSnapshot] = await Promise.all([
+        getDoc(doc(db, "configuracoes", "geral")),
+        getDoc(doc(db, "configuracoes", "app")),
+        getDocs(query(collection(db, "cardapio"), orderBy("posicao")))
+      ]);
+      
+      // Processa configurações gerais
+      if (configGeralDoc.exists()) {
+        const configData = configGeralDoc.data()
         setDeliveryTimes(configData.horariosEntrega || [])
-
         if (configData.cabanas && Array.isArray(configData.cabanas)) {
           const cabinList: Cabin[] = configData.cabanas.map((c: any) => ({
             name: c.nomeCabana,
@@ -64,27 +58,26 @@ export function useFirebaseData() {
         }
       }
 
-      // Carregar e mesclar configurações do app
-      const appConfigDoc = await getDoc(doc(db, "configuracoes", "app"))
-      if (appConfigDoc.exists()) {
-        const appConfigData = appConfigDoc.data()
-        finalAppConfig = {
-            ...finalAppConfig,
-            ...appConfigData
-        }
-      }
-      
-      // Define o estado de appConfig uma única vez com os dados finais
+      // Processa e mescla configurações do app
+      const finalAppConfig: AppConfig = {
+        nomeFazenda: "Fazenda do Rosa",
+        subtitulo: "Cesta de Café da Manhã Personalizada",
+        textoIntroducao: "Preparamos tudo com muito carinho...",
+        textoAgradecimento: 'Agradecemos sua colaboração...',
+        corPrimaria: "#97A25F",
+        corSecundaria: "#4B4F36",
+        caloriasMediasPorPessoa: 600,
+        ...appConfigDoc.data()
+      };
       setAppConfig(finalAppConfig);
 
-      // Carregar cardápio
+      // Processa cardápio
       const dishes: HotDish[] = []
       const accompanimentsData: Record<string, AccompanimentCategory> = {}
-      const menuQuery = query(collection(db, "cardapio"), orderBy("posicao"));
-      const menuSnapshot = await getDocs(menuQuery);
 
-      for (const categoryDoc of menuSnapshot.docs) {
-        const categoryData = categoryDoc.data()
+      // Mapeia todas as buscas de subcoleções em um array de promessas
+      const itemPromises = menuSnapshot.docs.map(async (categoryDoc) => {
+        const categoryData = categoryDoc.data();
         const itemsQuery = query(collection(db, "cardapio", categoryDoc.id, "itens"), orderBy("posicao"));
         const itemsSnapshot = await getDocs(itemsQuery);
         
@@ -92,62 +85,47 @@ export function useFirebaseData() {
 
         if (isHotDishCategory) {
           for (const itemDoc of itemsSnapshot.docs) {
-            const itemData = itemDoc.data()
+            const itemData = itemDoc.data();
             if (itemData.disponivel) {
-              const dish: HotDish = {
-                id: itemDoc.id,
-                nomeItem: itemData.nomeItem,
-                emoji: itemData.emoji,
-                imageUrl: itemData.imageUrl,
-                calorias: itemData.calorias || 0,
-                disponivel: itemData.disponivel,
-                sabores: [],
-              }
-              const saboresSnapshot = await getDocs(collection(db, "cardapio", categoryDoc.id, "itens", itemDoc.id, "sabores"))
-              saboresSnapshot.forEach((saborDoc) => {
-                const saborData = saborDoc.data()
-                if (saborData.disponivel) {
-                  dish.sabores.push({
-                    id: saborDoc.id,
-                    nomeSabor: saborData.nomeSabor,
-                    calorias: saborData.calorias || 0,
-                    disponivel: saborData.disponivel,
-                  })
-                }
-              })
-              if (dish.sabores.length > 0) {
-                 dishes.push(dish)
+              const saboresSnapshot = await getDocs(collection(db, "cardapio", categoryDoc.id, "itens", itemDoc.id, "sabores"));
+              const sabores = saboresSnapshot.docs
+                .map(saborDoc => ({ id: saborDoc.id, ...saborDoc.data() }))
+                .filter(saborData => saborData.disponivel);
+              
+              if (sabores.length > 0) {
+                dishes.push({
+                  id: itemDoc.id,
+                  nomeItem: itemData.nomeItem,
+                  emoji: itemData.emoji,
+                  imageUrl: itemData.imageUrl,
+                  calorias: itemData.calorias || 0,
+                  disponivel: itemData.disponivel,
+                  sabores: sabores as any,
+                });
               }
             }
           }
         } else {
-          const categoryItems: any[] = []
-          itemsSnapshot.forEach((itemDoc) => {
-            const itemData = itemDoc.data()
-            if (itemData.disponivel) {
-              categoryItems.push({
-                id: itemDoc.id,
-                nomeItem: itemData.nomeItem,
-                emoji: itemData.emoji,
-                calorias: itemData.calorias || 0,
-                disponivel: itemData.disponivel,
-                descricaoPorcao: itemData.descricaoPorcao,
-              })
-            }
-          })
+          const categoryItems = itemsSnapshot.docs
+            .map(itemDoc => ({ id: itemDoc.id, ...itemDoc.data() }))
+            .filter(itemData => itemData.disponivel);
+
           if (categoryItems.length > 0) {
             accompanimentsData[categoryDoc.id] = {
               id: categoryDoc.id,
               name: categoryData.nomeCategoria,
-              items: categoryItems,
-            }
+              items: categoryItems as any,
+            };
           }
         }
-      }
+      });
+
+      await Promise.all(itemPromises);
 
       setHotDishes(dishes)
       setAccompaniments(accompanimentsData)
       setError(null)
+
     } catch (err: any) {
       console.error("Error loading data:", err)
       setError(`Erro ao carregar dados: ${err.message}`)
