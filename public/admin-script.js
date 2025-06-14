@@ -20,7 +20,7 @@ let sortableInstances = [];
 let activeCharts = [];
 window.menuData = []; // Cache do cardápio para categorização rápida
 
-// Funções Utilitárias
+// --- Funções Utilitárias ---
 window.closeModal = (id) => {
     const modal = document.getElementById(id);
     if(modal) modal.remove();
@@ -61,32 +61,53 @@ function clearListeners() {
     activeCharts = [];
 }
 
-// --- Autenticação ---
-auth.onAuthStateChanged(user => {
-    clearListeners();
-    if (user) {
-        document.getElementById('login-view').classList.add('hidden');
-        document.getElementById('app-view').classList.remove('hidden');
-        document.getElementById('user-email').textContent = user.email;
-        initializeApp();
-    } else {
-        document.getElementById('login-view').classList.remove('hidden');
-        document.getElementById('app-view').classList.add('hidden');
+// --- Lógica Principal do Aplicativo ---
+
+// Espera o DOM estar totalmente carregado antes de manipular os elementos
+document.addEventListener('DOMContentLoaded', () => {
+
+    // --- Autenticação ---
+    auth.onAuthStateChanged(user => {
+        clearListeners();
+        if (user) {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('app-view').classList.remove('hidden');
+            document.getElementById('user-email').textContent = user.email;
+            initializeApp();
+        } else {
+            document.getElementById('login-view').classList.remove('hidden');
+            document.getElementById('app-view').classList.add('hidden');
+        }
+    });
+
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', async () => {
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            const loginError = document.getElementById('login-error');
+
+            if (!emailInput || !passwordInput || !loginError) return;
+
+            const email = emailInput.value;
+            const password = passwordInput.value;
+
+            try {
+                loginError.classList.add('hidden'); // Esconde erros antigos
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (error) {
+                loginError.textContent = "Erro: " + error.message;
+                loginError.classList.remove('hidden');
+            }
+        });
+    }
+
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => auth.signOut());
     }
 });
 
-document.getElementById('login-btn').addEventListener('click', async () => {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const loginError = document.getElementById('login-error');
-    try {
-        await auth.signInWithEmailAndPassword(email, password);
-    } catch (error) {
-        loginError.textContent = "Erro: " + error.message;
-        loginError.classList.remove('hidden');
-    }
-});
-document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
 
 // --- Inicialização e Navegação do App ---
 async function initializeApp() {
@@ -130,7 +151,6 @@ async function initializeApp() {
 
     // CÓDIGO DO BOTÃO NO LUGAR CERTO
     // O listener é adicionado aqui para garantir que o botão 'add-admin-btn' existe no DOM
-    // quando a seção 'settings' for carregada.
     const addAdminBtn = document.getElementById('add-admin-btn');
     if(addAdminBtn) {
         addAdminBtn.addEventListener('click', async () => {
@@ -150,7 +170,6 @@ async function initializeApp() {
             feedbackDiv.className = 'mt-4 text-sm text-gray-500';
     
             try {
-                // Certifique-se que o SDK do Functions está carregado
                 if (firebase.functions) {
                     const addAdminRole = firebase.functions().httpsCallable('addAdminRole');
                     const result = await addAdminRole({ email: email });
@@ -311,7 +330,6 @@ window.openOrderDetailModal = async (orderId) => {
     const order = { id: doc.id, ...doc.data() };
     const modalId = `order-detail-modal-${orderId}`;
 
-    // --- Lógica de Categorização de Itens ---
     const categoryOrder = ["pratos quentes", "bebidas", "pães"];
     const categorizedItems = {};
     categoryOrder.forEach(cat => categorizedItems[cat] = []);
