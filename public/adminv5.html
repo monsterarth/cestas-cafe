@@ -94,10 +94,10 @@
                     <section id="settings" class="content-section">
                         <div class="bg-white p-6 rounded-xl shadow-sm border border-[var(--cinza-taupe)] mb-8">
                             <h4 class="text-lg font-semibold mb-4">Adicionar Novo Administrador</h4>
-                            <p class="text-sm text-[var(--cinza-taupe)] mb-4">O usuário já deve estar cadastrado no Firebase Authentication para poder ser promovido.</p>
+                            <p class="text-sm text-[var(--cinza-taupe)] mb-4">Para adicionar um novo admin, encontre o UID do usuário na aba "Authentication" do Firebase e cole abaixo.</p>
                             <div class="flex flex-col sm:flex-row gap-2">
-                               <input type="email" id="new-admin-email" placeholder="Email do novo admin" class="flex-grow border border-gray-300 rounded-lg px-3 py-2">
-                               <button id="add-admin-btn" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded-lg">Promover a Admin</button>
+                               <input type="text" id="new-admin-uid" placeholder="UID do novo admin" class="flex-grow border border-gray-300 rounded-lg px-3 py-2">
+                               <button id="add-admin-btn" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded-lg">Adicionar Admin</button>
                             </div>
                             <div id="admin-feedback" class="mt-4 text-sm"></div>
                         </div>

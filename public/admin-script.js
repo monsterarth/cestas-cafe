@@ -73,34 +73,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const userEmailSpan = document.getElementById('user-email');
     const loginErrorDiv = document.getElementById('login-error');
 
-    auth.onAuthStateChanged(async (user) => {
+auth.onAuthStateChanged(async (user) => {
         clearListeners();
-        
+
         if (user) {
             loginView.classList.add('hidden');
-            
+            appView.classList.add('hidden');
+            authLoader.classList.remove('hidden');
+            authLoader.classList.add('flex');
+
             try {
-                const idTokenResult = await user.getIdTokenResult(true);
-                
-                if (idTokenResult.claims.admin === true) {
-                    appView.classList.remove('hidden');
-                    if (loginErrorDiv) loginErrorDiv.classList.add('hidden');
+                // Nova lógica: consulta o Firestore para verificar se é admin
+                const adminDocRef = db.collection('admins').doc(user.uid);
+                const adminDoc = await adminDocRef.get();
+
+                if (adminDoc.exists && adminDoc.data().isAdmin === true) {
                     userEmailSpan.textContent = user.email;
+                    if (loginErrorDiv) loginErrorDiv.classList.add('hidden');
+                    appView.classList.remove('hidden');
                     initializeApp();
                 } else {
-                    if(loginErrorDiv) {
+                    if (loginErrorDiv) {
                         loginErrorDiv.textContent = "Você não tem permissão para acessar este painel.";
                         loginErrorDiv.classList.remove('hidden');
                     }
                     await auth.signOut();
+                    loginView.classList.remove('hidden');
                 }
             } catch (error) {
-                console.error("Erro ao verificar permissões de admin:", error);
+                console.error("Erro ao verificar permissões:", error);
+                if (loginErrorDiv) {
+                    loginErrorDiv.textContent = "Erro ao verificar permissões: " + error.message;
+                    loginErrorDiv.classList.remove('hidden');
+                }
                 await auth.signOut();
+                loginView.classList.remove('hidden');
+            } finally {
+                authLoader.classList.add('hidden');
+                authLoader.classList.remove('flex');
             }
         } else {
             loginView.classList.remove('hidden');
             appView.classList.add('hidden');
+            authLoader.classList.add('hidden');
+            authLoader.classList.remove('flex');
         }
     });
 
@@ -604,27 +620,26 @@ function initializeAdminButton() {
     const addAdminBtn = document.getElementById('add-admin-btn');
     if (addAdminBtn) {
         addAdminBtn.addEventListener('click', async () => {
-            const emailInput = document.getElementById('new-admin-email');
+            const uidInput = document.getElementById('new-admin-uid');
             const feedbackDiv = document.getElementById('admin-feedback');
-            if (!emailInput || !feedbackDiv) return;
-            const email = emailInput.value;
-            if (!email) {
-                feedbackDiv.textContent = 'Por favor, insira um e-mail.';
+            if (!uidInput || !feedbackDiv) return;
+
+            const newAdminUid = uidInput.value.trim();
+            if (!newAdminUid) {
+                feedbackDiv.textContent = 'Por favor, insira um UID.';
                 feedbackDiv.className = 'mt-4 text-sm text-red-600';
                 return;
             }
-            feedbackDiv.textContent = 'Processando...';
+
+            feedbackDiv.textContent = 'Adicionando...';
             feedbackDiv.className = 'mt-4 text-sm text-gray-500';
+
             try {
-                if (firebase.functions) {
-                    const addAdminRole = firebase.functions().httpsCallable('addAdminRole');
-                    const result = await addAdminRole({ email: email });
-                    feedbackDiv.textContent = result.data.message;
-                    feedbackDiv.className = 'mt-4 text-sm text-green-600';
-                    emailInput.value = '';
-                } else {
-                    throw new Error("O SDK do Firebase Functions não está carregado.");
-                }
+                // Nova lógica: escreve diretamente no Firestore
+                await db.collection('admins').doc(newAdminUid).set({ isAdmin: true });
+                feedbackDiv.textContent = `Sucesso! Usuário ${newAdminUid} agora é um administrador.`;
+                feedbackDiv.className = 'mt-4 text-sm text-green-600';
+                uidInput.value = '';
             } catch (error) {
                 console.error('Erro ao adicionar admin:', error);
                 feedbackDiv.textContent = 'Erro: ' + error.message;
