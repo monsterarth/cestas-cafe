@@ -118,6 +118,30 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-functions-compat.js"></script>
 
-    <script type="module" src="admin-script.js"></script>
+    <script>
+      // Função para buscar a configuração e carregar o script principal
+      async function loadAdminApp() {
+        try {
+          const response = await fetch('/api/firebase-config');
+          if (!response.ok) {
+            throw new Error('Falha ao buscar a configuração do Firebase.');
+          }
+          // Torna a configuração global para o admin-script.js poder usá-la
+          window.firebaseConfig = await response.json();
+
+          // Cria e adiciona o script principal do admin ao documento
+          const script = document.createElement('script');
+          script.type = 'module';
+          script.src = 'admin-script.js';
+          document.body.appendChild(script);
+
+        } catch (error) {
+          console.error("Erro Crítico:", error);
+          document.body.innerHTML = `<div style="padding: 2rem; text-align: center;"><h1>Erro ao carregar o painel</h1><p>${error.message}</p></div>`;
+        }
+      }
+
+      loadAdminApp();
+    </script>
 </body>
 </html>

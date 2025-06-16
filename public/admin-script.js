@@ -1,16 +1,7 @@
 /* public/admin-script.js */
-// Configuração do Firebase
-const firebaseConfig = {
-    apiKey: "AIzaSyAjAUVa7_4cAHtFqm8xBuzDVzxDknPMYJM",
-    authDomain: "cafe-da-fazenda-a2ec3.firebaseapp.com",
-    projectId: "cafe-da-fazenda-a2ec3",
-    storageBucket: "cafe-da-fazenda-a2ec3.appspot.com",
-    messagingSenderId: "604485035435",
-    appId: "1:604485035435:web:876f003565cec1ac4a5eee"
-};
-
 // Inicialização dos serviços Firebase
-firebase.initializeApp(firebaseConfig);
+// A variável `firebaseConfig` agora é injetada globalmente pelo adminv5.html
+firebase.initializeApp(window.firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
