@@ -3,7 +3,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useReducer, useState } from "react" // Alterado de useState para useReducer
 import { useFirebaseData } from "@/hooks/use-firebase-data"
 import { LoadingScreen } from "@/components/loading-screen"
 import { StepNavigation } from "@/components/step-navigation"
@@ -20,88 +20,169 @@ import { MessageCircle } from "lucide-react"
 import { StepReview } from "@/components/step-review"
 import { StepSuccess } from "@/components/step-success"
 
-export default function Home() {
-  const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error, refetch } = useFirebaseData()
+// --- LÓGICA DO REDUCER ---
 
-  const [currentStep, setCurrentStep] = useState(1)
-  const [orderState, setOrderState] = useState<OrderState>({
-    guestInfo: { name: "", cabin: "", people: 0, time: "" },
-    persons: [],
-    accompaniments: {},
-    globalHotDishNotes: "",
-    specialRequests: "",
-  })
-  const [orderSubmitted, setOrderSubmitted] = useState(false)
+// 1. Definimos o estado inicial do pedido
+const initialOrderState: OrderState = {
+  guestInfo: { name: "", cabin: "", people: 0, time: "" },
+  persons: [],
+  accompaniments: {},
+  globalHotDishNotes: "",
+  specialRequests: "",
+}
 
-  const updateOrderState = (updates: Partial<OrderState>) => {
-    setOrderState((prev) => ({ ...prev, ...updates }))
-  }
+// 2. Definimos todas as possíveis ações que podem alterar o estado
+type OrderAction =
+  | { type: "UPDATE_GUEST_INFO"; payload: Partial<OrderState["guestInfo"]> }
+  | { type: "SET_PEOPLE"; payload: number }
+  | { type: "SELECT_DISH"; payload: { personIndex: number; dishId: string } }
+  | { type: "SELECT_FLAVOR"; payload: { personIndex: number; flavorId: string } }
+  | { type: "TOGGLE_NO_DISH"; payload: { personIndex: number } }
+  | { type: "UPDATE_GLOBAL_NOTES"; payload: string }
+  | { type: "UPDATE_ACCOMPANIMENT"; payload: { categoryId: string; itemId: string; change: number } }
+  | { type: "UPDATE_SPECIAL_REQUESTS"; payload: string }
 
-  const handleSelectDish = (personIndex: number, dishId: string) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) =>
-        index === personIndex ? { ...person, hotDish: { typeId: dishId, flavorId: "" } } : person,
-      ),
-    }))
-  }
+// 3. Criamos a função reducer que centraliza toda a lógica de atualização
+function orderReducer(state: OrderState, action: OrderAction): OrderState {
+  switch (action.type) {
+    case "UPDATE_GUEST_INFO":
+      return { ...state, guestInfo: { ...state.guestInfo, ...action.payload } }
 
-  const handleSelectFlavor = (personIndex: number, flavorId: string) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) =>
-        index === personIndex && person.hotDish ? { ...person, hotDish: { ...person.hotDish, flavorId } } : person,
-      ),
-    }))
-  }
+    case "SET_PEOPLE":
+      const people = action.payload
+      const persons = Array.from({ length: people }, (_, i) => ({
+        id: i + 1,
+        hotDish: null,
+        notes: "",
+      }))
+      return { ...state, guestInfo: { ...state.guestInfo, people }, persons }
 
-  const handleUpdateNotes = (personIndex: number, notes: string) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) => (index === personIndex ? { ...person, notes } : person)),
-    }))
-  }
+    case "SELECT_DISH":
+      return {
+        ...state,
+        persons: state.persons.map((person, index) =>
+          index === action.payload.personIndex
+            ? { ...person, hotDish: { typeId: action.payload.dishId, flavorId: "" } }
+            : person,
+        ),
+      }
 
-  const handleNotesChange = (notes: string) => {
-    setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
-  }
+    case "SELECT_FLAVOR":
+      return {
+        ...state,
+        persons: state.persons.map((person, index) =>
+          index === action.payload.personIndex && person.hotDish
+            ? { ...person, hotDish: { ...person.hotDish, flavorId: action.payload.flavorId } }
+            : person,
+        ),
+      }
 
-  const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number) => {
-    setOrderState((prev) => {
-      const newAccompaniments = { ...prev.accompaniments }
+    case "TOGGLE_NO_DISH": {
+      const { personIndex } = action.payload
+      const personToUpdate = state.persons[personIndex]
+      const newHotDishState =
+        personToUpdate?.hotDish?.typeId === "NONE" ? null : { typeId: "NONE", flavorId: "NONE" }
+      return {
+        ...state,
+        persons: state.persons.map((person, index) =>
+          index === personIndex ? { ...person, hotDish: newHotDishState } : person,
+        ),
+      }
+    }
+
+    case "UPDATE_GLOBAL_NOTES":
+      return { ...state, globalHotDishNotes: action.payload }
+
+    case "UPDATE_ACCOMPANIMENT": {
+      const { categoryId, itemId, change } = action.payload
+      const newAccompaniments = JSON.parse(JSON.stringify(state.accompaniments)) // Deep copy
       if (!newAccompaniments[categoryId]) {
         newAccompaniments[categoryId] = {}
       }
       const currentCount = newAccompaniments[categoryId][itemId] || 0
       let newCount = currentCount + change
       if (newCount < 0) newCount = 0
-      
+
       if (newCount === 0) {
         delete newAccompaniments[categoryId][itemId]
       } else {
         newAccompaniments[categoryId][itemId] = newCount
       }
-      return { ...prev, accompaniments: newAccompaniments }
-    })
+      return { ...state, accompaniments: newAccompaniments }
+    }
+
+    case "UPDATE_SPECIAL_REQUESTS":
+      return { ...state, specialRequests: action.payload }
+
+    default:
+      return state
+  }
+}
+
+export default function Home() {
+  const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error, refetch } = useFirebaseData()
+
+  const [currentStep, setCurrentStep] = useState(1)
+  const [orderSubmitted, setOrderSubmitted] = useState(false)
+
+  // 4. Substituímos o useState pelo useReducer
+  const [orderState, dispatch] = useReducer(orderReducer, initialOrderState)
+
+  // 5. As funções "handle" agora apenas "despacham" (dispatch) ações para o reducer
+  const handleUpdateGuestInfo = (updates: Partial<OrderState["guestInfo"]>) => {
+    dispatch({ type: "UPDATE_GUEST_INFO", payload: updates })
+  }
+  
+  const handleSetPeople = (people: number) => {
+    dispatch({ type: "SET_PEOPLE", payload: people });
+  };
+  
+  // Note que a função `onUpdateOrderState` em StepDetails foi separada em duas para maior clareza.
+  const updateOrderStateForDetails = (updates: Partial<OrderState>) => {
+    if(updates.guestInfo && updates.guestInfo.name !== undefined) {
+      handleUpdateGuestInfo({ name: updates.guestInfo.name });
+    }
+     if(updates.guestInfo && updates.guestInfo.cabin !== undefined) {
+      handleUpdateGuestInfo({ cabin: updates.guestInfo.cabin });
+      // Resetar pessoas ao trocar de cabana, como antes.
+      handleSetPeople(0);
+    }
+     if(updates.guestInfo && updates.guestInfo.time !== undefined) {
+      handleUpdateGuestInfo({ time: updates.guestInfo.time });
+    }
+    if (updates.guestInfo && updates.guestInfo.people !== undefined) {
+       handleSetPeople(updates.guestInfo.people);
+    }
+  }
+
+
+  const handleSelectDish = (personIndex: number, dishId: string) => {
+    dispatch({ type: "SELECT_DISH", payload: { personIndex, dishId } })
+  }
+
+  const handleSelectFlavor = (personIndex: number, flavorId: string) => {
+    dispatch({ type: "SELECT_FLAVOR", payload: { personIndex, flavorId } })
+  }
+
+  const handleUpdateNotes = (personIndex: number, notes: string) => {
+    // Esta função não foi implementada no reducer, pois não era usada. Mantendo assim por enquanto.
+    // Se precisar dela, podemos adicionar a ação 'UPDATE_PERSON_NOTES'.
+  }
+
+  const handleNotesChange = (notes: string) => {
+    dispatch({ type: "UPDATE_GLOBAL_NOTES", payload: notes })
+  }
+
+  const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number) => {
+    dispatch({ type: "UPDATE_ACCOMPANIMENT", payload: { categoryId, itemId, change } })
   }
 
   const handleSpecialRequestsChange = (requests: string) => {
-    setOrderState((prev) => ({ ...prev, specialRequests: requests }))
+    dispatch({ type: "UPDATE_SPECIAL_REQUESTS", payload: requests })
   }
 
   const handleSelectNoHotDish = (personIndex: number) => {
-    setOrderState((prev) => {
-      const personToUpdate = prev.persons[personIndex]
-      const newHotDishState =
-        personToUpdate?.hotDish?.typeId === "NONE" ? null : { typeId: "NONE", flavorId: "NONE" }
-
-      return {
-        ...prev,
-        persons: prev.persons.map((person, index) =>
-          index === personIndex ? { ...person, hotDish: newHotDishState } : person,
-        ),
-      }
-    })
+    dispatch({ type: "TOGGLE_NO_DISH", payload: { personIndex } })
   }
 
   // --- Renderização ---
@@ -120,7 +201,7 @@ export default function Home() {
       </div>
     )
   }
-  
+
   if (!appConfig) {
     return <LoadingScreen message="Aguardando configurações..." />
   }
@@ -141,7 +222,7 @@ export default function Home() {
                 orderState={orderState}
                 cabins={cabins}
                 deliveryTimes={deliveryTimes}
-                onUpdateOrderState={updateOrderState}
+                onUpdateOrderState={updateOrderStateForDetails}
                 onNext={() => setCurrentStep(3)}
                 onBack={() => setCurrentStep(1)}
               />
