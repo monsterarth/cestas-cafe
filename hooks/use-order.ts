@@ -52,48 +52,46 @@ export function useOrder() {
     setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
   }
 
-  const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number, accompaniments: any) => {
-    const categoryName = accompaniments[categoryId]?.name.toLowerCase()
-    const isPaoCategory = categoryName === "pães"
-    const isBoloCategory = categoryName === "bolos"
-    const isLimitedCategory = isPaoCategory || isBoloCategory
+const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number, accompaniments: any) => {
+  const category = accompaniments[categoryId]
+  const categoryLimitPerPerson = category?.limitePorPessoa || 0
 
-    if (isLimitedCategory && change > 0) {
-      const categoryData = accompaniments[categoryId]
-      const currentCountInCategory = categoryData.items.reduce((total: number, currentItem: any) => {
-        return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0)
-      }, 0)
+  // Aplica a lógica de limite apenas se a categoria tiver um limite configurado (maior que 0)
+  if (categoryLimitPerPerson > 0 && change > 0) {
+    const totalGuests = orderState.guestInfo.people
+    const absoluteLimit = categoryLimitPerPerson * totalGuests
 
-      // Regra de limite: 2 pães por pessoa, 1 bolo por pessoa
-      const limit = isPaoCategory ? orderState.guestInfo.people * 2 : orderState.guestInfo.people
-      const limitMessage = isPaoCategory
-        ? `Limite atingido: máximo ${limit} pães para ${orderState.guestInfo.people} hóspede(s).`
-        : `Limite atingido: máximo ${limit} bolo(s) para ${orderState.guestInfo.people} hóspede(s).`
+    const currentCountInCategory = category.items.reduce((total: number, currentItem: any) => {
+      return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0)
+    }, 0)
 
-      if (currentCountInCategory >= limit) {
-        toast.warning(limitMessage, {
+    if (currentCountInCategory >= absoluteLimit) {
+      toast.warning(
+        `Limite atingido: máximo <span class="math-inline">\{absoluteLimit\} item\(ns\) da categoria "</span>{category.name}" para ${totalGuests} hóspede(s).`,
+        {
           duration: 4000,
-        })
-        return
-      }
+        },
+      )
+      return
     }
-
-    setOrderState((prev) => {
-      const newAccompaniments = { ...prev.accompaniments }
-      if (!newAccompaniments[categoryId]) {
-        newAccompaniments[categoryId] = {}
-      }
-      const currentCount = newAccompaniments[categoryId][itemId] || 0
-      let newCount = currentCount + change
-      if (newCount < 0) newCount = 0
-      if (newCount === 0) {
-        delete newAccompaniments[categoryId][itemId]
-      } else {
-        newAccompaniments[categoryId][itemId] = newCount
-      }
-      return { ...prev, accompaniments: newAccompaniments }
-    })
   }
+
+  setOrderState((prev) => {
+    const newAccompaniments = { ...prev.accompaniments }
+    if (!newAccompaniments[categoryId]) {
+      newAccompaniments[categoryId] = {}
+    }
+    const currentCount = newAccompaniments[categoryId][itemId] || 0
+    let newCount = currentCount + change
+    if (newCount < 0) newCount = 0
+    if (newCount === 0) {
+      delete newAccompaniments[categoryId][itemId]
+    } else {
+      newAccompaniments[categoryId][itemId] = newCount
+    }
+    return { ...prev, accompaniments: newAccompaniments }
+  })
+}
 
   const handleSpecialRequestsChange = (requests: string) => {
     setOrderState((prev) => ({ ...prev, specialRequests: requests }))

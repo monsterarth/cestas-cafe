@@ -28,6 +28,7 @@ interface MenuCategory {
   nomeCategoria: string
   posicao: number
   items: MenuItem[]
+  limitePorPessoa?: number
 }
 
 function SortableCategory({
@@ -198,27 +199,34 @@ export default function MenuPage() {
     }
   }
 
-  const handleSaveCategory = async (formData: FormData) => {
-    if (!db) return
-    const name = formData.get("name") as string
-    if (!name) return
+const handleSaveCategory = async (formData: FormData) => {
+  if (!db) return
+  const name = formData.get("name") as string
+  const limite = Number(formData.get("limitePorPessoa") as string)
 
-    try {
-      if (categoryModal.category) {
-        await firestore.updateDoc(firestore.doc(db, "cardapio", categoryModal.category.id), {
-          nomeCategoria: name,
-        })
-      } else {
-        await firestore.addDoc(firestore.collection(db, "cardapio"), {
-          nomeCategoria: name,
-          posicao: categories.length,
-        })
-      }
-      setCategoryModal({ open: false })
-    } catch (error) {
-      console.error("Error saving category:", error)
-    }
+  if (!name) return
+
+  const categoryData = {
+    nomeCategoria: name,
+    limitePorPessoa: isNaN(limite) ? 0 : limite,
   }
+
+  try {
+    if (categoryModal.category) {
+      // Edit existing category
+      await firestore.updateDoc(firestore.doc(db, "cardapio", categoryModal.category.id), categoryData)
+    } else {
+      // Add new category
+      await firestore.addDoc(firestore.collection(db, "cardapio"), {
+        ...categoryData,
+        posicao: categories.length,
+      })
+    }
+    setCategoryModal({ open: false })
+  } catch (error) {
+    console.error("Error saving category:", error)
+  }
+}
 
   const handleDeleteCategory = async (categoryId: string) => {
     if (!db) return
@@ -322,19 +330,34 @@ export default function MenuPage() {
             <DialogTitle>{categoryModal.category ? "Editar" : "Adicionar"} Categoria</DialogTitle>
           </DialogHeader>
           <form action={handleSaveCategory} className="space-y-4">
-            <div>
-              <Label htmlFor="name">Nome da Categoria</Label>
-              <Input id="name" name="name" defaultValue={categoryModal.category?.nomeCategoria || ""} required />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setCategoryModal({ open: false })}>
-                Cancelar
-              </Button>
-              <Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90">
-                Salvar
-              </Button>
-            </div>
-          </form>
+  <div>
+    <Label htmlFor="name">Nome da Categoria</Label>
+    <Input id="name" name="name" defaultValue={categoryModal.category?.nomeCategoria || ""} required />
+  </div>
+  <div>
+    <Label htmlFor="limitePorPessoa">Limite de Itens por Pessoa</Label>
+    <Input
+      id="limitePorPessoa"
+      name="limitePorPessoa"
+      type="number"
+      min="0"
+      placeholder="0 para ilimitado"
+      defaultValue={categoryModal.category?.limitePorPessoa || 0}
+      required
+    />
+    <p className="text-xs text-gray-500 mt-1">
+      Defina quantos itens desta categoria cada pessoa pode escolher. Use 0 para sem limite.
+    </p>
+  </div>
+  <div className="flex justify-end gap-2 pt-4">
+    <Button type="button" variant="outline" onClick={() => setCategoryModal({ open: false })}>
+      Cancelar
+    </Button>
+    <Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90">
+      Salvar
+    </Button>
+  </div>
+</form>
         </DialogContent>
       </Dialog>
 

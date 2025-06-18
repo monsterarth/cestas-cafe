@@ -119,10 +119,11 @@ export function useFirebaseData() {
           })
           if (categoryItems.length > 0) {
             accompanimentsData[categoryDoc.id] = {
-              id: categoryDoc.id,
-              name: categoryData.nomeCategoria,
-              items: categoryItems,
-            }
+    id: categoryDoc.id,
+    name: categoryData.nomeCategoria,
+    items: categoryItems,
+    limitePorPessoa: categoryData.limitePorPessoa || 0, // Adiciona o limite
+  }
           }
         }
       }

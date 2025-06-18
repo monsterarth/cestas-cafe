@@ -29,24 +29,25 @@ export function StepAccompaniments({
       </div>
       <div className="p-6 space-y-8">
         {Object.values(accompaniments).map((category) => {
-          const maxGuests = orderState.guestInfo.people || 1
-          const categoryNameLower = category.name.toLowerCase()
-          const isPaoCategory = categoryNameLower === "pães"
-          const isBoloCategory = categoryNameLower === "bolos"
-          const isLimitedByCategory = isPaoCategory || isBoloCategory
+          const totalGuests = orderState.guestInfo.people || 1
+const limitPerPerson = category.limitePorPessoa || 0
+const isLimitedCategory = limitPerPerson > 0
 
-          const limit = isPaoCategory ? maxGuests * 2 : maxGuests
-          const limitMessage = `Limite de ${limit} ${
-            isPaoCategory ? "pães" : "bolo(s)"
-          } para ${maxGuests} pessoa(s).`
+let totalInCategory = 0
+let absoluteLimit = 0
+let isLimitReached = false
+let limitMessage = ""
 
-          const totalInCategory = isLimitedByCategory
-            ? category.items.reduce((total, currentItem) => {
-                return total + (orderState.accompaniments[category.id]?.[currentItem.id] || 0)
-              }, 0)
-            : 0
+if (isLimitedCategory) {
+  absoluteLimit = limitPerPerson * totalGuests
+  limitMessage = `Limite de ${absoluteLimit} item(ns) para ${totalGuests} pessoa(s).`
 
-          const isLimitReached = isLimitedByCategory && totalInCategory >= limit
+  totalInCategory = category.items.reduce((total, currentItem) => {
+    return total + (orderState.accompaniments[category.id]?.[currentItem.id] || 0)
+  }, 0)
+
+  isLimitReached = totalInCategory >= absoluteLimit
+}
 
           return (
             <div key={category.id}>

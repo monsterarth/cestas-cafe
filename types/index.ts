@@ -32,6 +32,7 @@ export interface AccompanimentCategory {
   id: string
   name: string
   items: AccompanimentItem[]
+  limitePorPessoa?: number
 }
 
 export interface AccompanimentItem {
