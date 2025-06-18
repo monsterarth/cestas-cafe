@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { getFirebaseDb } from "@/lib/firebase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { Clock, CheckCircle, AlertCircle } from "lucide-react"

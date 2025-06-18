@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { collection, onSnapshot, orderBy, query, doc, updateDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { getFirebaseDb } from "@/lib/firebase"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
