@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getFirebaseDb, isFirebaseAvailable } from "@/lib/firebase"
-import type { HotDish, Cabin, AccompanimentCategory, AppConfig, Flavor } from "@/types"
-
+import type { HotDish, Cabin, AccompanimentCategory, AppConfig, Flavor, AccompanimentItem } from "@/types"
 export function useFirebaseData() {
   const [hotDishes, setHotDishes] = useState<HotDish[]>([])
   const [cabins, setCabins] = useState<Cabin[]>([])
