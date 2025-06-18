@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect }from "react"
 import {
   collection,
   onSnapshot,
@@ -12,6 +12,7 @@ import {
   deleteDoc,
   getDocs,
   writeBatch,
+  Firestore,
 } from "firebase/firestore"
 import { getFirebaseDb } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -120,6 +121,7 @@ function SortableCategory({
 }
 
 export default function MenuPage() {
+  const [db, setDb] = useState<Firestore | null>(null)
   const [categories, setCategories] = useState<MenuCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [categoryModal, setCategoryModal] = useState<{ open: boolean; category?: MenuCategory }>({ open: false })
@@ -133,45 +135,63 @@ export default function MenuPage() {
   )
 
   useEffect(() => {
-    const loadMenu = async () => {
-      try {
-        const menuQuery = query(collection(db, "cardapio"), orderBy("posicao"))
-        const unsubscribe = onSnapshot(menuQuery, async (snapshot) => {
-          const categoriesData: MenuCategory[] = []
+    const initializeDbAndListener = async () => {
+      const firestoreDb = await getFirebaseDb()
+      if (firestoreDb) {
+        setDb(firestoreDb)
+        const menuQuery = query(collection(firestoreDb, "cardapio"), orderBy("posicao"))
+        const unsubscribe = onSnapshot(
+          menuQuery,
+          async (snapshot) => {
+            const categoriesData: MenuCategory[] = []
+            for (const categoryDoc of snapshot.docs) {
+              const categoryData = categoryDoc.data()
+              const itemsQuery = query(collection(firestoreDb, "cardapio", categoryDoc.id, "itens"), orderBy("posicao"))
+              const itemsSnapshot = await getDocs(itemsQuery)
 
-          for (const categoryDoc of snapshot.docs) {
-            const categoryData = categoryDoc.data()
-            const itemsQuery = query(collection(db, "cardapio", categoryDoc.id, "itens"), orderBy("posicao"))
-            const itemsSnapshot = await getDocs(itemsQuery)
+              const items: MenuItem[] = itemsSnapshot.docs.map((itemDoc) => ({
+                id: itemDoc.id,
+                ...itemDoc.data(),
+              })) as MenuItem[]
 
-            const items: MenuItem[] = itemsSnapshot.docs.map((itemDoc) => ({
-              id: itemDoc.id,
-              ...itemDoc.data(),
-            })) as MenuItem[]
-
-            categoriesData.push({
-              id: categoryDoc.id,
-              nomeCategoria: categoryData.nomeCategoria,
-              posicao: categoryData.posicao,
-              items,
-            })
-          }
-
-          setCategories(categoriesData)
-          setLoading(false)
-        })
-
-        return () => unsubscribe()
-      } catch (error) {
-        console.error("Error loading menu:", error)
+              categoriesData.push({
+                id: categoryDoc.id,
+                nomeCategoria: categoryData.nomeCategoria,
+                posicao: categoryData.posicao,
+                items,
+              })
+            }
+            setCategories(categoriesData)
+            setLoading(false)
+          },
+          (error) => {
+            console.error("Error loading menu:", error)
+            setLoading(false)
+          },
+        )
+        return unsubscribe
+      } else {
+        console.error("Firestore is not available.")
         setLoading(false)
       }
     }
 
-    loadMenu()
+    let unsubscribe: (() => void) | undefined
+    initializeDbAndListener().then((unsub) => {
+      if (unsub) {
+        unsubscribe = unsub
+      }
+    })
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
   }, [])
 
   const handleDragEnd = async (event: any) => {
+    if (!db) return
     const { active, over } = event
 
     if (active.id !== over.id) {
@@ -191,6 +211,7 @@ export default function MenuPage() {
   }
 
   const handleSaveCategory = async (formData: FormData) => {
+    if (!db) return
     const name = formData.get("name") as string
     if (!name) return
 
@@ -214,6 +235,7 @@ export default function MenuPage() {
   }
 
   const handleDeleteCategory = async (categoryId: string) => {
+    if (!db) return
     if (!confirm("Tem certeza que deseja excluir esta categoria e todos os itens?")) return
 
     try {
@@ -235,6 +257,7 @@ export default function MenuPage() {
   }
 
   const handleSaveItem = async (formData: FormData) => {
+    if (!db) return
     const categoryId = itemModal.categoryId
     if (!categoryId) return
 
@@ -266,6 +289,7 @@ export default function MenuPage() {
   }
 
   const handleDeleteItem = async (categoryId: string, itemId: string) => {
+    if (!db) return
     if (!confirm("Tem certeza que deseja excluir este item?")) return
 
     try {
