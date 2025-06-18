@@ -76,8 +76,26 @@ export default function AdminLoginPage() {
       await signInWithEmailAndPassword(auth, email, password)
       router.push("/admin")
     } catch (error: any) {
-      console.error("Erro no login:", error)
-      setError("Credenciais inválidas. Verifique seu email e senha.")
+      console.error("Erro no login:", { code: error.code, message: error.message })
+      let errorMessage = "Ocorreu um erro inesperado. Tente novamente."
+      switch (error.code) {
+        case "auth/user-not-found":
+          errorMessage = "Nenhum usuário encontrado com este e-mail."
+          break
+        case "auth/wrong-password":
+          errorMessage = "A senha está incorreta. Verifique e tente novamente."
+          break
+        case "auth/invalid-email":
+          errorMessage = "O formato do e-mail é inválido."
+          break
+        case "auth/too-many-requests":
+          errorMessage = "Acesso temporariamente bloqueado devido a muitas tentativas. Tente novamente mais tarde."
+          break
+        default:
+          errorMessage = "Credenciais inválidas. Verifique seu e-mail e senha."
+          break
+      }
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
