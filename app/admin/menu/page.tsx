@@ -354,7 +354,7 @@ export default function MenuPage() {
 
       {/* Item Modal */}
       <Dialog open={itemModal.open} onOpenChange={(open) => setItemModal({ open })}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl bg-background/90 backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle>{itemModal.item ? "Editar" : "Adicionar"} Item</DialogTitle>
           </DialogHeader>
