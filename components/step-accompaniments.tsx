@@ -74,29 +74,28 @@ if (isPaoCategory) {
                         )}
                       </div>
                       <div className="flex items-center gap-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onUpdateAccompaniment(category.id, item.id, 1, accompaniments)}
-                          disabled={
-                              (isPaoCategory && paoLimitReached) ||
-                              (isItemLimitedCategory && currentCount >= totalGuests)
-                          }
-                          className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD] disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                        <span className="w-8 text-center text-lg font-semibold text-[#4B4F36]">{currentCount}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onUpdateAccompaniment(category.id, item.id, 1, accompaniments)}
-                          disabled={paoLimitReached}
-                          className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
+    <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onUpdateAccompaniment(category.id, item.id, -1, accompaniments)}
+        disabled={currentCount === 0}
+        className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD]"
+    >
+        <Minus className="h-4 w-4" />
+    </Button>
+    <span className="w-8 text-center text-lg font-semibold text-[#4B4F36]">{currentCount}</span>
+    <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onUpdateAccompaniment(category.id, item.id, 1, accompaniments)}
+        disabled={
+            (isPaoCategory && paoLimitReached) ||
+            (isItemLimitedCategory && currentCount >= totalGuests)
+        }
+        className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD] disabled:opacity-50 disabled:cursor-not-allowed">
+        <Plus className="h-4 w-4" />
+    </Button>
+</div>
                     </div>
                   )
                 })}
