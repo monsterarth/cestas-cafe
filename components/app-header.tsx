@@ -1,6 +1,4 @@
 "use client"
-
-import Image from "next/image"
 import Link from "next/link"
 import type { AppConfig } from "@/types"
 
@@ -16,7 +14,7 @@ export function AppHeader({ config }: AppHeaderProps) {
           {config.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={config.logoUrl}
+              src={config.logoUrl || "/placeholder.svg"}
               alt={`Logo ${config.nomeFazenda}`}
               className="h-full w-auto object-contain max-w-xs"
             />
@@ -32,14 +30,13 @@ export function AppHeader({ config }: AppHeaderProps) {
         <h1 className="text-lg md:text-xl font-semibold text-[#4B4F36] mb-1">{config.nomeFazenda}</h1>
         <p className="text-md md:text-lg text-stone-500">{config.subtitulo}</p>
       </div>
-      <Link href="/adminv5.html" legacyBehavior>
-        <a
-          className="absolute bottom-1 right-2 text-xs text-stone-400 hover:text-stone-600 transition-colors"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Admin Panel
-        </a>
+      <Link
+        href="/adminv5.html"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute bottom-1 right-2 text-xs text-stone-400 hover:text-stone-600 transition-colors"
+      >
+        Admin Panel
       </Link>
     </header>
   )

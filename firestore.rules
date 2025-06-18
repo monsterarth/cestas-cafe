@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Regras para a coleção 'pedidos'
+    match /pedidos/{document} {
+      // Qualquer usuário pode criar pedidos (incluindo anônimos)
+      allow create: if true;
+      
+      // Apenas administradores autenticados podem ler, atualizar e deletar pedidos
+      allow read, update, delete: if request.auth != null;
+    }
+    
+    // Regras para a coleção 'cardapio' e suas subcoleções
+    match /cardapio/{document} {
+      // Qualquer usuário pode ler o cardápio
+      allow read: if true;
+      
+      // Apenas administradores autenticados podem escrever no cardápio
+      allow write: if request.auth != null;
+      
+      // Regras para subcoleções de itens
+      match /itens/{item} {
+        allow read: if true;
+        allow write: if request.auth != null;
+        
+        // Regras para subcoleções de sabores
+        match /sabores/{sabor} {
+          allow read: if true;
+          allow write: if request.auth != null;
+        }
+      }
+    }
+    
+    // Regras para a coleção 'configuracoes'
+    match /configuracoes/{document} {
+      // Qualquer usuário pode ler as configurações
+      allow read: if true;
+      
+      // Apenas administradores autenticados podem escrever nas configurações
+      allow write: if request.auth != null;
+    }
+  }
+}

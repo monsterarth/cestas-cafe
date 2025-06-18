@@ -1,10 +1,9 @@
-// app/page.tsx
-
 "use client"
 
 import type React from "react"
 import { useState } from "react"
 import { useFirebaseData } from "@/hooks/use-firebase-data"
+import { useOrder } from "@/hooks/use-order"
 import { LoadingScreen } from "@/components/loading-screen"
 import { StepNavigation } from "@/components/step-navigation"
 import { GuestAccordion } from "@/components/guest-accordion"
@@ -13,99 +12,44 @@ import { StepDetails } from "@/components/step-details"
 import { StepAccompaniments } from "@/components/step-accompaniments"
 import { StepWelcome } from "@/components/step-welcome"
 import { AppHeader } from "@/components/app-header"
-import type { OrderState } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageCircle } from "lucide-react"
 import { StepReview } from "@/components/step-review"
 import { StepSuccess } from "@/components/step-success"
+import { Toaster } from "sonner"
 
 export default function Home() {
-  const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error, refetch } = useFirebaseData()
+  const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData()
+  const {
+    orderState,
+    orderSubmitted,
+    updateOrderState,
+    handleSelectDish,
+    handleSelectFlavor,
+    handleUpdateNotes,
+    handleNotesChange,
+    handleUpdateAccompaniment,
+    handleSpecialRequestsChange,
+    handleSelectNoHotDish,
+    setOrderSubmitted,
+  } = useOrder()
 
   const [currentStep, setCurrentStep] = useState(1)
-  const [orderState, setOrderState] = useState<OrderState>({
-    guestInfo: { name: "", cabin: "", people: 0, time: "" },
-    persons: [],
-    accompaniments: {},
-    globalHotDishNotes: "",
-    specialRequests: "",
-  })
-  const [orderSubmitted, setOrderSubmitted] = useState(false)
+  const [completedSteps, setCompletedSteps] = useState<number[]>([1])
 
-  const updateOrderState = (updates: Partial<OrderState>) => {
-    setOrderState((prev) => ({ ...prev, ...updates }))
+  const handleStepNavigation = (step: number) => {
+    if (step <= Math.max(...completedSteps) || step === currentStep) {
+      setCurrentStep(step)
+    }
   }
 
-  const handleSelectDish = (personIndex: number, dishId: string) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) =>
-        index === personIndex ? { ...person, hotDish: { typeId: dishId, flavorId: "" } } : person,
-      ),
-    }))
+  const handleNextStep = (nextStep: number) => {
+    setCurrentStep(nextStep)
+    setCompletedSteps((prev) => [...new Set([...prev, nextStep])])
   }
 
-  const handleSelectFlavor = (personIndex: number, flavorId: string) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) =>
-        index === personIndex && person.hotDish ? { ...person, hotDish: { ...person.hotDish, flavorId } } : person,
-      ),
-    }))
-  }
-
-  const handleUpdateNotes = (personIndex: number, notes: string) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) => (index === personIndex ? { ...person, notes } : person)),
-    }))
-  }
-
-  const handleNotesChange = (notes: string) => {
-    setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
-  }
-
-  const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number) => {
-    setOrderState((prev) => {
-      const newAccompaniments = { ...prev.accompaniments }
-      if (!newAccompaniments[categoryId]) {
-        newAccompaniments[categoryId] = {}
-      }
-      const currentCount = newAccompaniments[categoryId][itemId] || 0
-      let newCount = currentCount + change
-      if (newCount < 0) newCount = 0
-      
-      if (newCount === 0) {
-        delete newAccompaniments[categoryId][itemId]
-      } else {
-        newAccompaniments[categoryId][itemId] = newCount
-      }
-      return { ...prev, accompaniments: newAccompaniments }
-    })
-  }
-
-  const handleSpecialRequestsChange = (requests: string) => {
-    setOrderState((prev) => ({ ...prev, specialRequests: requests }))
-  }
-
-  const handleSelectNoHotDish = (personIndex: number) => {
-    setOrderState((prev) => {
-      const personToUpdate = prev.persons[personIndex]
-      const newHotDishState =
-        personToUpdate?.hotDish?.typeId === "NONE" ? null : { typeId: "NONE", flavorId: "NONE" }
-
-      return {
-        ...prev,
-        persons: prev.persons.map((person, index) =>
-          index === personIndex ? { ...person, hotDish: newHotDishState } : person,
-        ),
-      }
-    })
-  }
-
-  // --- Renderização ---
-
+  // Verificações de segurança
   if (loading) {
     return <LoadingScreen />
   }
@@ -114,27 +58,32 @@ export default function Home() {
     return (
       <div className="fixed inset-0 flex flex-col justify-center items-center z-50 bg-[#F7FDF2]">
         <p className="text-red-600 p-4 text-center">{error}</p>
-        <Button onClick={() => refetch()} className="mt-4">
+        <Button onClick={() => window.location.reload()} className="mt-4">
           Tentar Novamente
         </Button>
       </div>
     )
   }
-  
+
   if (!appConfig) {
     return <LoadingScreen message="Aguardando configurações..." />
   }
 
   return (
     <div className="min-h-screen bg-[#E9D9CD] text-[#4B4F36]">
+      <Toaster position="top-center" richColors />
       <AppHeader config={appConfig} />
 
-      {!orderSubmitted && <StepNavigation currentStep={currentStep} onStepClick={setCurrentStep} />}
+      {!orderSubmitted && (
+        <StepNavigation currentStep={currentStep} completedSteps={completedSteps} onStepClick={handleStepNavigation} />
+      )}
 
       <main className="container mx-auto p-2 md:p-4 lg:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
           <div className="lg:col-span-2">
-            {currentStep === 1 && !orderSubmitted && <StepWelcome config={appConfig} onNext={() => setCurrentStep(2)} />}
+            {currentStep === 1 && !orderSubmitted && (
+              <StepWelcome config={appConfig} onNext={() => handleNextStep(2)} />
+            )}
 
             {currentStep === 2 && !orderSubmitted && (
               <StepDetails
@@ -142,7 +91,7 @@ export default function Home() {
                 cabins={cabins}
                 deliveryTimes={deliveryTimes}
                 onUpdateOrderState={updateOrderState}
-                onNext={() => setCurrentStep(3)}
+                onNext={() => handleNextStep(3)}
                 onBack={() => setCurrentStep(1)}
               />
             )}
@@ -199,7 +148,7 @@ export default function Home() {
                         ← Voltar
                       </Button>
                       <Button
-                        onClick={() => setCurrentStep(4)}
+                        onClick={() => handleNextStep(4)}
                         className="text-white hover:opacity-90"
                         style={{ backgroundColor: appConfig.corPrimaria }}
                       >
@@ -216,7 +165,7 @@ export default function Home() {
                 orderState={orderState}
                 accompaniments={accompaniments}
                 onUpdateAccompaniment={handleUpdateAccompaniment}
-                onNext={() => setCurrentStep(5)}
+                onNext={() => handleNextStep(5)}
                 onBack={() => setCurrentStep(3)}
               />
             )}

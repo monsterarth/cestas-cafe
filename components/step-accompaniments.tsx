@@ -7,7 +7,7 @@ import type { AccompanimentCategory, OrderState } from "@/types"
 interface StepAccompanimentsProps {
   orderState: OrderState
   accompaniments: Record<string, AccompanimentCategory>
-  onUpdateAccompaniment: (categoryId: string, itemId: string, change: number) => void
+  onUpdateAccompaniment: (categoryId: string, itemId: string, change: number, accompaniments: any) => void
   onNext: () => void
   onBack: () => void
 }
@@ -29,15 +29,15 @@ export function StepAccompaniments({
       </div>
       <div className="p-6 space-y-8">
         {Object.values(accompaniments).map((category) => {
-          const maxGuests = orderState.guestInfo.people || 1;
-          const categoryNameLower = category.name.toLowerCase();
-          const isLimitedByCategory = categoryNameLower === 'pães' || categoryNameLower === 'bolos';
-          
-          let totalInCategory = 0;
+          const maxGuests = orderState.guestInfo.people || 1
+          const categoryNameLower = category.name.toLowerCase()
+          const isLimitedByCategory = categoryNameLower === "pães" || categoryNameLower === "bolos"
+
+          let totalInCategory = 0
           if (isLimitedByCategory) {
             totalInCategory = category.items.reduce((total, currentItem) => {
-              return total + (orderState.accompaniments[category.id]?.[currentItem.id] || 0);
-            }, 0);
+              return total + (orderState.accompaniments[category.id]?.[currentItem.id] || 0)
+            }, 0)
           }
 
           return (
@@ -45,10 +45,10 @@ export function StepAccompaniments({
               <h3 className="text-xl font-bold text-[#4B4F36] mb-4">{category.name}</h3>
               <div className="space-y-4">
                 {category.items.map((item) => {
-                  const currentCount = orderState.accompaniments[category.id]?.[item.id] || 0;
+                  const currentCount = orderState.accompaniments[category.id]?.[item.id] || 0
                   const isAddButtonDisabled = isLimitedByCategory
                     ? totalInCategory >= maxGuests
-                    : currentCount >= maxGuests;
+                    : currentCount >= maxGuests
 
                   return (
                     <div
@@ -68,7 +68,7 @@ export function StepAccompaniments({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => onUpdateAccompaniment(category.id, item.id, -1)}
+                          onClick={() => onUpdateAccompaniment(category.id, item.id, -1, accompaniments)}
                           disabled={currentCount === 0}
                           className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD]"
                         >
@@ -78,7 +78,7 @@ export function StepAccompaniments({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => onUpdateAccompaniment(category.id, item.id, 1)}
+                          onClick={() => onUpdateAccompaniment(category.id, item.id, 1, accompaniments)}
                           disabled={isAddButtonDisabled}
                           className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD]"
                         >

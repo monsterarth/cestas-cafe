@@ -2,7 +2,6 @@ export interface HotDish {
   id: string
   nomeItem: string
   emoji?: string
-  imageUrl?: string // Adicionado
   calorias: number
   disponivel: boolean
   sabores: Flavor[]

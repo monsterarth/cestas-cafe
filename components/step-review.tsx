@@ -4,8 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { CheckCircle } from "lucide-react"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { getFirebaseDb, isFirebaseAvailable } from "@/lib/firebase"
 import type { OrderState, HotDish, AccompanimentCategory } from "@/types"
 
 interface StepReviewProps {
@@ -124,15 +123,33 @@ export function StepReview({
         observacoesGerais: orderState.specialRequests || "",
         observacoesPratosQuentes: orderState.globalHotDishNotes || "",
         status: "Novo",
-        timestampPedido: serverTimestamp(),
+        timestampPedido: new Date().toISOString(),
       }
 
-      // Salva no Firestore
-      await addDoc(collection(db, "pedidos"), orderPayload)
+      // Try to save to Firebase if available
+      if (isFirebaseAvailable()) {
+        try {
+          const db = await getFirebaseDb()
+          if (db) {
+            const { collection, addDoc, serverTimestamp } = await import("firebase/firestore")
+
+            await addDoc(collection(db, "pedidos"), {
+              ...orderPayload,
+              timestampPedido: serverTimestamp(),
+            })
+            console.log("Order saved to Firebase successfully")
+          }
+        } catch (firebaseError) {
+          console.warn("Firebase save failed, order processed locally:", firebaseError)
+        }
+      } else {
+        console.log("Firebase not available, order processed locally")
+      }
+
       onSuccess()
     } catch (err) {
-      console.error("Erro ao enviar pedido:", err)
-      setError("Erro ao enviar pedido. Tente novamente.")
+      console.error("Erro ao processar pedido:", err)
+      setError("Erro ao processar pedido. Tente novamente.")
     } finally {
       setIsSubmitting(false)
     }

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { ChevronDown, User, Check, X, ArrowLeft } from "lucide-react"
+import Image from "next/image"
 import type { HotDish, Person } from "@/types"
 import { Button } from "@/components/ui/button"
 
@@ -31,10 +32,8 @@ export function GuestAccordion({
     onSelectDish(personIndex, dishId)
   }
 
-  // Função para fechar o acordeão atual, abrir o próximo e rolar para o topo
   const advanceToNext = (personIndex: number) => {
     setTimeout(() => {
-      // Abre o próximo acordeão
       setOpenAccordions((prev) => {
         const accordionsSemOAtual = prev.filter((i) => i !== personIndex)
         if (personIndex < persons.length - 1) {
@@ -42,7 +41,6 @@ export function GuestAccordion({
         }
         return accordionsSemOAtual
       })
-      // Rola a página para o topo
       window.scrollTo({
         top: 0,
         behavior: "smooth",
@@ -59,8 +57,6 @@ export function GuestAccordion({
     const isUndoing = persons[personIndex]?.hotDish?.typeId === "NONE"
     onSelectNoHotDish(personIndex)
 
-    // A rolagem só acontece se o usuário estiver optando por NÃO querer o prato.
-    // Se ele estiver revertendo a escolha, a tela permanece no lugar.
     if (!isUndoing) {
       advanceToNext(personIndex)
     }
@@ -179,13 +175,14 @@ export function GuestAccordion({
                             onClick={() => handleSelectDish(index, dish.id)}
                           >
                             <div className="flex flex-col items-center text-center space-y-3 md:space-y-4">
-                              <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl flex items-center justify-center text-3xl md:text-5xl shadow-inner bg-[#E9D9CD] overflow-hidden">
+                              <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl flex items-center justify-center text-3xl md:text-5xl shadow-inner bg-[#E9D9CD] overflow-hidden relative">
                                 {dish.imageUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={dish.imageUrl}
+                                  <Image
+                                    src={dish.imageUrl || "/placeholder.svg"}
                                     alt={dish.nomeItem}
-                                    className="w-full h-full object-cover"
+                                    fill
+                                    className="object-cover rounded-2xl"
+                                    sizes="(max-width: 768px) 80px, 112px"
                                   />
                                 ) : (
                                   <span className="text-3xl md:text-5xl">{dish.emoji || "🍽️"}</span>
