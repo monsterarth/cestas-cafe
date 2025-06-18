@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore"
+
 export interface HotDish {
   id: string
   nomeItem: string
@@ -9,10 +11,10 @@ export interface HotDish {
 }
 
 export interface Flavor {
-  id: string
+  id:string
   nomeSabor: string
   disponivel: boolean
-  posicao: number // O campo 'posicao' é necessário aqui
+  posicao: number
 }
 
 export interface Person {
@@ -33,7 +35,6 @@ export interface AccompanimentCategory {
   id: string
   name: string
   items: AccompanimentItem[]
-  // 'limitePorPessoa' foi removido daqui pois a lógica agora é fixa no código
 }
 
 export interface AccompanimentItem {
@@ -68,4 +69,23 @@ export interface OrderState {
   accompaniments: Record<string, Record<string, number>>
   globalHotDishNotes: string
   specialRequests: string
+}
+
+// NOVA INTERFACE PARA PEDIDOS
+export interface Order {
+  id: string
+  hospedeNome: string
+  cabanaNumero: string
+  horarioEntrega: string
+  numeroPessoas: number
+  status: "Novo" | "Em Preparação" | "Entregue" | "Cancelado"
+  timestampPedido: Timestamp
+  itensPedido: Array<{
+    nomeItem: string
+    quantidade: number
+    observacao?: string
+    paraPessoa?: string
+  }>
+  observacoesGerais?: string
+  observacoesPratosQuentes?: string
 }

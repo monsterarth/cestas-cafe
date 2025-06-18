@@ -1,223 +1,192 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore"
+import { useState, useEffect, useMemo } from "react"
+import { collection, onSnapshot, orderBy, query, where, Timestamp } from "firebase/firestore"
 import { getFirebaseDb } from "@/lib/firebase"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-import { Clock, CheckCircle, AlertCircle } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts"
+import { Utensils, Clock, Users, ShoppingBasket, UtensilsCrossed } from "lucide-react"
+import type { Order } from "@/types"
 
-interface Order {
-  id: string
-  hospedeNome: string
-  cabanaNumero: string
-  horarioEntrega: string
-  status: string
-  timestampPedido: any
-  itensPedido: Array<{
-    nomeItem: string
-    quantidade: number
-  }>
-}
+// --- COMPONENTES DO DASHBOARD ---
 
+const StatsCard = ({ title, value, description, icon: Icon }: { title: string; value: string | number; description: string; icon: React.ElementType }) => (
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium text-gray-500">{title}</CardTitle>
+      <Icon className="h-5 w-5 text-gray-400" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-3xl font-bold text-[#4B4F36]">{value}</div>
+      <p className="text-xs text-gray-500">{description}</p>
+    </CardContent>
+  </Card>
+)
+
+const UpcomingDeliveries = ({ schedule }: { schedule: { time: string; orders: Order[] }[] }) => (
+  <Card className="lg:col-span-2">
+    <CardHeader>
+      <CardTitle>Entregas de Hoje</CardTitle>
+      <CardDescription>Linha do tempo das cestas programadas para hoje.</CardDescription>
+    </CardHeader>
+    <CardContent className="space-y-6">
+      {schedule.length > 0 ? schedule.map(({ time, orders }) => (
+        <div key={time} className="flex gap-4">
+          <div className="flex flex-col items-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#97A25F] text-white font-bold">
+              {time}
+            </div>
+            <div className="flex-1 w-px bg-gray-200"></div>
+          </div>
+          <div className="flex-1 pb-8">
+            {orders.map(order => (
+              <div key={order.id} className="mb-2 p-3 bg-white border rounded-lg shadow-sm">
+                <div className="font-bold text-[#4B4F36]">Cabana {order.cabanaNumero}</div>
+                <div className="text-sm text-gray-600">{order.hospedeNome} - {order.numeroPessoas} pessoa(s)</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )) : (
+        <div className="text-center py-10 text-gray-500">Nenhuma entrega para hoje.</div>
+      )}
+    </CardContent>
+  </Card>
+)
+
+const PrepList = ({ items }: { items: { name: string; quantity: number }[] }) => (
+    <Card>
+        <CardHeader>
+            <CardTitle>Itens para Preparar Hoje</CardTitle>
+            <CardDescription>Soma de todos os itens para as cestas de hoje.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            {items.length > 0 ? (
+                <ul className="space-y-2 max-h-80 overflow-y-auto">
+                {items.map(item => (
+                    <li key={item.name} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded-md">
+                        <span className="text-[#4B4F36]">{item.name}</span>
+                        <span className="font-bold bg-[#E9D9CD] text-[#4B4F36] px-2 py-0.5 rounded-full">{item.quantity}</span>
+                    </li>
+                ))}
+                </ul>
+            ) : (
+                <div className="text-center py-10 text-gray-500">Nenhum item a preparar.</div>
+            )}
+        </CardContent>
+    </Card>
+)
+
+// --- PÁGINA PRINCIPAL DO DASHBOARD ---
 export default function DashboardPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
 
-useEffect(() => {
-  const setupFirestoreListener = async () => {
-    const db = await getFirebaseDb(); // Obtenha a instância do DB
-    if (!db) {
-      console.error("Firestore não está disponível.");
-      setLoading(false);
-      return; // Para a execução se o DB não for inicializado
+  useEffect(() => {
+    const setupFirestoreListener = async () => {
+      const db = await getFirebaseDb()
+      if (!db) { setLoading(false); return }
+      
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+      
+      const ordersQuery = query(
+        collection(db, "pedidos"),
+        where("timestampPedido", ">=", Timestamp.fromDate(todayStart)),
+        where("timestampPedido", "<=", Timestamp.fromDate(todayEnd)),
+        orderBy("timestampPedido", "desc")
+      );
+
+      const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
+        const ordersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+        setOrders(ordersData)
+        setLoading(false)
+      }, (error) => { console.error("Error loading orders:", error); setLoading(false) })
+      return unsubscribe
     }
+    let unsubscribe: (() => void) | undefined
+    setupFirestoreListener().then(unsub => { if (unsub) unsubscribe = unsub })
+    return () => { if (unsubscribe) unsubscribe() }
+  }, [])
 
-    // Agora que temos o 'db', podemos criar a query
-    const ordersQuery = query(collection(db, "pedidos"), orderBy("timestampPedido", "desc"));
+  const { stats, deliverySchedule, prepList, ordersByHour } = useMemo(() => {
+    const activeOrders = orders.filter(o => o.status !== 'Cancelado');
 
-    const unsubscribe = onSnapshot(
-      ordersQuery,
-      (snapshot) => {
-        const ordersData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Order[];
+    const nextDelivery = activeOrders
+      .filter(o => o.status !== 'Entregue')
+      .sort((a, b) => a.horarioEntrega.localeCompare(b.horarioEntrega))
+      .find(o => true);
 
-        setOrders(ordersData);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Error loading orders:", error);
-        setLoading(false);
-      },
-    );
+    const stats = {
+      ordersToday: activeOrders.length,
+      nextDelivery: nextDelivery ? `${nextDelivery.horarioEntrega} (Cab. ${nextDelivery.cabanaNumero})` : 'Nenhuma',
+      guestsToday: activeOrders.reduce((sum, o) => sum + o.numeroPessoas, 0),
+      itemsToPrep: activeOrders.reduce((sum, o) => sum + o.itensPedido.reduce((itemSum, i) => itemSum + i.quantidade, 0), 0)
+    };
 
-    return unsubscribe;
-  };
+    const scheduleMap = new Map<string, Order[]>();
+    activeOrders.sort((a, b) => a.horarioEntrega.localeCompare(b.horarioEntrega)).forEach(order => {
+        const time = order.horarioEntrega;
+        if (!scheduleMap.has(time)) scheduleMap.set(time, []);
+        scheduleMap.get(time)!.push(order);
+    });
+    const deliverySchedule = Array.from(scheduleMap.entries()).map(([time, orders]) => ({ time, orders }));
 
-  let unsubscribe: (() => void) | undefined;
-  
-  setupFirestoreListener().then(unsub => {
-    if (unsub) {
-      unsubscribe = unsub;
-    }
-  });
+    const prepMap = new Map<string, number>();
+    activeOrders.forEach(order => {
+        order.itensPedido.forEach(item => {
+            prepMap.set(item.nomeItem, (prepMap.get(item.nomeItem) || 0) + item.quantidade);
+        });
+    });
+    const prepList = Array.from(prepMap.entries()).map(([name, quantity]) => ({ name, quantity })).sort((a,b) => b.quantity - a.quantity);
 
-  // Função de limpeza para se desinscrever do listener
-  return () => {
-    if (unsubscribe) {
-      unsubscribe();
-    }
-  };
-}, []);
+    const hourMap = new Map<string, number>();
+    activeOrders.forEach(order => {
+        hourMap.set(order.horarioEntrega, (hourMap.get(order.horarioEntrega) || 0) + 1);
+    });
+    const ordersByHour = Array.from(hourMap.entries()).map(([name, total]) => ({ name, total })).sort((a,b) => a.name.localeCompare(b.name));
 
-  // Calcular estatísticas
-  const newOrders = orders.filter((o) => o.status === "Novo").length
-  const inPrepOrders = orders.filter((o) => o.status === "Em Preparação").length
-  const deliveredToday = orders.filter((o) => {
-    const orderDate = o.timestampPedido?.toDate?.()
-    const today = new Date()
-    return o.status === "Entregue" && orderDate && orderDate.toDateString() === today.toDateString()
-  }).length
+    return { stats, deliverySchedule, prepList, ordersByHour };
+  }, [orders]);
 
-  // Pedidos recentes em aberto
-  const recentOpenOrders = orders.filter((o) => ["Novo", "Em Preparação"].includes(o.status)).slice(0, 5)
-
-  // Itens mais pedidos
-  const itemCounts: Record<string, number> = {}
-  orders.forEach((order) => {
-    ;(order.itensPedido || []).forEach((item) => {
-      const itemName = item.nomeItem.split(" - ")[0]
-      itemCounts[itemName] = (itemCounts[itemName] || 0) + item.quantidade
-    })
-  })
-
-  const topItems = Object.entries(itemCounts)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
-    .map(([name, quantity]) => ({ name, quantity }))
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="w-8 h-8 border-4 border-gray-300 border-t-[#97A25F] rounded-full animate-spin"></div>
-      </div>
-    )
-  }
+  if (loading) return <div className="flex justify-center items-center h-64"><div className="w-8 h-8 border-4 border-gray-300 border-t-[#97A25F] rounded-full animate-spin"></div></div>
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-xl font-semibold text-[#4B4F36]">Dashboard</h3>
-        <p className="text-[#ADA192] mt-1">Visão geral dos pedidos e estatísticas.</p>
-      </div>
-
-      {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#ADA192]">Novos Pedidos</CardTitle>
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#4B4F36]">{newOrders}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#ADA192]">Em Preparação</CardTitle>
-            <Clock className="h-4 w-4 text-amber-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#4B4F36]">{inPrepOrders}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-[#ADA192]">Entregues Hoje</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#4B4F36]">{deliveredToday}</div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatsCard title="Pedidos para Hoje" value={stats.ordersToday} description="Total de cestas a entregar" icon={ShoppingBasket} />
+        <StatsCard title="Próxima Entrega" value={stats.nextDelivery} description="Horário e cabana" icon={Clock} />
+        <StatsCard title="Hóspedes Servidos Hoje" value={stats.guestsToday} description="Total de pessoas nas cestas" icon={Users} />
+        <StatsCard title="Itens para Preparar" value={stats.itemsToPrep} description="Soma de todos os produtos" icon={UtensilsCrossed} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Pedidos Recentes */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-bold text-[#4B4F36]">Pedidos em Aberto Recentes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="p-3 font-medium text-[#ADA192]">Hóspede</th>
-                      <th className="p-3 font-medium text-[#ADA192]">Cabana</th>
-                      <th className="p-3 font-medium text-[#ADA192]">Entrega</th>
-                      <th className="p-3 font-medium text-[#ADA192]">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentOpenOrders.length > 0 ? (
-                      recentOpenOrders.map((order) => (
-                        <tr key={order.id} className="border-b hover:bg-gray-50">
-                          <td className="p-3 font-medium text-[#4B4F36]">{order.hospedeNome}</td>
-                          <td className="p-3 text-[#4B4F36]">{order.cabanaNumero}</td>
-                          <td className="p-3 text-[#4B4F36]">{order.horarioEntrega}</td>
-                          <td className="p-3">
-                            <span
-                              className={`font-medium px-2.5 py-0.5 rounded-full text-xs ${
-                                order.status === "Novo" ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"
-                              }`}
-                            >
-                              {order.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
+        <UpcomingDeliveries schedule={deliverySchedule} />
+        <div className="space-y-8">
+            <PrepList items={prepList} />
+             <Card>
+                <CardHeader>
+                    <CardTitle>Entregas por Horário</CardTitle>
+                    <CardDescription>Volume de cestas para cada horário de entrega.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {ordersByHour.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={ordersByHour} margin={{ top: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} width={30} />
+                                <Tooltip cursor={{ fill: 'rgba(233, 217, 205, 0.4)' }} contentStyle={{backgroundColor: '#F7FDF2', border: '1px solid #E9D9CD', borderRadius: '0.5rem'}}/>
+                                <Bar dataKey="total" fill="#97A25F" radius={[4, 4, 0, 0]}>
+                                    <LabelList dataKey="total" position="top" style={{ fill: '#4B4F36', fontSize: 12 }} />
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
                     ) : (
-                      <tr>
-                        <td colSpan={4} className="p-3 text-center text-[#ADA192]">
-                          Nenhum pedido em aberto.
-                        </td>
-                      </tr>
+                        <div className="text-center py-10 text-gray-500">Nenhum dado para exibir.</div>
                     )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Gráfico de Itens Mais Pedidos */}
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-bold text-[#4B4F36]">Itens Mais Pedidos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {topItems.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topItems} layout="horizontal">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={80} />
-                    <Tooltip />
-                    <Bar dataKey="quantity" fill="#97A25F" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-64 text-[#ADA192]">Nenhum dado disponível</div>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+            </Card>
         </div>
       </div>
     </div>
