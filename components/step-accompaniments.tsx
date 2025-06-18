@@ -29,36 +29,32 @@ export function StepAccompaniments({
       </div>
       <div className="p-6 space-y-8">
         {Object.values(accompaniments).map((category) => {
-          const totalGuests = orderState.guestInfo.people || 1
-const limitPerPerson = category.limitePorPessoa || 0
-const isLimitedCategory = limitPerPerson > 0
+const totalGuests = orderState.guestInfo.people || 1;
+const categoryNameLower = category.name.toLowerCase();
+const itemLimitedCategories = ["bebidas", "bolos", "complementos", "frios", "frutas"];
 
-let totalInCategory = 0
-let absoluteLimit = 0
-let isLimitReached = false
-let limitMessage = ""
+let isPaoCategory = categoryNameLower === "pães";
+let isItemLimitedCategory = itemLimitedCategories.includes(categoryNameLower);
 
-if (isLimitedCategory) {
-  absoluteLimit = limitPerPerson * totalGuests
-  limitMessage = `Limite de ${absoluteLimit} item(ns) para ${totalGuests} pessoa(s).`
-
-  totalInCategory = category.items.reduce((total, currentItem) => {
-    return total + (orderState.accompaniments[category.id]?.[currentItem.id] || 0)
-  }, 0)
-
-  isLimitReached = totalInCategory >= absoluteLimit
+let paoLimitReached = false;
+if (isPaoCategory) {
+    const absoluteLimit = totalGuests * 2;
+    const totalInCategory = category.items.reduce((total, currentItem) => {
+        return total + (orderState.accompaniments[category.id]?.[currentItem.id] || 0);
+    }, 0);
+    paoLimitReached = totalInCategory >= absoluteLimit;
 }
 
           return (
             <div key={category.id}>
               <div className="flex items-baseline justify-between flex-wrap gap-2 mb-4">
                 <h3 className="text-xl font-bold text-[#4B4F36]">{category.name}</h3>
-                {isLimitReached && (
-                  <div className="flex items-center gap-2 p-2 text-sm text-amber-800 bg-amber-100 border border-amber-200 rounded-md">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span>{limitMessage}</span>
-                  </div>
-                )}
+                {isPaoCategory && paoLimitReached && (
+    <div className="flex items-center gap-2 p-2 text-sm text-amber-800 bg-amber-100 border border-amber-200 rounded-md">
+        <AlertTriangle className="h-4 w-4" />
+        <span>Limite total de {totalGuests * 2} pães atingido.</span>
+    </div>
+)}
               </div>
               <div className="space-y-4">
                 {category.items.map((item) => {
@@ -81,18 +77,21 @@ if (isLimitedCategory) {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => onUpdateAccompaniment(category.id, item.id, -1, accompaniments)}
-                          disabled={currentCount === 0}
-                          className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD]"
-                        >
-                          <Minus className="h-4 w-4" />
+                          onClick={() => onUpdateAccompaniment(category.id, item.id, 1, accompaniments)}
+                          disabled={
+                              (isPaoCategory && paoLimitReached) ||
+                              (isItemLimitedCategory && currentCount >= totalGuests)
+                          }
+                          className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD] disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          <Plus className="h-4 w-4" />
                         </Button>
                         <span className="w-8 text-center text-lg font-semibold text-[#4B4F36]">{currentCount}</span>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => onUpdateAccompaniment(category.id, item.id, 1, accompaniments)}
-                          disabled={isLimitReached}
+                          disabled={paoLimitReached}
                           className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Plus className="h-4 w-4" />
