@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { collection, onSnapshot, orderBy, query, where, Timestamp } from "firebase/firestore"
+import { collection, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore"
 import { getFirebaseDb } from "@/lib/firebase"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts"
 import { Utensils, Clock, Users, ShoppingBasket, UtensilsCrossed } from "lucide-react"
 import type { Order } from "@/types"
 
-// --- COMPONENTES DO DASHBOARD ---
+// --- COMPONENTES DO DASHBOARD (sem alterações) ---
 
 const StatsCard = ({ title, value, description, icon: Icon }: { title: string; value: string | number; description: string; icon: React.ElementType }) => (
   <Card>
@@ -79,7 +79,7 @@ const PrepList = ({ items }: { items: { name: string; quantity: number }[] }) =>
 
 // --- PÁGINA PRINCIPAL DO DASHBOARD ---
 export default function DashboardPage() {
-  const [orders, setOrders] = useState<Order[]>([])
+  const [todaysOrders, setTodaysOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -87,30 +87,53 @@ export default function DashboardPage() {
       const db = await getFirebaseDb()
       if (!db) { setLoading(false); return }
       
-      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-      
-      const ordersQuery = query(
-        collection(db, "pedidos"),
-        where("timestampPedido", ">=", Timestamp.fromDate(todayStart)),
-        where("timestampPedido", "<=", Timestamp.fromDate(todayEnd)),
-        orderBy("timestampPedido", "desc")
-      );
+      // ALTERAÇÃO: Busca todos os pedidos, a filtragem será feita no código.
+      const ordersQuery = query(collection(db, "pedidos"), orderBy("timestampPedido", "desc"));
 
       const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
-        const ordersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
-        setOrders(ordersData)
-        setLoading(false)
-      }, (error) => { console.error("Error loading orders:", error); setLoading(false) })
-      return unsubscribe
+        const allOrders = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Order[];
+
+        // ALTERAÇÃO: Lógica para filtrar os pedidos de hoje, entendendo os dois formatos de data
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        const filteredOrders = allOrders.filter(order => {
+          let orderDate: Date | null = null;
+          // Verifica se o timestamp é um objeto do Firestore (formato novo)
+          if (order.timestampPedido && typeof order.timestampPedido.toDate === 'function') {
+            orderDate = order.timestampPedido.toDate();
+          } 
+          // Senão, tenta converter de string (formato antigo)
+          else if (typeof order.timestampPedido === 'string') {
+            orderDate = new Date(order.timestampPedido);
+          }
+
+          if (orderDate) {
+            return orderDate >= todayStart && orderDate <= todayEnd;
+          }
+          return false;
+        });
+
+        setTodaysOrders(filteredOrders);
+        setLoading(false);
+      }, (error) => { console.error("Error loading orders:", error); setLoading(false); });
+      
+      return unsubscribe;
     }
-    let unsubscribe: (() => void) | undefined
-    setupFirestoreListener().then(unsub => { if (unsub) unsubscribe = unsub })
-    return () => { if (unsubscribe) unsubscribe() }
-  }, [])
+    let unsubscribe: (() => void) | undefined;
+    setupFirestoreListener().then(unsub => { if (unsub) unsubscribe = unsub; });
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, []);
 
   const { stats, deliverySchedule, prepList, ordersByHour } = useMemo(() => {
-    const activeOrders = orders.filter(o => o.status !== 'Cancelado');
+    // Agora o cálculo usa 'todaysOrders' que já vem filtrado
+    const activeOrders = todaysOrders.filter(o => o.status !== 'Cancelado');
 
     const nextDelivery = activeOrders
       .filter(o => o.status !== 'Entregue')
@@ -147,7 +170,7 @@ export default function DashboardPage() {
     const ordersByHour = Array.from(hourMap.entries()).map(([name, total]) => ({ name, total })).sort((a,b) => a.name.localeCompare(b.name));
 
     return { stats, deliverySchedule, prepList, ordersByHour };
-  }, [orders]);
+  }, [todaysOrders]);
 
   if (loading) return <div className="flex justify-center items-center h-64"><div className="w-8 h-8 border-4 border-gray-300 border-t-[#97A25F] rounded-full animate-spin"></div></div>
 
