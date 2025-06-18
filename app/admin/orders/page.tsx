@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, onSnapshot, orderBy, query, doc, updateDoc } from "firebase/firestore"
+import { collection, onSnapshot, orderBy, query, doc, updateDoc, QuerySnapshot, DocumentData } from "firebase/firestore"
 import { getFirebaseDb } from "@/lib/firebase"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Printer } from "lucide-react"
+
 
 interface Order {
   id: string
@@ -33,28 +34,53 @@ export default function OrdersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const ordersQuery = query(collection(db, "pedidos"), orderBy("timestampPedido", "desc"))
+useEffect(() => {
+  const setupFirestoreListener = async () => {
+    const db = await getFirebaseDb(); // Obtenha a instância do DB
+    if (!db) {
+      console.error("Firestore não está disponível.");
+      setLoading(false);
+      return; // Para a execução se o DB não for inicializado
+    }
+
+    // Agora que temos o 'db', podemos criar a query
+    const ordersQuery = query(collection(db, "pedidos"), orderBy("timestampPedido", "desc"));
 
     const unsubscribe = onSnapshot(
       ordersQuery,
-      (snapshot) => {
+      (snapshot: QuerySnapshot<DocumentData>) => {
         const ordersData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        })) as Order[]
+        })) as Order[];
 
-        setOrders(ordersData)
-        setLoading(false)
+        setOrders(ordersData);
+        setLoading(false);
       },
       (error) => {
-        console.error("Error loading orders:", error)
-        setLoading(false)
+        console.error("Error loading orders:", error);
+        setLoading(false);
       },
-    )
+    );
 
-    return () => unsubscribe()
-  }, [])
+    return unsubscribe;
+  };
+
+  let unsubscribe: (() => void) | undefined;
+  
+  setupFirestoreListener().then(unsub => {
+    if (unsub) {
+      unsubscribe = unsub;
+    }
+  });
+
+  // Função de limpeza para se desinscrever do listener
+  return () => {
+    if (unsubscribe) {
+      unsubscribe();
+    }
+  };
+}, []);
 
   const handleOrderClick = (order: Order) => {
     setSelectedOrder(order)
@@ -62,6 +88,12 @@ export default function OrdersPage() {
   }
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+  const db = await getFirebaseDb(); // Primeiro, peça a conexão
+  
+  if (!db) { // Verifique se a conexão foi bem-sucedida
+     console.error("Falha ao conectar ao DB");
+     return;
+  }
     try {
       await updateDoc(doc(db, "pedidos", orderId), { status: newStatus })
       setIsModalOpen(false)

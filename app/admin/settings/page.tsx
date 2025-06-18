@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { doc, getDoc, setDoc } from "firebase/firestore"
-import { getFirebaseDb } from "@/lib/firebase"
+import { getFirebaseDb } from '@/lib/firebase'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,27 +51,43 @@ export default function SettingsPage() {
   }, [])
 
   const loadConfigurations = async () => {
-    try {
-      // Load app config
-      const appConfigDoc = await getDoc(doc(db, "configuracoes", "app"))
-      if (appConfigDoc.exists()) {
-        setAppConfig((prev) => ({ ...prev, ...appConfigDoc.data() }))
-      }
+  // 1. Obtenha a instância do banco de dados AQUI
+  const db = await getFirebaseDb();
 
-      // Load general config
-      const generalConfigDoc = await getDoc(doc(db, "configuracoes", "geral"))
-      if (generalConfigDoc.exists()) {
-        setGeneralConfig((prev) => ({ ...prev, ...generalConfigDoc.data() }))
-      }
-    } catch (error) {
-      console.error("Error loading configurations:", error)
-    } finally {
-      setLoading(false)
-    }
+  // 2. Adicione uma verificação de segurança
+  if (!db) {
+    console.error("Conexão com o banco de dados falhou.");
+    setLoading(false); // Pare o carregamento se não houver DB
+    return;
   }
 
+  try {
+    // Load app config
+    // 3. Agora você pode usar a variável 'db' que acabou de criar
+    const appConfigDoc = await getDoc(doc(db, "configuracoes", "app"));
+    if (appConfigDoc.exists()) {
+      setAppConfig((prev) => ({ ...prev, ...appConfigDoc.data() }));
+    }
+
+    // Load general config
+    const generalConfigDoc = await getDoc(doc(db, "configuracoes", "geral"));
+    if (generalConfigDoc.exists()) {
+      setGeneralConfig((prev) => ({ ...prev, ...generalConfigDoc.data() }));
+    }
+  } catch (error) {
+    console.error("Error loading configurations:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
   const handleSaveAppConfig = async (formData: FormData) => {
-    setSaving(true)
+  const db = await getFirebaseDb(); // Primeiro, peça a conexão
+  
+  if (!db) { // Verifique se a conexão foi bem-sucedida
+     console.error("Falha ao conectar ao DB");
+     return;
+  }
     try {
       const configData = {
         nomeFazenda: formData.get("nomeFazenda") as string,
@@ -96,7 +112,12 @@ export default function SettingsPage() {
   }
 
   const handleSaveCabanas = async () => {
-    setSaving(true)
+  const db = await getFirebaseDb(); // Primeiro, peça a conexão
+  
+  if (!db) { // Verifique se a conexão foi bem-sucedida
+     console.error("Falha ao conectar ao DB");
+     return;
+  }
     try {
       await setDoc(doc(db, "configuracoes", "geral"), { cabanas: generalConfig.cabanas }, { merge: true })
       alert("Cabanas salvas com sucesso!")
@@ -109,7 +130,12 @@ export default function SettingsPage() {
   }
 
   const handleSaveHorarios = async () => {
-    setSaving(true)
+  const db = await getFirebaseDb(); // Primeiro, peça a conexão
+  
+  if (!db) { // Verifique se a conexão foi bem-sucedida
+     console.error("Falha ao conectar ao DB");
+     return;
+  }
     try {
       await setDoc(
         doc(db, "configuracoes", "geral"),

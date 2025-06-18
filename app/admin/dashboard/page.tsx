@@ -24,8 +24,17 @@ export default function DashboardPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const ordersQuery = query(collection(db, "pedidos"), orderBy("timestampPedido", "desc"))
+useEffect(() => {
+  const setupFirestoreListener = async () => {
+    const db = await getFirebaseDb(); // Obtenha a instância do DB
+    if (!db) {
+      console.error("Firestore não está disponível.");
+      setLoading(false);
+      return; // Para a execução se o DB não for inicializado
+    }
+
+    // Agora que temos o 'db', podemos criar a query
+    const ordersQuery = query(collection(db, "pedidos"), orderBy("timestampPedido", "desc"));
 
     const unsubscribe = onSnapshot(
       ordersQuery,
@@ -33,19 +42,35 @@ export default function DashboardPage() {
         const ordersData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        })) as Order[]
+        })) as Order[];
 
-        setOrders(ordersData)
-        setLoading(false)
+        setOrders(ordersData);
+        setLoading(false);
       },
       (error) => {
-        console.error("Error loading orders:", error)
-        setLoading(false)
+        console.error("Error loading orders:", error);
+        setLoading(false);
       },
-    )
+    );
 
-    return () => unsubscribe()
-  }, [])
+    return unsubscribe;
+  };
+
+  let unsubscribe: (() => void) | undefined;
+  
+  setupFirestoreListener().then(unsub => {
+    if (unsub) {
+      unsubscribe = unsub;
+    }
+  });
+
+  // Função de limpeza para se desinscrever do listener
+  return () => {
+    if (unsubscribe) {
+      unsubscribe();
+    }
+  };
+}, []);
 
   // Calcular estatísticas
   const newOrders = orders.filter((o) => o.status === "Novo").length
