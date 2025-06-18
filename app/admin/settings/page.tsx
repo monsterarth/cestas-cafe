@@ -18,7 +18,6 @@ interface AppConfig {
   textoAgradecimento: string
   corPrimaria: string
   corSecundaria: string
-  caloriasMediasPorPessoa: number
 }
 
 interface GeneralConfig {
@@ -36,7 +35,6 @@ export default function SettingsPage() {
     textoAgradecimento: "",
     corPrimaria: "#97A25F",
     corSecundaria: "#4B4F36",
-    caloriasMediasPorPessoa: 600,
   })
 
   const [generalConfig, setGeneralConfig] = useState<GeneralConfig>({
@@ -92,7 +90,6 @@ export default function SettingsPage() {
         textoAgradecimento: formData.get("textoAgradecimento") as string,
         corPrimaria: formData.get("corPrimaria") as string,
         corSecundaria: formData.get("corSecundaria") as string,
-        caloriasMediasPorPessoa: Number.parseInt(formData.get("caloriasMediasPorPessoa") as string) || 600,
       }
 
       await setDoc(doc(db, "configuracoes", "app"), configData, { merge: true })
@@ -194,7 +191,6 @@ export default function SettingsPage() {
         <p className="text-[#ADA192] mt-1">Gerencie os parâmetros do sistema e a aparência do aplicativo.</p>
       </div>
 
-      {/* Personalização do Aplicativo */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-[#4B4F36]">Personalização do Aplicativo</CardTitle>
@@ -244,17 +240,6 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div>
-              <Label htmlFor="caloriasMediasPorPessoa">Total de Calorias Ideal por Pessoa</Label>
-              <Input
-                id="caloriasMediasPorPessoa"
-                name="caloriasMediasPorPessoa"
-                type="number"
-                defaultValue={appConfig.caloriasMediasPorPessoa}
-                className="mt-1"
-              />
-            </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="corPrimaria">Cor Primária (Destaque)</Label>
@@ -287,7 +272,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Gerenciar Cabanas */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-[#4B4F36]">Gerenciar Cabanas</CardTitle>
@@ -318,7 +302,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Gerenciar Horários */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-[#4B4F36]">Gerenciar Horários de Entrega</CardTitle>

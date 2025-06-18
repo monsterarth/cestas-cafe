@@ -1,5 +1,5 @@
 import { User, MapPin, Users, Clock, Utensils } from "lucide-react"
-import type { OrderState, HotDish, AccompanimentCategory } from "@/types"
+import type { OrderState, HotDish, AccompanimentCategory, AppConfig } from "@/types"
 
 interface OrderSidebarProps {
   orderState: OrderState
@@ -8,46 +8,7 @@ interface OrderSidebarProps {
   appConfig: AppConfig
 }
 
-
-export function OrderSidebar({ orderState, hotDishes, accompaniments, appConfig }: OrderSidebarProps) {  const calculateTotalCalories = () => {
-    let totalCalories = 0
-
-    // Calorias dos pratos quentes
-    orderState.persons.forEach((person) => {
-      if (person.hotDish?.typeId && person.hotDish.flavorId) {
-        const dish = hotDishes.find((d) => d.id === person.hotDish?.typeId)
-        if (dish) {
-          totalCalories += dish.calorias || 0
-          const flavor = dish.sabores.find((f) => f.id === person.hotDish?.flavorId)
-          if (flavor) totalCalories += flavor.calorias || 0
-        }
-      }
-    })
-
-    // Calorias dos acompanhamentos
-    Object.keys(orderState.accompaniments).forEach((catId) => {
-      const itemsInCategory = orderState.accompaniments[catId]
-      Object.keys(itemsInCategory).forEach((itemId) => {
-        const count = itemsInCategory[itemId]
-        const itemData = accompaniments[catId]?.items.find((i) => i.id === itemId)
-        if (itemData && count > 0) {
-          totalCalories += (itemData.calorias || 0) * count
-        }
-      })
-    })
-
-    return totalCalories
-  }
-
-  const totalCalories = calculateTotalCalories()
-  const maxCalories = (orderState.guestInfo.people || 1) * (appConfig.caloriasMediasPorPessoa || 600)
-  const caloriePercentage = maxCalories > 0 ? (totalCalories / maxCalories) * 100 : 0
-
-  let barColor = "bg-stone-400"
-  if (caloriePercentage > 20 && caloriePercentage <= 80) barColor = "bg-green-500"
-  else if (caloriePercentage > 80 && caloriePercentage <= 100) barColor = "bg-yellow-500"
-  else if (caloriePercentage > 100) barColor = "bg-red-500"
-
+export function OrderSidebar({ orderState, hotDishes, accompaniments, appConfig }: OrderSidebarProps) {
   const hasSelectedItems =
     orderState.persons.some((person) => person.hotDish?.typeId && person.hotDish?.flavorId) ||
     Object.values(orderState.accompaniments).some((category) => Object.values(category).some((count) => count > 0))
@@ -91,20 +52,6 @@ export function OrderSidebar({ orderState, hotDishes, accompaniments, appConfig 
           </div>
         </div>
 
-        {/* Barra de Calorias */}
-        <div className="border-t pt-4 border-[#ADA192]">
-          <p className="text-sm font-medium text-stone-600 mb-2">Peso da Cesta (Estimativa)</p>
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
-            <div
-              className={`h-2.5 rounded-full transition-all duration-500 ${barColor}`}
-              style={{ width: `${Math.min(caloriePercentage, 100)}%` }}
-            ></div>
-          </div>
-          <p className="text-xs text-stone-500 mt-1">
-            Total: {totalCalories} kcal / Ideal: {maxCalories} kcal
-          </p>
-        </div>
-
         <div className="border-t pt-6 border-[#ADA192]">
           <h4 className="font-bold mb-4 flex items-center gap-2 text-[#4B4F36]">
             <Utensils className="w-4 h-4" />
@@ -113,27 +60,27 @@ export function OrderSidebar({ orderState, hotDishes, accompaniments, appConfig 
           <div className="space-y-3">
             {!hasSelectedItems && <div className="text-center py-8 text-stone-500">Sua cesta está vazia.</div>}
 
-            {/* Pratos Quentes */}
-            {orderState.persons.some((person) => person.hotDish?.typeId && person.hotDish?.flavorId) && (
+            {orderState.persons.some((person) => person.hotDish) && (
               <div>
                 <h5 className="font-semibold text-stone-600 mb-2">Pratos Quentes</h5>
                 {orderState.persons.map((person) => {
-                  if (!person.hotDish?.typeId) return null
+                  const hotDish = person.hotDish
+                  if (!hotDish) return null
 
-                  if (person.hotDish.typeId === "NONE") {
+                  if (hotDish.typeId === "NONE") {
                     return (
-                      <div key={person.id} className="text-sm p-3 bg-stone-100 border border-stone-200 rounded-lg">
+                      <div key={person.id} className="text-sm p-3 bg-stone-100 border border-stone-200 rounded-lg mb-2">
                         <strong>Hóspede {person.id}:</strong> Sem prato quente
                       </div>
                     )
                   }
 
-                  if (person.hotDish.flavorId) {
-                    const dish = hotDishes.find((d) => d.id === person.hotDish.typeId)
-                    const flavor = dish?.sabores?.find((f) => f.id === person.hotDish.flavorId)
+                  if (hotDish.typeId && hotDish.flavorId) {
+                    const dish = hotDishes.find((d) => d.id === hotDish.typeId)
+                    const flavor = dish?.sabores?.find((f) => f.id === hotDish.flavorId)
                     return (
-                      <div key={person.id} className="text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <strong>Hóspede {person.id}:</strong> {dish?.emoji || ""} {flavor?.nomeSabor || ""}
+                      <div key={person.id} className="text-sm p-3 bg-green-50 border border-green-200 rounded-lg mb-2">
+                        <strong>Hóspede {person.id}:</strong> {dish?.emoji || ""} {dish?.nomeItem} - {flavor?.nomeSabor || ""}
                       </div>
                     )
                   }
@@ -143,11 +90,10 @@ export function OrderSidebar({ orderState, hotDishes, accompaniments, appConfig 
               </div>
             )}
 
-            {/* Acompanhamentos */}
             {Object.values(orderState.accompaniments).some((category) =>
               Object.values(category).some((count) => count > 0),
             ) && (
-              <div>
+              <div className="mt-4">
                 <h5 className="font-semibold text-stone-600 mb-2">Acompanhamentos</h5>
                 {Object.keys(orderState.accompaniments).map((catId) => {
                   const itemsInCategory = orderState.accompaniments[catId]

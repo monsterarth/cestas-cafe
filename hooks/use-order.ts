@@ -54,7 +54,9 @@ export function useOrder() {
 
   const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number, accompaniments: any) => {
     const categoryName = accompaniments[categoryId]?.name.toLowerCase()
-    const isLimitedCategory = categoryName === "pães" || categoryName === "bolos"
+    const isPaoCategory = categoryName === "pães"
+    const isBoloCategory = categoryName === "bolos"
+    const isLimitedCategory = isPaoCategory || isBoloCategory
 
     if (isLimitedCategory && change > 0) {
       const categoryData = accompaniments[categoryId]
@@ -62,13 +64,16 @@ export function useOrder() {
         return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0)
       }, 0)
 
-      if (currentCountInCategory >= orderState.guestInfo.people) {
-        toast.warning(
-          `Limite atingido: máximo ${orderState.guestInfo.people} opção(ões) de ${categoryName} para ${orderState.guestInfo.people} hóspede(s).`,
-          {
-            duration: 4000,
-          },
-        )
+      // Regra de limite: 2 pães por pessoa, 1 bolo por pessoa
+      const limit = isPaoCategory ? orderState.guestInfo.people * 2 : orderState.guestInfo.people
+      const limitMessage = isPaoCategory
+        ? `Limite atingido: máximo ${limit} pães para ${orderState.guestInfo.people} hóspede(s).`
+        : `Limite atingido: máximo ${limit} bolo(s) para ${orderState.guestInfo.people} hóspede(s).`
+
+      if (currentCountInCategory >= limit) {
+        toast.warning(limitMessage, {
+          duration: 4000,
+        })
         return
       }
     }

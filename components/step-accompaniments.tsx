@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Minus, Plus } from "lucide-react"
+import { Minus, Plus, AlertTriangle } from "lucide-react"
 import type { AccompanimentCategory, OrderState } from "@/types"
 
 interface StepAccompanimentsProps {
@@ -31,24 +31,37 @@ export function StepAccompaniments({
         {Object.values(accompaniments).map((category) => {
           const maxGuests = orderState.guestInfo.people || 1
           const categoryNameLower = category.name.toLowerCase()
-          const isLimitedByCategory = categoryNameLower === "pães" || categoryNameLower === "bolos"
+          const isPaoCategory = categoryNameLower === "pães"
+          const isBoloCategory = categoryNameLower === "bolos"
+          const isLimitedByCategory = isPaoCategory || isBoloCategory
 
-          let totalInCategory = 0
-          if (isLimitedByCategory) {
-            totalInCategory = category.items.reduce((total, currentItem) => {
-              return total + (orderState.accompaniments[category.id]?.[currentItem.id] || 0)
-            }, 0)
-          }
+          const limit = isPaoCategory ? maxGuests * 2 : maxGuests
+          const limitMessage = `Limite de ${limit} ${
+            isPaoCategory ? "pães" : "bolo(s)"
+          } para ${maxGuests} pessoa(s).`
+
+          const totalInCategory = isLimitedByCategory
+            ? category.items.reduce((total, currentItem) => {
+                return total + (orderState.accompaniments[category.id]?.[currentItem.id] || 0)
+              }, 0)
+            : 0
+
+          const isLimitReached = isLimitedByCategory && totalInCategory >= limit
 
           return (
             <div key={category.id}>
-              <h3 className="text-xl font-bold text-[#4B4F36] mb-4">{category.name}</h3>
+              <div className="flex items-baseline justify-between flex-wrap gap-2 mb-4">
+                <h3 className="text-xl font-bold text-[#4B4F36]">{category.name}</h3>
+                {isLimitReached && (
+                  <div className="flex items-center gap-2 p-2 text-sm text-amber-800 bg-amber-100 border border-amber-200 rounded-md">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>{limitMessage}</span>
+                  </div>
+                )}
+              </div>
               <div className="space-y-4">
                 {category.items.map((item) => {
                   const currentCount = orderState.accompaniments[category.id]?.[item.id] || 0
-                  const isAddButtonDisabled = isLimitedByCategory
-                    ? totalInCategory >= maxGuests
-                    : currentCount >= maxGuests
 
                   return (
                     <div
@@ -62,7 +75,6 @@ export function StepAccompaniments({
                         {item.descricaoPorcao && (
                           <p className="text-stone-500 text-sm font-normal">{item.descricaoPorcao}</p>
                         )}
-                        <p className="text-xs text-stone-500">{item.calorias} kcal</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <Button
@@ -79,8 +91,8 @@ export function StepAccompaniments({
                           variant="outline"
                           size="sm"
                           onClick={() => onUpdateAccompaniment(category.id, item.id, 1, accompaniments)}
-                          disabled={isAddButtonDisabled}
-                          className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD]"
+                          disabled={isLimitReached}
+                          className="h-8 w-8 p-0 rounded-full border-[#ADA192] hover:bg-[#E9D9CD] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>

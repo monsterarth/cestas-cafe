@@ -17,7 +17,6 @@ interface MenuItem {
   id: string
   nomeItem: string
   emoji?: string
-  calorias: number
   disponivel: boolean
   descricaoPorcao?: string
   imageUrl?: string
@@ -80,7 +79,6 @@ function SortableCategory({
               <tr key={item.id} className="border-b">
                 <td className="p-3">
                   <span className="font-medium text-[#4B4F36]">{item.nomeItem}</span>
-                  <span className="text-gray-500 text-sm ml-2">({item.calorias || 0} kcal)</span>
                 </td>
                 <td className="p-3">
                   <span
@@ -192,7 +190,6 @@ export default function MenuPage() {
       const newCategories = arrayMove(categories, oldIndex, newIndex)
       setCategories(newCategories)
 
-      // Update positions in Firestore
       const batch = firestore.writeBatch(db)
       newCategories.forEach((category, index) => {
         batch.update(firestore.doc(db, "cardapio", category.id), { posicao: index })
@@ -208,12 +205,10 @@ export default function MenuPage() {
 
     try {
       if (categoryModal.category) {
-        // Edit existing category
         await firestore.updateDoc(firestore.doc(db, "cardapio", categoryModal.category.id), {
           nomeCategoria: name,
         })
       } else {
-        // Add new category
         await firestore.addDoc(firestore.collection(db, "cardapio"), {
           nomeCategoria: name,
           posicao: categories.length,
@@ -231,16 +226,11 @@ export default function MenuPage() {
 
     try {
       const batch = firestore.writeBatch(db)
-
-      // Delete all items in category
       const itemsSnapshot = await firestore.getDocs(firestore.collection(db, "cardapio", categoryId, "itens"))
       itemsSnapshot.docs.forEach((itemDoc) => {
         batch.delete(itemDoc.ref)
       })
-
-      // Delete category
       batch.delete(firestore.doc(db, "cardapio", categoryId))
-
       await batch.commit()
     } catch (error) {
       console.error("Error deleting category:", error)
@@ -255,7 +245,6 @@ export default function MenuPage() {
     const itemData = {
       nomeItem: formData.get("nomeItem") as string,
       emoji: formData.get("emoji") as string,
-      calorias: Number.parseInt(formData.get("calorias") as string) || 0,
       disponivel: formData.get("disponivel") === "on",
       descricaoPorcao: formData.get("descricaoPorcao") as string,
       imageUrl: formData.get("imageUrl") as string,
@@ -263,10 +252,8 @@ export default function MenuPage() {
 
     try {
       if (itemModal.item) {
-        // Edit existing item
         await firestore.updateDoc(firestore.doc(db, "cardapio", categoryId, "itens", itemModal.item.id), itemData)
       } else {
-        // Add new item
         const itemsSnapshot = await firestore.getDocs(firestore.collection(db, "cardapio", categoryId, "itens"))
         await firestore.addDoc(firestore.collection(db, "cardapio", categoryId, "itens"), {
           ...itemData,
@@ -329,7 +316,6 @@ export default function MenuPage() {
         </SortableContext>
       </DndContext>
 
-      {/* Category Modal */}
       <Dialog open={categoryModal.open} onOpenChange={(open) => setCategoryModal({ open })}>
         <DialogContent>
           <DialogHeader>
@@ -352,7 +338,6 @@ export default function MenuPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Item Modal */}
       <Dialog open={itemModal.open} onOpenChange={(open) => setItemModal({ open })}>
         <DialogContent className="max-w-2xl bg-background/90 backdrop-blur-sm">
           <DialogHeader>
@@ -367,15 +352,9 @@ export default function MenuPage() {
               <Label htmlFor="descricaoPorcao">Descrição da Porção</Label>
               <Input id="descricaoPorcao" name="descricaoPorcao" defaultValue={itemModal.item?.descricaoPorcao || ""} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="emoji">Emoji</Label>
-                <Input id="emoji" name="emoji" defaultValue={itemModal.item?.emoji || ""} />
-              </div>
-              <div>
-                <Label htmlFor="calorias">Calorias (kcal)</Label>
-                <Input id="calorias" name="calorias" type="number" defaultValue={itemModal.item?.calorias || 0} />
-              </div>
+            <div>
+              <Label htmlFor="emoji">Emoji</Label>
+              <Input id="emoji" name="emoji" defaultValue={itemModal.item?.emoji || ""} />
             </div>
             <div>
               <Label htmlFor="imageUrl">URL da Imagem</Label>

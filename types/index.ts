@@ -2,15 +2,15 @@ export interface HotDish {
   id: string
   nomeItem: string
   emoji?: string
-  calorias: number
   disponivel: boolean
   sabores: Flavor[]
+  imageUrl?: string
+  posicao?: number
 }
 
 export interface Flavor {
   id: string
   nomeSabor: string
-  calorias: number
   disponivel: boolean
 }
 
@@ -38,7 +38,6 @@ export interface AccompanimentItem {
   id: string
   nomeItem: string
   emoji?: string
-  calorias: number
   disponivel: boolean
   descricaoPorcao?: string
 }
@@ -51,7 +50,6 @@ export interface AppConfig {
   textoAgradecimento: string
   corPrimaria: string
   corSecundaria: string
-  caloriasMediasPorPessoa?: number
 }
 
 export interface OrderState {

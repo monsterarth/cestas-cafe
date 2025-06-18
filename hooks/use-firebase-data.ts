@@ -21,7 +21,6 @@ export function useFirebaseData() {
     setLoading(true)
     setError(null)
 
-    // Se o Firebase não estiver configurado, exibe um erro claro.
     if (!isFirebaseAvailable()) {
       console.error("Firebase not available. Please check your .env.local file.")
       setError(
@@ -37,19 +36,15 @@ export function useFirebaseData() {
         throw new Error("Falha ao inicializar o Firestore.")
       }
 
-      // Dynamic imports
       const { collection, getDocs, doc, getDoc, orderBy, query } = await import("firebase/firestore")
 
-      // Carregar configurações do App
       const appConfigDoc = await getDoc(doc(db, "configuracoes", "app"))
       if (appConfigDoc.exists()) {
         setAppConfig(appConfigDoc.data() as AppConfig)
       } else {
-        // Lida com o caso de não encontrar as configurações essenciais
         throw new Error("Documento de configuração do aplicativo ('app') não encontrado no Firestore.")
       }
 
-      // Carregar configurações gerais (cabanas, horários)
       const generalConfigDoc = await getDoc(doc(db, "configuracoes", "geral"))
       if (generalConfigDoc.exists()) {
         const configData = generalConfigDoc.data()
@@ -63,7 +58,6 @@ export function useFirebaseData() {
         throw new Error("Documento de configurações gerais ('geral') não encontrado no Firestore.")
       }
 
-      // Carregar cardápio
       const menuQuery = query(collection(db, "cardapio"), orderBy("posicao"))
       const menuSnapshot = await getDocs(menuQuery)
 
@@ -85,11 +79,12 @@ export function useFirebaseData() {
                 id: itemDoc.id,
                 nomeItem: itemData.nomeItem,
                 emoji: itemData.emoji,
-                calorias: itemData.calorias || 0,
                 disponivel: itemData.disponivel,
                 sabores: [],
+                imageUrl: itemData.imageUrl,
+                posicao: itemData.posicao,
               }
-              // Assumindo que sabores são uma subcoleção
+
               const saboresSnapshot = await getDocs(
                 collection(db, "cardapio", categoryDoc.id, "itens", itemDoc.id, "sabores"),
               )
@@ -99,7 +94,6 @@ export function useFirebaseData() {
                   dish.sabores.push({
                     id: saborDoc.id,
                     nomeSabor: saborData.nomeSabor,
-                    calorias: saborData.calorias || 0,
                     disponivel: saborData.disponivel,
                   })
                 }
@@ -118,7 +112,6 @@ export function useFirebaseData() {
                 id: itemDoc.id,
                 nomeItem: itemData.nomeItem,
                 emoji: itemData.emoji,
-                calorias: itemData.calorias || 0,
                 disponivel: itemData.disponivel,
                 descricaoPorcao: itemData.descricaoPorcao,
               })
