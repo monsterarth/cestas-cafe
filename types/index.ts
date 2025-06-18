@@ -12,6 +12,7 @@ export interface Flavor {
   id: string
   nomeSabor: string
   disponivel: boolean
+  posicao: number // O campo 'posicao' é necessário aqui
 }
 
 export interface Person {
@@ -32,7 +33,7 @@ export interface AccompanimentCategory {
   id: string
   name: string
   items: AccompanimentItem[]
-  limitePorPessoa?: number
+  // 'limitePorPessoa' foi removido daqui pois a lógica agora é fixa no código
 }
 
 export interface AccompanimentItem {
@@ -49,8 +50,11 @@ export interface AppConfig {
   subtitulo: string
   textoIntroducao: string
   textoAgradecimento: string
-  corPrimaria: string
-  corSecundaria: string
+  corFundo: string
+  corTexto: string
+  corDestaque: string
+  corDestaqueTexto: string
+  corCartao: string
 }
 
 export interface OrderState {

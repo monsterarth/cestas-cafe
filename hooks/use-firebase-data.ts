@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getFirebaseDb, isFirebaseAvailable } from "@/lib/firebase"
-import type { HotDish, Cabin, AccompanimentCategory, AppConfig } from "@/types"
+import type { HotDish, Cabin, AccompanimentCategory, AppConfig, Flavor } from "@/types"
 
 export function useFirebaseData() {
   const [hotDishes, setHotDishes] = useState<HotDish[]>([])
@@ -22,28 +22,20 @@ export function useFirebaseData() {
     setError(null)
 
     if (!isFirebaseAvailable()) {
-      console.error("Firebase not available. Please check your .env.local file.")
-      setError(
-        "A conexão com o banco de dados não foi configurada. Verifique as variáveis de ambiente e reinicie o servidor.",
-      )
+      setError("A conexão com o banco de dados não foi configurada. Verifique as variáveis de ambiente e reinicie o servidor.")
       setLoading(false)
       return
     }
 
     try {
       const db = await getFirebaseDb()
-      if (!db) {
-        throw new Error("Falha ao inicializar o Firestore.")
-      }
+      if (!db) throw new Error("Falha ao inicializar o Firestore.")
 
       const { collection, getDocs, doc, getDoc, orderBy, query } = await import("firebase/firestore")
 
       const appConfigDoc = await getDoc(doc(db, "configuracoes", "app"))
-      if (appConfigDoc.exists()) {
-        setAppConfig(appConfigDoc.data() as AppConfig)
-      } else {
-        throw new Error("Documento de configuração do aplicativo ('app') não encontrado no Firestore.")
-      }
+      if (appConfigDoc.exists()) setAppConfig(appConfigDoc.data() as AppConfig)
+      else throw new Error("Documento de configuração do aplicativo ('app') não encontrado no Firestore.")
 
       const generalConfigDoc = await getDoc(doc(db, "configuracoes", "geral"))
       if (generalConfigDoc.exists()) {
@@ -68,43 +60,41 @@ export function useFirebaseData() {
         const categoryData = categoryDoc.data()
         const itemsQuery = query(collection(db, "cardapio", categoryDoc.id, "itens"), orderBy("posicao"))
         const itemsSnapshot = await getDocs(itemsQuery)
-
         const isHotDishCategory = categoryData.nomeCategoria?.toLowerCase().includes("pratos quentes")
 
         if (isHotDishCategory) {
           for (const itemDoc of itemsSnapshot.docs) {
             const itemData = itemDoc.data()
             if (itemData.disponivel) {
-              const dish: HotDish = {
-                id: itemDoc.id,
-                nomeItem: itemData.nomeItem,
-                emoji: itemData.emoji,
-                disponivel: itemData.disponivel,
-                sabores: [],
-                imageUrl: itemData.imageUrl,
-                posicao: itemData.posicao,
-              }
-
-              const saboresSnapshot = await getDocs(
-                collection(db, "cardapio", categoryDoc.id, "itens", itemDoc.id, "sabores"),
-              )
+              const saboresQuery = query(collection(db, "cardapio", categoryDoc.id, "itens", itemDoc.id, "sabores"), orderBy("posicao"));
+              const saboresSnapshot = await getDocs(saboresQuery)
+              const sabores: Flavor[] = []
               saboresSnapshot.forEach((saborDoc) => {
                 const saborData = saborDoc.data()
                 if (saborData.disponivel) {
-                  dish.sabores.push({
+                  sabores.push({
                     id: saborDoc.id,
                     nomeSabor: saborData.nomeSabor,
                     disponivel: saborData.disponivel,
+                    posicao: saborData.posicao || 0,
                   })
                 }
               })
-              if (dish.sabores.length > 0) {
-                dishes.push(dish)
+
+              if (sabores.length > 0) {
+                dishes.push({
+                  id: itemDoc.id,
+                  nomeItem: itemData.nomeItem,
+                  emoji: itemData.emoji,
+                  disponivel: itemData.disponivel,
+                  sabores: sabores,
+                  imageUrl: itemData.imageUrl,
+                })
               }
             }
           }
         } else {
-          const categoryItems: any[] = []
+          const categoryItems: AccompanimentItem[] = []
           itemsSnapshot.forEach((itemDoc) => {
             const itemData = itemDoc.data()
             if (itemData.disponivel) {
@@ -119,11 +109,10 @@ export function useFirebaseData() {
           })
           if (categoryItems.length > 0) {
             accompanimentsData[categoryDoc.id] = {
-    id: categoryDoc.id,
-    name: categoryData.nomeCategoria,
-    items: categoryItems,
-    limitePorPessoa: categoryData.limitePorPessoa || 0, // Adiciona o limite
-  }
+              id: categoryDoc.id,
+              name: categoryData.nomeCategoria,
+              items: categoryItems,
+            }
           }
         }
       }
