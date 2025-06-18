@@ -1,19 +1,7 @@
 "use client"
 
-import { useState, useEffect }from "react"
-import {
-  collection,
-  onSnapshot,
-  orderBy,
-  query,
-  doc,
-  updateDoc,
-  addDoc,
-  deleteDoc,
-  getDocs,
-  writeBatch,
-  Firestore,
-} from "firebase/firestore"
+import { useState, useEffect } from "react"
+import * as firestore from "firebase/firestore"
 import { getFirebaseDb } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -121,7 +109,7 @@ function SortableCategory({
 }
 
 export default function MenuPage() {
-  const [db, setDb] = useState<Firestore | null>(null)
+  const [db, setDb] = useState<firestore.Firestore | null>(null)
   const [categories, setCategories] = useState<MenuCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [categoryModal, setCategoryModal] = useState<{ open: boolean; category?: MenuCategory }>({ open: false })
@@ -139,15 +127,18 @@ export default function MenuPage() {
       const firestoreDb = await getFirebaseDb()
       if (firestoreDb) {
         setDb(firestoreDb)
-        const menuQuery = query(collection(firestoreDb, "cardapio"), orderBy("posicao"))
-        const unsubscribe = onSnapshot(
+        const menuQuery = firestore.query(firestore.collection(firestoreDb, "cardapio"), firestore.orderBy("posicao"))
+        const unsubscribe = firestore.onSnapshot(
           menuQuery,
           async (snapshot) => {
             const categoriesData: MenuCategory[] = []
             for (const categoryDoc of snapshot.docs) {
               const categoryData = categoryDoc.data()
-              const itemsQuery = query(collection(firestoreDb, "cardapio", categoryDoc.id, "itens"), orderBy("posicao"))
-              const itemsSnapshot = await getDocs(itemsQuery)
+              const itemsQuery = firestore.query(
+                firestore.collection(firestoreDb, "cardapio", categoryDoc.id, "itens"),
+                firestore.orderBy("posicao"),
+              )
+              const itemsSnapshot = await firestore.getDocs(itemsQuery)
 
               const items: MenuItem[] = itemsSnapshot.docs.map((itemDoc) => ({
                 id: itemDoc.id,
@@ -202,9 +193,9 @@ export default function MenuPage() {
       setCategories(newCategories)
 
       // Update positions in Firestore
-      const batch = writeBatch(db)
+      const batch = firestore.writeBatch(db)
       newCategories.forEach((category, index) => {
-        batch.update(doc(db, "cardapio", category.id), { posicao: index })
+        batch.update(firestore.doc(db, "cardapio", category.id), { posicao: index })
       })
       await batch.commit()
     }
@@ -218,12 +209,12 @@ export default function MenuPage() {
     try {
       if (categoryModal.category) {
         // Edit existing category
-        await updateDoc(doc(db, "cardapio", categoryModal.category.id), {
+        await firestore.updateDoc(firestore.doc(db, "cardapio", categoryModal.category.id), {
           nomeCategoria: name,
         })
       } else {
         // Add new category
-        await addDoc(collection(db, "cardapio"), {
+        await firestore.addDoc(firestore.collection(db, "cardapio"), {
           nomeCategoria: name,
           posicao: categories.length,
         })
@@ -239,16 +230,16 @@ export default function MenuPage() {
     if (!confirm("Tem certeza que deseja excluir esta categoria e todos os itens?")) return
 
     try {
-      const batch = writeBatch(db)
+      const batch = firestore.writeBatch(db)
 
       // Delete all items in category
-      const itemsSnapshot = await getDocs(collection(db, "cardapio", categoryId, "itens"))
+      const itemsSnapshot = await firestore.getDocs(firestore.collection(db, "cardapio", categoryId, "itens"))
       itemsSnapshot.docs.forEach((itemDoc) => {
         batch.delete(itemDoc.ref)
       })
 
       // Delete category
-      batch.delete(doc(db, "cardapio", categoryId))
+      batch.delete(firestore.doc(db, "cardapio", categoryId))
 
       await batch.commit()
     } catch (error) {
@@ -273,11 +264,11 @@ export default function MenuPage() {
     try {
       if (itemModal.item) {
         // Edit existing item
-        await updateDoc(doc(db, "cardapio", categoryId, "itens", itemModal.item.id), itemData)
+        await firestore.updateDoc(firestore.doc(db, "cardapio", categoryId, "itens", itemModal.item.id), itemData)
       } else {
         // Add new item
-        const itemsSnapshot = await getDocs(collection(db, "cardapio", categoryId, "itens"))
-        await addDoc(collection(db, "cardapio", categoryId, "itens"), {
+        const itemsSnapshot = await firestore.getDocs(firestore.collection(db, "cardapio", categoryId, "itens"))
+        await firestore.addDoc(firestore.collection(db, "cardapio", categoryId, "itens"), {
           ...itemData,
           posicao: itemsSnapshot.size,
         })
@@ -293,7 +284,7 @@ export default function MenuPage() {
     if (!confirm("Tem certeza que deseja excluir este item?")) return
 
     try {
-      await deleteDoc(doc(db, "cardapio", categoryId, "itens", itemId))
+      await firestore.deleteDoc(firestore.doc(db, "cardapio", categoryId, "itens", itemId))
     } catch (error) {
       console.error("Error deleting item:", error)
     }
