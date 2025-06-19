@@ -51,7 +51,7 @@
     @apply bg-background text-foreground;
     font-feature-settings: "cv03", "cv04", "cv11";
   }
-  @media print {
+@media print {
   body * {
     visibility: hidden;
   }
