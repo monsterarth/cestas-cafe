@@ -9,7 +9,8 @@ import { getFirebaseDb } from '@/lib/firebase';
 import type { Order, ItemPedido, AppConfig } from '@/types';
 import { OrderPrintLayout } from '@/components/order-print-layout';
 import { OrderReceiptLayout } from '@/components/order-receipt-layout';
-import { OrdersSummaryLayout } from '@/components/orders-summary-layout';
+// CORREÇÃO 1: Importação ajustada para default (sem chaves)
+import OrdersSummaryLayout from '@/components/orders-summary-layout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -45,7 +46,6 @@ export default function OrdersPage() {
             return;
         }
 
-        // Busca a configuração do App
         try {
             const configRef = doc(db, "configuracoes", "app");
             const configSnap = await getDoc(configRef);
@@ -57,7 +57,6 @@ export default function OrdersPage() {
             console.error(e);
         }
 
-        // Listener de pedidos em tempo real
         const q = query(collection(db, 'pedidos'), orderBy('timestampPedido', 'desc'));
         const unsubscribe = onSnapshot(q,
             (snapshot) => {
@@ -92,8 +91,12 @@ export default function OrdersPage() {
   }, [componentToPrint]);
 
   const triggerPrint = (order: Order, type: 'a4' | 'receipt') => {
-    if (type === 'a4') setComponentToPrint(<OrderPrintLayout order={order} />);
-    else setComponentToPrint(<OrderReceiptLayout order={order} />);
+    if (type === 'a4') {
+      // CORREÇÃO 2: Passando a prop 'config' que estava faltando
+      setComponentToPrint(<OrderPrintLayout order={order} config={appConfig} />);
+    } else {
+      setComponentToPrint(<OrderReceiptLayout order={order} />);
+    }
   };
 
   const triggerSummaryPrint = () => {
@@ -165,7 +168,7 @@ export default function OrdersPage() {
             <div className="max-h-[60vh] overflow-y-auto p-1 pr-4 mt-4 space-y-4">
                 <div>
                     <h3 className="font-semibold mb-2">Itens:</h3>
-                    <ul className="list-disc list-inside space-y-2">{(viewingOrder?.itensPedido || []).map((item: ItemPedido, i: number) => <li key={i}>{item.quantidade}x {item.nomeItem} {item.sabor && `(${item.sabor})`}</li>)}</ul>
+                    <ul className="list-disc list-inside space-y-2">{(viewingOrder?.itensPedido || []).map((item, i) => <li key={i}>{item.quantidade}x {item.nomeItem} {item.sabor && `(${item.sabor})`}</li>)}</ul>
                 </div>
             </div>
             </DialogContent>
