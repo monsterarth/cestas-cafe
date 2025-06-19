@@ -10,13 +10,11 @@ interface OrdersSummaryLayoutProps {
   totalOrders: number;
 }
 
-// CORREÇÃO: React.forwardRef RESTAURADO
-export const OrdersSummaryLayout = React.forwardRef<HTMLDivElement, OrdersSummaryLayoutProps>(({ summary, totalOrders }, ref) => {
+// SIMPLIFICADO: Não usa mais React.forwardRef
+export const OrdersSummaryLayout = ({ summary, totalOrders }: OrdersSummaryLayoutProps) => {
   return (
-    <div ref={ref} className="p-10 font-sans bg-white text-black">
-        {/* ... conteúdo interno sem alterações ... */}
+    <div className="p-10 font-sans bg-white text-black">
+      {/* ... todo o seu layout de resumo aqui ... */}
     </div>
   );
-});
-
-OrdersSummaryLayout.displayName = 'OrdersSummaryLayout';
+};

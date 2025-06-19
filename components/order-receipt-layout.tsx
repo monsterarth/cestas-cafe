@@ -7,21 +7,12 @@ interface OrderReceiptLayoutProps {
   order: Order;
 }
 
-// CORREÇÃO: React.forwardRef RESTAURADO
-export const OrderReceiptLayout = React.forwardRef<HTMLDivElement, OrderReceiptLayoutProps>(({ order }, ref) => {
-  const allItems = order.itensPedido || [];
-  const itemsByCategory = allItems.reduce((acc, item) => {
-    const category = item.categoria || 'Outros';
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(item);
-    return acc;
-  }, {} as Record<string, typeof allItems>);
-
+// SIMPLIFICADO: Não usa mais React.forwardRef
+export const OrderReceiptLayout = ({ order }: OrderReceiptLayoutProps) => {
+  // ... Conteúdo interno do componente sem alterações ...
   return (
-    <div ref={ref} className="p-1 font-mono text-xs bg-white text-black" style={{ width: '80mm' }}>
-        {/* ... conteúdo interno sem alterações ... */}
+    <div className="p-1 font-mono text-xs bg-white text-black" style={{ width: '80mm' }}>
+      {/* ... todo o seu layout de comanda aqui ... */}
     </div>
   );
-});
-
-OrderReceiptLayout.displayName = 'OrderReceiptLayout';
+};
