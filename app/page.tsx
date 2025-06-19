@@ -1,217 +1,195 @@
+// SUBSTITUA TODO O CONTEÚDO DE: app/page.tsx
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { collection, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore"
-import { getFirebaseDb } from "@/lib/firebase"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts"
-import { Utensils, Clock, Users, ShoppingBasket, UtensilsCrossed } from "lucide-react"
-import type { Order } from "@/types"
+import type React from "react"
+import { useState } from "react"
+import { useFirebaseData } from "@/hooks/use-firebase-data"
+import { useOrder } from "@/hooks/use-order"
+import { LoadingScreen } from "@/components/loading-screen"
+import { StepNavigation } from "@/components/step-navigation"
+import { GuestAccordion } from "@/components/guest-accordion"
+import { OrderSidebar } from "@/components/order-sidebar"
+import { StepDetails } from "@/components/step-details"
+import { StepAccompaniments } from "@/components/step-accompaniments"
+import { StepWelcome } from "@/components/step-welcome"
+import { AppHeader } from "@/components/app-header"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { MessageCircle } from "lucide-react"
+import { StepReview } from "@/components/step-review"
+import { StepSuccess } from "@/components/step-success"
+import { Toaster } from "sonner"
 
-// --- COMPONENTES DO DASHBOARD (sem alterações) ---
+export default function Home() {
+  const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error, refetch } = useFirebaseData()
+  const {
+    orderState,
+    orderSubmitted,
+    updateOrderState,
+    handleSelectDish,
+    handleSelectFlavor,
+    handleUpdateNotes,
+    handleNotesChange,
+    handleUpdateAccompaniment,
+    handleSpecialRequestsChange,
+    handleSelectNoHotDish,
+    setOrderSubmitted,
+  } = useOrder()
 
-const StatsCard = ({ title, value, description, icon: Icon }: { title: string; value: string | number; description: string; icon: React.ElementType }) => (
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium text-gray-500">{title}</CardTitle>
-      <Icon className="h-5 w-5 text-gray-400" />
-    </CardHeader>
-    <CardContent>
-      <div className="text-3xl font-bold text-[#4B4F36]">{value}</div>
-      <p className="text-xs text-gray-500">{description}</p>
-    </CardContent>
-  </Card>
-)
+  const [currentStep, setCurrentStep] = useState(1)
+  const [completedSteps, setCompletedSteps] = useState<number[]>([1])
 
-const UpcomingDeliveries = ({ schedule }: { schedule: { time: string; orders: Order[] }[] }) => (
-  <Card className="lg:col-span-2">
-    <CardHeader>
-      <CardTitle>Entregas de Hoje</CardTitle>
-      <CardDescription>Linha do tempo das cestas programadas para hoje.</CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-6">
-      {schedule.length > 0 ? schedule.map(({ time, orders }) => (
-        <div key={time} className="flex gap-4">
-          <div className="flex flex-col items-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#97A25F] text-white font-bold">
-              {time}
-            </div>
-            <div className="flex-1 w-px bg-gray-200"></div>
-          </div>
-          <div className="flex-1 pb-8">
-            {orders.map(order => (
-              <div key={order.id} className="mb-2 p-3 bg-white border rounded-lg shadow-sm">
-                <div className="font-bold text-[#4B4F36]">Cabana {order.cabanaNumero}</div>
-                <div className="text-sm text-gray-600">{order.hospedeNome} - {order.numeroPessoas} pessoa(s)</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )) : (
-        <div className="text-center py-10 text-gray-500">Nenhuma entrega para hoje.</div>
-      )}
-    </CardContent>
-  </Card>
-)
-
-const PrepList = ({ items }: { items: { name: string; quantity: number }[] }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle>Itens para Preparar Hoje</CardTitle>
-            <CardDescription>Soma de todos os itens para as cestas de hoje.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            {items.length > 0 ? (
-                <ul className="space-y-2 max-h-80 overflow-y-auto">
-                {items.map(item => (
-                    <li key={item.name} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded-md">
-                        <span className="text-[#4B4F36]">{item.name}</span>
-                        <span className="font-bold bg-[#E9D9CD] text-[#4B4F36] px-2 py-0.5 rounded-full">{item.quantity}</span>
-                    </li>
-                ))}
-                </ul>
-            ) : (
-                <div className="text-center py-10 text-gray-500">Nenhum item a preparar.</div>
-            )}
-        </CardContent>
-    </Card>
-)
-
-// --- PÁGINA PRINCIPAL DO DASHBOARD ---
-export default function DashboardPage() {
-  const [todaysOrders, setTodaysOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const setupFirestoreListener = async () => {
-      const db = await getFirebaseDb()
-      if (!db) { setLoading(false); return }
-      
-      // ALTERAÇÃO: Busca todos os pedidos, a filtragem será feita no código.
-      const ordersQuery = query(collection(db, "pedidos"), orderBy("timestampPedido", "desc"));
-
-      const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
-        const allOrders = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Order[];
-
-        // ALTERAÇÃO: Lógica para filtrar os pedidos de hoje, entendendo os dois formatos de data
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-
-        const todayEnd = new Date();
-        todayEnd.setHours(23, 59, 59, 999);
-
-        const filteredOrders = allOrders.filter(order => {
-          let orderDate: Date | null = null;
-          // Verifica se o timestamp é um objeto do Firestore (formato novo)
-          if (order.timestampPedido && typeof order.timestampPedido.toDate === 'function') {
-            orderDate = order.timestampPedido.toDate();
-          } 
-          // Senão, tenta converter de string (formato antigo)
-          else if (typeof order.timestampPedido === 'string') {
-            orderDate = new Date(order.timestampPedido);
-          }
-
-          if (orderDate) {
-            return orderDate >= todayStart && orderDate <= todayEnd;
-          }
-          return false;
-        });
-
-        setTodaysOrders(filteredOrders);
-        setLoading(false);
-      }, (error) => { console.error("Error loading orders:", error); setLoading(false); });
-      
-      return unsubscribe;
+  const handleStepNavigation = (step: number) => {
+    if (step <= Math.max(...completedSteps) || step === currentStep) {
+      setCurrentStep(step)
     }
-    let unsubscribe: (() => void) | undefined;
-    setupFirestoreListener().then(unsub => { if (unsub) unsubscribe = unsub; });
-    return () => { if (unsubscribe) unsubscribe(); };
-  }, []);
+  }
 
-  const { stats, deliverySchedule, prepList, ordersByHour } = useMemo(() => {
-    // Agora o cálculo usa 'todaysOrders' que já vem filtrado
-    const activeOrders = todaysOrders.filter(o => o.status !== 'Cancelado');
+  const handleNextStep = (nextStep: number) => {
+    setCurrentStep(nextStep)
+    setCompletedSteps((prev) => [...new Set([...prev, nextStep])])
+  }
 
-    const nextDelivery = activeOrders
-      .filter(o => o.status !== 'Entregue')
-      .sort((a, b) => a.horarioEntrega.localeCompare(b.horarioEntrega))
-      .find(o => true);
+  if (loading) {
+    return <LoadingScreen />
+  }
 
-    const stats = {
-      ordersToday: activeOrders.length,
-      nextDelivery: nextDelivery ? `${nextDelivery.horarioEntrega} (Cab. ${nextDelivery.cabanaNumero})` : 'Nenhuma',
-      guestsToday: activeOrders.reduce((sum, o) => sum + o.numeroPessoas, 0),
-      itemsToPrep: activeOrders.reduce((sum, o) => sum + o.itensPedido.reduce((itemSum, i) => itemSum + i.quantidade, 0), 0)
-    };
+  if (error) {
+    return (
+      <div className="fixed inset-0 flex flex-col justify-center items-center z-50 bg-[#F7FDF2]">
+        <p className="text-red-600 p-4 text-center">{error}</p>
+        <Button onClick={() => window.location.reload()} className="mt-4">
+          Tentar Novamente
+        </Button>
+      </div>
+    )
+  }
 
-    const scheduleMap = new Map<string, Order[]>();
-    activeOrders.sort((a, b) => a.horarioEntrega.localeCompare(b.horarioEntrega)).forEach(order => {
-        const time = order.horarioEntrega;
-        if (!scheduleMap.has(time)) scheduleMap.set(time, []);
-        scheduleMap.get(time)!.push(order);
-    });
-    const deliverySchedule = Array.from(scheduleMap.entries()).map(([time, orders]) => ({ time, orders }));
-
-    const prepMap = new Map<string, number>();
-    activeOrders.forEach(order => {
-        order.itensPedido.forEach(item => {
-            prepMap.set(item.nomeItem, (prepMap.get(item.nomeItem) || 0) + item.quantidade);
-        });
-    });
-    const prepList = Array.from(prepMap.entries()).map(([name, quantity]) => ({ name, quantity })).sort((a,b) => b.quantity - a.quantity);
-
-    const hourMap = new Map<string, number>();
-    activeOrders.forEach(order => {
-        hourMap.set(order.horarioEntrega, (hourMap.get(order.horarioEntrega) || 0) + 1);
-    });
-    const ordersByHour = Array.from(hourMap.entries()).map(([name, total]) => ({ name, total })).sort((a,b) => a.name.localeCompare(b.name));
-
-    return { stats, deliverySchedule, prepList, ordersByHour };
-  }, [todaysOrders]);
-
-  if (loading) return <div className="flex justify-center items-center h-64"><div className="w-8 h-8 border-4 border-gray-300 border-t-[#97A25F] rounded-full animate-spin"></div></div>
+  if (!appConfig) {
+    return <LoadingScreen message="Aguardando configurações..." />
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="Pedidos para Hoje" value={stats.ordersToday} description="Total de cestas a entregar" icon={ShoppingBasket} />
-        <StatsCard title="Próxima Entrega" value={stats.nextDelivery} description="Horário e cabana" icon={Clock} />
-        <StatsCard title="Hóspedes Servidos Hoje" value={stats.guestsToday} description="Total de pessoas nas cestas" icon={Users} />
-        <StatsCard title="Itens para Preparar" value={stats.itemsToPrep} description="Soma de todos os produtos" icon={UtensilsCrossed} />
-      </div>
+    <div className="min-h-screen bg-background text-foreground">
+      <Toaster position="top-center" richColors />
+      <AppHeader config={appConfig} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <UpcomingDeliveries schedule={deliverySchedule} />
-        <div className="space-y-8">
-            <PrepList items={prepList} />
-             <Card>
-                <CardHeader>
-                    <CardTitle>Entregas por Horário</CardTitle>
-                    <CardDescription>Volume de cestas para cada horário de entrega.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {ordersByHour.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={ordersByHour} margin={{ top: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false}/>
-                                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} width={30} />
-                                <Tooltip cursor={{ fill: 'rgba(233, 217, 205, 0.4)' }} contentStyle={{backgroundColor: '#F7FDF2', border: '1px solid #E9D9CD', borderRadius: '0.5rem'}}/>
-                                <Bar dataKey="total" fill="#97A25F" radius={[4, 4, 0, 0]}>
-                                    <LabelList dataKey="total" position="top" style={{ fill: '#4B4F36', fontSize: 12 }} />
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="text-center py-10 text-gray-500">Nenhum dado para exibir.</div>
-                    )}
-                </CardContent>
-            </Card>
+      {!orderSubmitted && (
+        <StepNavigation currentStep={currentStep} completedSteps={completedSteps} onStepClick={handleStepNavigation} />
+      )}
+
+      <main className="container mx-auto p-2 md:p-4 lg:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
+          <div className="lg:col-span-2">
+            {currentStep === 1 && !orderSubmitted && (
+              <StepWelcome config={appConfig} onNext={() => handleNextStep(2)} />
+            )}
+
+            {currentStep === 2 && !orderSubmitted && (
+              <StepDetails
+                orderState={orderState}
+                cabins={cabins}
+                deliveryTimes={deliveryTimes}
+                onUpdateOrderState={updateOrderState}
+                onNext={() => handleNextStep(3)}
+                onBack={() => setCurrentStep(1)}
+              />
+            )}
+
+            {currentStep === 3 && !orderSubmitted && (
+              <div className="shadow-lg border-0 rounded-lg overflow-hidden bg-card">
+                <div className="text-primary-foreground p-4 md:p-6" style={{ backgroundColor: appConfig.corDestaque }}>
+                  <div className="flex items-center gap-3">
+                    <MessageCircle className="w-5 h-5 md:w-6 md:h-6" />
+                    <div>
+                      <h1 className="text-xl md:text-2xl font-bold">Escolha dos Pratos Quentes</h1>
+                      <p className="opacity-90 mt-1 text-sm md:text-base">
+                        Cada hóspede deve escolher <strong>1 prato quente</strong>. Toque no nome para ver as opções.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4 md:space-y-6 p-4 md:p-6">
+                  <GuestAccordion
+                    persons={orderState.persons}
+                    hotDishes={hotDishes}
+                    onSelectDish={handleSelectDish}
+                    onSelectFlavor={handleSelectFlavor}
+                    onUpdateNotes={handleUpdateNotes}
+                    onSelectNoHotDish={handleSelectNoHotDish}
+                  />
+
+                  <div className="pt-6 md:pt-8 border-t">
+                    <div className="space-y-3 mb-6">
+                      <label className="text-base md:text-lg font-bold flex items-center gap-2">
+                        <MessageCircle className="w-4 h-4 md:w-5 md:h-5" style={{ color: appConfig.corDestaque }} />
+                        Observações Gerais para Pratos Quentes
+                      </label>
+                      <Textarea
+                        placeholder="Observações que se aplicam a todos os pratos quentes (ex: sem cebola, alergias, preferências...)"
+                        value={orderState.globalHotDishNotes}
+                        onChange={(e) => handleNotesChange(e.target.value)}
+                        className="resize-none"
+                        rows={4}
+                      />
+                    </div>
+                    <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0">
+                      <Button
+                        variant="outline"
+                        onClick={() => setCurrentStep(2)}
+                      >
+                        ← Voltar
+                      </Button>
+                      <Button
+                        onClick={() => handleNextStep(4)}
+                        className="text-primary-foreground hover:opacity-90"
+                        style={{ backgroundColor: appConfig.corDestaque }}
+                      >
+                        Próximo →
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 4 && !orderSubmitted && (
+              <StepAccompaniments
+                orderState={orderState}
+                accompaniments={accompaniments}
+                onUpdateAccompaniment={handleUpdateAccompaniment}
+                onNext={() => handleNextStep(5)}
+                onBack={() => setCurrentStep(3)}
+              />
+            )}
+
+            {currentStep === 5 && !orderSubmitted && (
+              <StepReview
+                orderState={orderState}
+                hotDishes={hotDishes}
+                accompaniments={accompaniments}
+                onBack={() => setCurrentStep(4)}
+                onSuccess={() => setOrderSubmitted(true)}
+                onUpdateSpecialRequests={handleSpecialRequestsChange}
+                onNavigateToStep={setCurrentStep}
+              />
+            )}
+
+            {orderSubmitted && <StepSuccess />}
+          </div>
+
+          {!orderSubmitted && (
+            <div className="hidden lg:block lg:col-span-1">
+              <OrderSidebar
+                orderState={orderState}
+                hotDishes={hotDishes}
+                accompaniments={accompaniments}
+                appConfig={appConfig}
+              />
+            </div>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   )
 }

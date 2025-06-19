@@ -31,7 +31,7 @@ export function AppHeader({ config }: AppHeaderProps) {
         <p className="text-md md:text-lg text-stone-500">{config.subtitulo}</p>
       </div>
       <Link
-        href="/adminv5.html"
+        href="/admin"
         target="_blank"
         rel="noopener noreferrer"
         className="absolute bottom-1 right-2 text-xs text-stone-400 hover:text-stone-600 transition-colors"

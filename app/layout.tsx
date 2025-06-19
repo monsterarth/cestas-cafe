@@ -1,4 +1,4 @@
-// monsterarth/cestas-cafe/cestas-cafe-vfinal/app/layout.tsx
+// COLE ESTE CÓDIGO EM: app/layout.tsx
 import type React from "react"
 import { Inter } from "next/font/google"
 import "./globals.css"
@@ -42,11 +42,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="pt-BR" className={inter.variable}>
       <head>
-        {/* O injetor de tema aplica as cores customizadas, isso está correto */}
         <ThemeInjector config={appConfig} />
       </head>
-      {/* O body deve conter apenas os 'children' para que cada rota defina seu próprio layout */}
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        {children}
+      </body>
     </html>
   )
 }
