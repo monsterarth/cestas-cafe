@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, Firestore } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase';
-import type { Order } from '@/types';
-import { OrderPrintLayout } from '@/components/order-print-layout';
-import { OrderReceiptLayout } from '@/components/order-receipt-layout';
-import { OrdersSummaryLayout } from '@/components/orders-summary-layout';
+import type { Order, ItemPedido } from '@/types'; // CORRIGIDO: Usa 'Order' e importa 'ItemPedido'
+import { OrderPrintLayout } from '@/components/order-print-layout'; // CORRIGIDO: Importação nomeada
+import { OrderReceiptLayout } from '@/components/order-receipt-layout'; // CORRIGIDO: Importação nomeada
+import { OrdersSummaryLayout } from '@/components/orders-summary-layout'; // CORRIGIDO: Importação nomeada
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,11 +17,21 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
+// Adicionando uma interface para o resumo, para evitar o tipo 'any'
+interface AggregatedSummary {
+  [category: string]: {
+    [itemName: string]: {
+      total: number;
+      sabores: Record<string, number>;
+    };
+  };
+}
+
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]); // CORRIGIDO: Usa 'Order'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null); // CORRIGIDO: Usa 'Order'
   const [componentToPrint, setComponentToPrint] = useState<React.ReactElement | null>(null);
   const [retryFetch, setRetryFetch] = useState(0);
 
@@ -30,13 +40,18 @@ export default function OrdersPage() {
     setError(null);
     let unsubscribe: (() => void) | undefined;
 
+    // CORRIGIDO: Usa getFirebaseDb()
     getFirebaseDb().then(db => {
-      if (!db) throw new Error("A conexão com o banco de dados falhou.");
+      if (!db) {
+          setError(new Error("A conexão com o banco de dados falhou."));
+          setLoading(false);
+          return;
+      }
       
       const q = query(collection(db, 'pedidos'), orderBy('timestampPedido', 'desc'));
       unsubscribe = onSnapshot(q,
         (snapshot) => {
-          const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+          const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)); // CORRIGIDO: Usa 'Order'
           setOrders(ordersData);
           setLoading(false);
         },
@@ -67,16 +82,20 @@ export default function OrdersPage() {
     return () => window.removeEventListener('afterprint', handleAfterPrint);
   }, [componentToPrint]);
 
-  const triggerPrint = (order: Order, type: 'a4' | 'receipt') => {
+  const triggerPrint = (order: Order, type: 'a4' | 'receipt') => { // CORRIGIDO: Usa 'Order'
     if (type === 'a4') setComponentToPrint(<OrderPrintLayout order={order} />);
     else setComponentToPrint(<OrderReceiptLayout order={order} />);
   };
 
   const triggerSummaryPrint = () => {
     const pendingOrders = orders.filter(o => o.status !== "Entregue" && o.status !== "Cancelado");
-    if (pendingOrders.length === 0) return toast.info("Nenhum pedido pendente para gerar resumo.");
+    if (pendingOrders.length === 0) {
+      toast.info("Nenhum pedido pendente para gerar resumo.");
+      return;
+    }
     
-    const summary = pendingOrders.flatMap(o => o.itensPedido || []).reduce((acc, item) => {
+    // CORRIGIDO: Adiciona tipos para 'acc' e 'item' para resolver erros de 'implicit any'
+    const summary = pendingOrders.flatMap(o => o.itensPedido || []).reduce((acc: AggregatedSummary, item: ItemPedido) => {
       const category = item.categoria || 'Outros';
       const itemName = item.nomeItem;
       if (!acc[category]) acc[category] = {};
@@ -87,18 +106,21 @@ export default function OrdersPage() {
         acc[category][itemName].sabores[item.sabor] += item.quantidade;
       }
       return acc;
-    }, {} as any);
+    }, {} as AggregatedSummary);
     setComponentToPrint(<OrdersSummaryLayout summary={summary} pendingOrders={pendingOrders} />);
   };
 
-  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => { // CORRIGIDO: Usa 'Order'
     const db = await getFirebaseDb();
-    if (!db) return toast.error("Sem conexão.");
+    if (!db) {
+      toast.error("Sem conexão com o banco de dados.");
+      return;
+    }
     await updateDoc(doc(db, 'pedidos', orderId), { status });
     toast.success(`Pedido marcado como "${status}"`);
   };
 
-  const getStatusBadgeProps = (status: Order['status']) => {
+  const getStatusBadgeProps = (status: Order['status']) => { // CORRIGIDO: Usa 'Order'
     switch (status) {
       case "Novo": return { className: "bg-blue-100 text-blue-800" };
       case "Em Preparação": return { className: "bg-amber-100 text-amber-800" };
@@ -145,7 +167,11 @@ export default function OrdersPage() {
       <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
         <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Pedido de {viewingOrder?.hospedeNome}</DialogTitle><DialogDescription>Cabana {viewingOrder?.cabanaNumero} - Entrega: {viewingOrder?.horarioEntrega}</DialogDescription></DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto p-1 pr-4 mt-4 space-y-4">
-            <div><h3 className="font-semibold mb-2">Itens:</h3><ul className="list-disc list-inside space-y-2">{(viewingOrder?.itensPedido || []).map((item, i) => <li key={i}>{item.quantidade}x {item.nomeItem} {item.sabor && `(${item.sabor})`}</li>)}</ul></div>
+            <div>
+                <h3 className="font-semibold mb-2">Itens:</h3>
+                {/* CORRIGIDO: Adiciona tipos para 'item' e 'i' para resolver erros de 'implicit any' */}
+                <ul className="list-disc list-inside space-y-2">{(viewingOrder?.itensPedido || []).map((item: ItemPedido, i: number) => <li key={i}>{item.quantidade}x {item.nomeItem} {item.sabor && `(${item.sabor})`}</li>)}</ul>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
