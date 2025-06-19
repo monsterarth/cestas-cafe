@@ -12,7 +12,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Plus, Edit, Trash2, Sandwich, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { toast } from 'sonner';
 
 // --- TIPOS DE DADOS ---
 interface Flavor {
