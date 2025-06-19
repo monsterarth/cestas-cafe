@@ -1,141 +1,108 @@
-// Arquivo: components/orders-summary-layout.tsx
+// Arquivo: components/order-print-layout.tsx
 'use client';
 
 import { Order, ItemPedido, AppConfig } from '@/types';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { useMemo } from 'react';
-import { OrderReceiptLayout } from './order-receipt-layout';
 
-interface OrdersSummaryLayoutProps {
-  orders: Order[];
+interface OrderPrintLayoutProps {
+  order: Order | null;
   config: AppConfig | null;
 }
 
-// --- Nova Lógica de Processamento de Dados ---
-const processOrdersForSummary = (orders: Order[]) => {
-  // 1. Resumo dos Horários de Entrega
-  const deliveryTimeSummary = orders.reduce((acc, order) => {
-    const time = order.horarioEntrega;
-    acc[time] = (acc[time] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const allItems = orders.flatMap(order => order.itensPedido || []);
-
-  // 2. Resumo dos Pratos Quentes (agrupando por item e depois por sabor)
-  const hotDishes = allItems.filter(item => item.categoria?.toLowerCase().includes('pratos quentes'));
-  const hotDishesSummary = hotDishes.reduce((acc, item) => {
-    if (!acc[item.nomeItem]) {
-      acc[item.nomeItem] = { total: 0, flavors: {} };
-    }
-    acc[item.nomeItem].total += item.quantidade;
-    if (item.sabor) {
-      acc[item.nomeItem].flavors[item.sabor] = (acc[item.nomeItem].flavors[item.sabor] || 0) + item.quantidade;
-    }
-    return acc;
-  }, {} as Record<string, { total: number; flavors: Record<string, number> }>);
-
-  // 3. Resumo de outras categorias (agrupando apenas por item)
-  const otherItems = allItems.filter(item => !item.categoria?.toLowerCase().includes('pratos quentes'));
-  const otherItemsSummary = otherItems.reduce((acc, item) => {
-    const category = item.categoria || 'Outros';
-    if (!acc[category]) {
-      acc[category] = {};
-    }
-    acc[category][item.nomeItem] = (acc[category][item.nomeItem] || 0) + item.quantidade;
-    return acc;
-  }, {} as Record<string, Record<string, number>>);
-
-  return {
-    totalBaskets: orders.length,
-    deliveryTimeSummary,
-    hotDishesSummary,
-    otherItemsSummary,
-  };
+const groupItemsByCategory = (items: ItemPedido[]) => {
+    const pratosQuentes = items.filter(item => item.categoria?.toLowerCase().includes('pratos quentes'));
+    const bebidas = items.filter(item => item.categoria?.toLowerCase().includes('bebidas'));
+    const paes = items.filter(item => item.categoria?.toLowerCase().includes('pães'));
+    const acompanhamentos = items.filter(item => item.categoria?.toLowerCase().includes('acompanhamentos'));
+    
+    // CORREÇÃO DO ERRO DE 'i' PARA 'item'
+    const outros = items.filter(item => 
+        !item.categoria?.toLowerCase().includes('pratos quentes') &&
+        !item.categoria?.toLowerCase().includes('bebidas') &&
+        !item.categoria?.toLowerCase().includes('pães') &&
+        !item.categoria?.toLowerCase().includes('acompanhamentos')
+    );
+    return { pratosQuentes, bebidas, paes, acompanhamentos, outros };
 };
 
-export const OrdersSummaryLayout = ({ orders, config }: OrdersSummaryLayoutProps) => {
-  const { 
-    totalBaskets, 
-    deliveryTimeSummary, 
-    hotDishesSummary, 
-    otherItemsSummary 
-  } = useMemo(() => processOrdersForSummary(orders), [orders]);
-  
+export const OrderPrintLayout = ({ order, config }: OrderPrintLayoutProps) => {
+  if (!order) {
+    return null;
+  }
+
+  const groupedItems = useMemo(() => groupItemsByCategory(order.itensPedido || []), [order.itensPedido]);
+
   const motivationalMessage = useMemo(() => {
     const messages = config?.mensagensMotivacionais;
-    if (!messages || messages.length === 0) return "Bom trabalho, equipe!";
+    if (!messages || messages.length === 0) return "Tenha um dia incrível!";
     return messages[Math.floor(Math.random() * messages.length)];
   }, [config]);
 
-  // Formata a data atual para o cabeçalho
-  const currentDate = new Date().toLocaleDateString('pt-BR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-
-  return (
-    <div className="p-2 font-sans bg-white text-black text-sm" style={{ width: '80mm' }}>
-      {/* SEÇÃO 1: CABEÇALHO E RESUMO DE ENTREGAS */}
-      <div className="text-center mb-2">
-        <h1 className="font-bold text-base">Pedidos de hoje ({currentDate})</h1>
-      </div>
-      <div className="text-xs p-2 border border-black rounded">
-        <p className="font-bold">Número de Cestas: {totalBaskets}</p>
-        <div className="border-t border-dashed border-black my-1"></div>
-        {Object.entries(deliveryTimeSummary).map(([time, count]) => (
-          <p key={time}>{time}: {count} cesta(s)</p>
-        ))}
-      </div>
-      <p className="text-xs italic text-center p-2 my-2">"{motivationalMessage}"</p>
-      <div className="border-t-2 border-black"></div>
-
-      {/* SEÇÃO 2: RESUMO DE ITENS AGRUPADOS */}
-      <div className="my-2 space-y-3">
-        {/* Pratos Quentes com Sabores */}
-        {Object.keys(hotDishesSummary).length > 0 && (
-          <div>
-            <p className="font-bold uppercase text-xs">PRATOS QUENTES:</p>
-            {Object.entries(hotDishesSummary).map(([itemName, summary]) => (
-              <div key={itemName} className="pl-2">
-                <p className="font-semibold text-xs mt-1">{summary.total} {itemName}:</p>
-                {Object.entries(summary.flavors).map(([flavorName, flavorCount]) => (
-                  <p key={flavorName} className="pl-4 text-xs">- {flavorCount} {flavorName.toLowerCase()}</p>
-                ))}
-              </div>
-            ))}
-            <div className="border-t border-dashed border-black mt-2"></div>
-          </div>
-        )}
-        
-        {/* Outras Categorias */}
-        {Object.entries(otherItemsSummary).map(([categoryName, items]) => (
-            <div key={categoryName}>
-                <p className="font-bold uppercase text-xs">{categoryName}:</p>
-                {Object.entries(items).map(([itemName, quantity]) => (
-                    <p key={itemName} className="pl-2 text-xs">- {itemName}: {quantity} porções</p>
-                ))}
-                <div className="border-t border-dashed border-black mt-2"></div>
-            </div>
-        ))}
-      </div>
-      
-      {/* FIM DA PÁGINA DE RESUMO */}
-      <p className="text-center text-xs font-bold py-2">--- Fim do Resumo ---</p>
-
-      {/* SEÇÃO 3: COMANDAS INDIVIDUAIS (Começam em uma nova página) */}
-      <div style={{ pageBreakBefore: 'always' }}>
-        <div className="text-center mb-2">
-          <h2 className="font-bold text-lg">COMANDAS INDIVIDUAIS</h2>
-        </div>
-        <div className="space-y-4">
-          {orders.map(order => (
-              <div key={order.id} className="border-2 border-dashed border-gray-300 p-1" style={{ pageBreakInside: 'avoid' }}>
-                  <OrderReceiptLayout order={order} />
-              </div>
+  const ItemSection = ({ title, items }: { title: string, items: ItemPedido[] }) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <div className="mb-5">
+        <h3 className="text-lg font-bold text-gray-800 border-b border-gray-300 pb-1 mb-2 uppercase tracking-wider">{title}</h3>
+        <ul className="list-none space-y-1.5 pl-1">
+          {items.map((item, index) => (
+            <li key={index} className="flex items-center text-base">
+              <div className="w-5 h-5 border-2 border-gray-400 rounded-sm mr-4 flex-shrink-0"></div>
+              <span className="font-semibold">{item.quantidade}x</span>
+              <span className="mx-2">{item.nomeItem}</span>
+              {item.sabor && <span className="text-gray-600 font-light italic">({item.sabor})</span>}
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
+    );
+  };
+  
+  return (
+    // CORREÇÃO DE LAYOUT: Trocado flex por grid para ocupar a página inteira
+    <div className="p-8 font-sans bg-white text-black" style={{ width: '210mm', height: '297mm', display: 'grid', gridTemplateRows: 'auto auto auto 1fr auto' }}>
+      <header className="flex justify-between items-start pb-4 border-b-2 border-gray-800">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">{config?.nomeFazenda || "Fazenda do Rosa"}</h1>
+          <p className="text-lg text-gray-600">Checklist de Montagem da Cesta</p>
+        </div>
+        <div className="text-right">
+          <p className="font-semibold text-lg">Pedido #{order.id.substring(0, 6)}</p>
+          <p className="text-sm text-gray-500">
+            {order.timestampPedido?.toDate ? format(order.timestampPedido.toDate(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : ''}
+          </p>
+        </div>
+      </header>
+      
+      <div className="my-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+        <p className="text-base italic text-yellow-800">"{motivationalMessage}"</p>
+      </div>
+
+      <section className="grid grid-cols-2 gap-6 mb-6">
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h2 className="text-base font-bold text-gray-700 mb-2 uppercase">Informações do Hóspede</h2>
+          <p><span className="font-semibold">Nome:</span> {order.hospedeNome}</p>
+          <p><span className="font-semibold">Cabana:</span> {order.cabanaNumero}</p>
+        </div>
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h2 className="text-base font-bold text-gray-700 mb-2 uppercase">Detalhes da Entrega</h2>
+          <p><span className="font-semibold">Horário:</span> {order.horarioEntrega}</p>
+          <p><span className="font-semibold">Para:</span> {order.numeroPessoas} pessoas</p>
+        </div>
+      </section>
+
+      {/* A tag <main> agora tem '1fr' de altura, então vai se esticar */}
+      <main>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Itens para Coleta e Preparo</h2>
+        {Object.entries(groupedItems).map(([category, items]) => (
+            <ItemSection key={category} title={category} items={items} />
+        ))}
+      </main>
+
+      <footer className="pt-4 text-center text-xs text-gray-400 border-t">
+        <p>Por favor, confira todos os itens com atenção. Bom trabalho!</p>
+      </footer>
     </div>
   );
 };
