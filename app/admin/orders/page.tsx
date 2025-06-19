@@ -18,6 +18,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
+type PrintType = 'a4' | 'receipt' | 'summary';
+
 export default function OrdersPage() {
   const [db, setDb] = useState<Firestore | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -27,74 +29,73 @@ export default function OrdersPage() {
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
   const [summaryData, setSummaryData] = useState<any>(null);
+  const [printType, setPrintType] = useState<PrintType | null>(null);
 
   const printA4Ref = useRef<HTMLDivElement>(null);
   const printReceiptRef = useRef<HTMLDivElement>(null);
   const printSummaryRef = useRef<HTMLDivElement>(null);
 
+  // Lógica de fetch e listeners... (sem alterações)
   const fetchOrders = async () => {
     setError(null);
     setLoading(true);
-
     try {
       const firestoreDb = await getFirebaseDb();
       if (!firestoreDb) throw new Error("Não foi possível conectar ao banco de dados.");
       setDb(firestoreDb);
-
       const q = query(collection(firestoreDb, 'pedidos'), orderBy('timestampPedido', 'desc'));
-      
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const ordersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-        setOrders(ordersData);
-        setLoading(false);
+        setOrders(ordersData); setLoading(false);
       }, (err) => {
         console.error("Erro no listener do Firestore:", err);
-        setError(err);
-        setLoading(false);
+        setError(err); setLoading(false);
         toast.error("Erro ao receber atualizações de pedidos.");
       });
-
       return unsubscribe;
-
     } catch (err: any) {
       console.error("Erro ao buscar pedidos:", err);
-      setError(err);
-      setLoading(false);
+      setError(err); setLoading(false);
     }
   };
-
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-    
-    const initialize = async () => {
-      unsubscribe = await fetchOrders();
-    };
-
+    const initialize = async () => { unsubscribe = await fetchOrders(); };
     initialize();
-    
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
+    return () => { if (unsubscribe) { unsubscribe(); } };
   }, []);
 
-  // ===================================================================
-  // CORREÇÃO APLICADA ABAIXO
-  // ===================================================================
-  // @ts-ignore - Ignorando o erro de tipo da biblioteca desatualizada
-  const handlePrintA4 = useReactToPrint({ content: () => printA4Ref.current });
-  // @ts-ignore - Ignorando o erro de tipo da biblioteca desatualizada
-  const handlePrintReceipt = useReactToPrint({ content: () => printReceiptRef.current });
-  // @ts-ignore - Ignorando o erro de tipo da biblioteca desatualizada
-  const handlePrintSummary = useReactToPrint({ content: () => printSummaryRef.current });
 
+  // ===================================================================
+  // CORREÇÃO DA LÓGICA DE IMPRESSÃO
+  // ===================================================================
+  const handlePrint = useReactToPrint({
+    onAfterPrint: () => {
+      // Limpa os estados após a impressão
+      setOrderToPrint(null);
+      setSummaryData(null);
+      setPrintType(null);
+    }
+  });
+
+  useEffect(() => {
+    // Este efeito é disparado DEPOIS que o componente de impressão está pronto na tela
+    if (printType && handlePrint) {
+      let contentRef: React.RefObject<HTMLDivElement> | null = null;
+      if(printType === 'a4' && orderToPrint) contentRef = printA4Ref;
+      if(printType === 'receipt' && orderToPrint) contentRef = printReceiptRef;
+      if(printType === 'summary' && summaryData) contentRef = printSummaryRef;
+      
+      if(contentRef) {
+        // @ts-ignore - A lib espera uma função, mas passamos a ref diretamente
+        handlePrint(null, () => contentRef.current);
+      }
+    }
+  }, [orderToPrint, summaryData, printType, handlePrint]);
+  
   const triggerPrint = (order: Order, type: 'a4' | 'receipt') => {
     setOrderToPrint(order);
-    setTimeout(() => {
-      if (type === 'a4') handlePrintA4();
-      else handlePrintReceipt();
-    }, 0);
+    setPrintType(type);
   };
 
   const triggerSummaryPrint = () => {
@@ -103,57 +104,24 @@ export default function OrdersPage() {
       toast.info("Nenhum pedido pendente para gerar resumo.");
       return;
     }
-
     const summary = pendingOrders
       .flatMap(order => order.itensPedido || [])
       .reduce((acc, item) => {
         const category = item.categoria || 'Outros';
         const itemName = item.sabor ? `${item.nomeItem} (${item.sabor})` : item.nomeItem;
-        
         if (!acc[category]) acc[category] = {};
         if (!acc[category][itemName]) acc[category][itemName] = 0;
-        
         acc[category][itemName] += item.quantidade;
         return acc;
       }, {} as any);
-
     setSummaryData({ summary, totalOrders: pendingOrders.length });
-    setTimeout(() => handlePrintSummary(), 0);
-  };
-
-  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
-    if (!db) return;
-    try {
-      const orderRef = doc(db, 'pedidos', orderId);
-      await updateDoc(orderRef, { status });
-      toast.success(`Pedido marcado como "${status}"!`);
-    } catch (error) {
-      toast.error('Erro ao atualizar o status do pedido.');
-      console.error(error);
-    }
-  };
-
-  const deleteOrder = async (orderId: string) => {
-    if(!db) return;
-    if(!confirm('Tem certeza que deseja excluir este pedido permanentemente?')) return;
-    try {
-      await deleteDoc(doc(db, 'pedidos', orderId));
-      toast.success('Pedido excluído com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao excluir o pedido.');
-      console.error(error);
-    }
+    setPrintType('summary');
   };
   
-  const getStatusColor = (status: Order['status']) => {
-    switch (status) {
-      case "Novo": return "bg-blue-100 text-blue-800";
-      case "Em Preparação": return "bg-amber-100 text-amber-800";
-      case "Entregue": return "bg-green-100 text-green-800";
-      case "Cancelado": return "bg-red-100 text-red-800";
-      default: return "bg-slate-100 text-slate-800";
-    }
-  }
+  // Funções de update e delete (sem alterações)
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => { if (!db) return; try { const orderRef = doc(db, 'pedidos', orderId); await updateDoc(orderRef, { status }); toast.success(`Pedido marcado como "${status}"!`); } catch (error) { toast.error('Erro ao atualizar o status do pedido.'); console.error(error); } };
+  const deleteOrder = async (orderId: string) => { if(!db) return; if(!confirm('Tem certeza que deseja excluir este pedido permanentemente?')) return; try { await deleteDoc(doc(db, 'pedidos', orderId)); toast.success('Pedido excluído com sucesso!'); } catch (error) { toast.error('Erro ao excluir o pedido.'); console.error(error); } };
+  const getStatusColor = (status: Order['status']) => { switch (status) { case "Novo": return "bg-blue-100 text-blue-800"; case "Em Preparação": return "bg-amber-100 text-amber-800"; case "Entregue": return "bg-green-100 text-green-800"; case "Cancelado": return "bg-red-100 text-red-800"; default: return "bg-slate-100 text-slate-800"; } };
 
   if (loading) return <div className="flex items-center justify-center h-full text-muted-foreground"><Loader2 className="mr-2 animate-spin" />Carregando pedidos...</div>;
   if (error) return ( <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-4"> <AlertTriangle className="w-12 h-12 text-destructive" /> <h2 className="text-xl font-semibold">Erro ao Carregar os Pedidos</h2> <p className="text-muted-foreground">Não foi possível conectar ao banco de dados.</p> <Button onClick={fetchOrders}>Tentar Novamente</Button> </div> );
@@ -165,7 +133,6 @@ export default function OrdersPage() {
           <Printer className="mr-2 h-4 w-4"/> Imprimir Resumo da Cozinha
         </Button>
       </div>
-
       <Table>
         <TableHeader>
           <TableRow>
