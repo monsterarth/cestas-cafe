@@ -9,8 +9,8 @@ import { getFirebaseDb } from '@/lib/firebase';
 import type { Order, ItemPedido, AppConfig } from '@/types';
 import { OrderPrintLayout } from '@/components/order-print-layout';
 import { OrderReceiptLayout } from '@/components/order-receipt-layout';
-// CORREÇÃO 1: Importação ajustada para default (sem chaves)
-import OrdersSummaryLayout from '@/components/orders-summary-layout';
+// CORREÇÃO FINAL: Usando a importação nomeada com chaves
+import { OrdersSummaryLayout } from '@/components/orders-summary-layout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -92,7 +92,6 @@ export default function OrdersPage() {
 
   const triggerPrint = (order: Order, type: 'a4' | 'receipt') => {
     if (type === 'a4') {
-      // CORREÇÃO 2: Passando a prop 'config' que estava faltando
       setComponentToPrint(<OrderPrintLayout order={order} config={appConfig} />);
     } else {
       setComponentToPrint(<OrderReceiptLayout order={order} />);
