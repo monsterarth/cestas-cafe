@@ -1,5 +1,5 @@
-// SUBSTITUA TODO O CONTEÚDO DE: app/admin/page.tsx
 "use client"
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useMemo } from "react"
 import { collection, onSnapshot, orderBy, query, where, Timestamp } from "firebase/firestore"

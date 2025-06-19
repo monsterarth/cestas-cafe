@@ -1,4 +1,4 @@
-// Arquivo: app/admin/layout.tsx
+export const dynamic = 'force-dynamic';
 
 import { getFirebaseDb } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore"; // Importe 'doc' e 'getDoc'
