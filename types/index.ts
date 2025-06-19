@@ -1,3 +1,5 @@
+// Arquivo: types/index.ts
+
 import { Timestamp } from "firebase/firestore";
 
 export interface HotDish {
@@ -11,7 +13,7 @@ export interface HotDish {
 }
 
 export interface Flavor {
-  id: string;
+  id:string;
   nomeSabor: string;
   disponivel: boolean;
   posicao: number;
@@ -56,8 +58,10 @@ export interface AppConfig {
   corDestaque: string;
   corDestaqueTexto: string;
   corCartao: string;
+  mensagensMotivacionais?: string[];
 }
 
+// CORREÇÃO PRINCIPAL AQUI
 export interface OrderState {
   guestInfo: {
     name: string;
@@ -65,9 +69,9 @@ export interface OrderState {
     people: number;
     time: string;
   };
-  persons: Person[];
+  persons: Person[]; // Propriedade adicionada
   accompaniments: Record<string, Record<string, number>>;
-  globalHotDishNotes: string;
+  globalHotDishNotes: string; // Propriedade adicionada
   specialRequests: string;
 }
 

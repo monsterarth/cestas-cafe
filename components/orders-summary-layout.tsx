@@ -1,79 +1,103 @@
-import React from 'react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import type { Order } from '@/types';
+// Arquivo: components/orders-summary-layout.tsx
+'use client';
 
-// O tipo para a estrutura de dados agregada
-interface AggregatedSummary {
-  [category: string]: {
-    [itemName: string]: {
-      total: number;
-      sabores: Record<string, number>;
-    };
-  };
-}
+import { Order, ItemPedido, AppConfig } from '@/types';
+import { useMemo } from 'react';
+import { OrderReceiptLayout } from './order-receipt-layout';
 
 interface OrdersSummaryLayoutProps {
-  summary: AggregatedSummary;
-  pendingOrders: Order[];
+  orders: Order[];
+  config: AppConfig | null;
 }
 
-export const OrdersSummaryLayout = ({ summary, pendingOrders }: OrdersSummaryLayoutProps) => {
-  return (
-    <div className="p-8 font-sans bg-white text-black">
-      <header className="text-center border-b-2 border-black pb-4 mb-8">
-        <h1 className="text-3xl font-bold">Resumo da Cozinha</h1>
-        <p className="text-lg">Total de Pedidos Pendentes: {pendingOrders.length}</p>
-        <p className="text-sm text-gray-600">Gerado em: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
-      </header>
-      
-      {/* SEÇÃO 1: RESUMO DE PRODUÇÃO */}
-      <section className="mb-10 page-break-after">
-        <h2 className="text-2xl font-bold mb-4 border-b-2 pb-2">RESUMO DE PRODUÇÃO</h2>
-        <div className="space-y-6">
-          {Object.entries(summary).map(([category, items]) => (
-            <div key={category}>
-              <h3 className="text-xl font-semibold uppercase text-gray-800">{category}</h3>
-              <div className="pl-4 mt-2 space-y-3">
-                {Object.entries(items).map(([itemName, data]) => (
-                  <div key={itemName}>
-                    <p className="text-base font-bold">{data.total}x {itemName} (Total)</p>
-                    {/* Mostra o detalhamento de sabores apenas se houver sabores */}
-                    {Object.keys(data.sabores).length > 0 && (
-                      <div className="pl-6">
-                        {Object.entries(data.sabores).map(([sabor, count]) => (
-                          <p key={sabor} className="text-sm text-gray-700">↳ {count}x {sabor}</p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+const aggregateAllItems = (orders: Order[]) => {
+    const allItems = orders.flatMap(order => order.itensPedido || []);
+    
+    const itemMap = allItems.reduce((acc, item) => {
+        const key = `${item.nomeItem}-${item.sabor || ''}`;
+        if (!acc[key]) {
+            acc[key] = { ...item, quantidade: 0, fromOrders: new Set<string>() };
+        }
+        acc[key].quantidade += item.quantidade;
+        
+        // ESTA É A LINHA CORRIGIDA
+        const orderOfItem = orders.find(o => o.itensPedido.includes(item));
+        
+        if (orderOfItem) {
+           acc[key].fromOrders.add(`Cabana ${orderOfItem.cabanaNumero}`);
+        }
+        return acc;
+    }, {} as Record<string, ItemPedido & { fromOrders: Set<string> }>);
+    
+    const aggregatedItems = Object.values(itemMap);
 
-      {/* SEÇÃO 2: DETALHES POR CABANA */}
-      <section>
-        <h2 className="text-2xl font-bold mb-4 border-b-2 pb-2">DETALHES POR CABANA</h2>
-        <div className="space-y-6">
-          {pendingOrders.map(order => (
-            <div key={order.id} className="p-4 border rounded-lg page-break-inside-avoid">
-              <h3 className="text-lg font-bold">Cabana {order.cabanaNumero} ({order.hospedeNome}) - Entrega: {order.horarioEntrega}</h3>
-              <ul className="list-disc list-inside text-sm mt-2">
-                {order.itensPedido.map((item, index) => (
-                   <li key={index}>
-                    {item.quantidade}x {item.nomeItem}
-                    {item.sabor && <span className="text-gray-600"> ({item.sabor})</span>}
-                  </li>
-                ))}
-              </ul>
-              {order.observacoesGerais && <p className="mt-2 text-sm italic"><strong>Obs:</strong> {order.observacoesGerais}</p>}
-            </div>
-          ))}
+    const pratosQuentes = aggregatedItems.filter(i => i.categoria?.toLowerCase().includes('pratos quentes'));
+    const bebidas = aggregatedItems.filter(i => i.categoria?.toLowerCase().includes('bebidas'));
+    const paes = aggregatedItems.filter(i => i.categoria?.toLowerCase().includes('pães'));
+    const acompanhamentos = aggregatedItems.filter(i => i.categoria?.toLowerCase().includes('acompanhamentos'));
+    const outros = aggregatedItems.filter(i => 
+        !i.categoria?.toLowerCase().includes('pratos quentes') &&
+        !i.categoria?.toLowerCase().includes('bebidas') &&
+        !i.categoria?.toLowerCase().includes('pães') &&
+        !i.categoria?.toLowerCase().includes('acompanhamentos')
+    );
+
+    return { pratosQuentes, bebidas, paes, acompanhamentos, outros };
+};
+
+export const OrdersSummaryLayout = ({ orders, config }: OrdersSummaryLayoutProps) => {
+  const { pratosQuentes, bebidas, paes, acompanhamentos, outros } = useMemo(() => aggregateAllItems(orders), [orders]);
+  
+  const motivationalMessage = useMemo(() => {
+      const messages = config?.mensagensMotivacionais;
+      if (!messages || messages.length === 0) return "Bom trabalho, equipe!";
+      return messages[Math.floor(Math.random() * messages.length)];
+  }, [config]);
+
+  const ItemSection = ({ title, items }: { title: string, items: (ItemPedido & { fromOrders: Set<string> })[]}) => {
+      if (items.length === 0) return null;
+      return (
+        <div className="mb-2">
+            <p className="font-bold uppercase text-xs border-b border-black pb-1">{title}</p>
+            {items.map((item, index) => (
+                <p key={index} className="text-xs pl-2">
+                    {item.quantidade}x {item.nomeItem} {item.sabor && `(${item.sabor})`}
+                    <span className="text-gray-500 text-[10px] block pl-2">↳ {Array.from(item.fromOrders).join(', ')}</span>
+                </p>
+            ))}
         </div>
-      </section>
+      );
+  };
+
+  return (
+    <div className="p-2 font-sans bg-white text-black" style={{ width: '80mm' }}>
+      <div className="text-center">
+        <h1 className="font-bold text-lg">RESUMO DA COZINHA</h1>
+        <p className="text-xs">{new Date().toLocaleDateString('pt-BR')} - {orders.length} pedidos pendentes</p>
+        <p className="text-xs italic p-2 bg-gray-100 my-2 rounded">"{motivationalMessage}"</p>
+      </div>
+
+      <div className="my-2">
+        <ItemSection title="Pratos Quentes" items={pratosQuentes} />
+        <ItemSection title="Bebidas" items={bebidas} />
+        <ItemSection title="Pães" items={paes} />
+        <ItemSection title="Acompanhamentos" items={acompanhamentos} />
+        <ItemSection title="Outros" items={outros} />
+      </div>
+
+      <div className="border-t-4 border-double border-black my-4"></div>
+
+      <div className="text-center mb-2">
+        <h2 className="font-bold text-lg">COMANDAS INDIVIDUAIS</h2>
+      </div>
+
+      <div className="space-y-4">
+        {orders.map(order => (
+            <div key={order.id} className="border-2 border-dashed border-gray-300 p-1" style={{ pageBreakBefore: 'always' }}>
+                <OrderReceiptLayout order={order} />
+            </div>
+        ))}
+      </div>
     </div>
   );
 };

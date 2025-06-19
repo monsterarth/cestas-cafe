@@ -1,11 +1,12 @@
+// Arquivo: app/admin/orders/page.tsx
 'use client';
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom'; // Importe o createPortal
-import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { createPortal } from 'react-dom'; 
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase';
-import type { Order, ItemPedido } from '@/types';
+import type { Order, ItemPedido, AppConfig } from '@/types';
 import { OrderPrintLayout } from '@/components/order-print-layout';
 import { OrderReceiptLayout } from '@/components/order-receipt-layout';
 import { OrdersSummaryLayout } from '@/components/orders-summary-layout';
@@ -19,17 +20,9 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
-interface AggregatedSummary {
-  [category: string]: {
-    [itemName: string]: {
-      total: number;
-      sabores: Record<string, number>;
-    };
-  };
-}
-
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
@@ -37,45 +30,51 @@ export default function OrdersPage() {
   const [retryFetch, setRetryFetch] = useState(0);
   const [printContainer, setPrintContainer] = useState<HTMLElement | null>(null);
 
-  // Garante que temos o container do DOM para o portal
   useEffect(() => {
     setPrintContainer(document.getElementById('print-container'));
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    let unsubscribe: (() => void) | undefined;
-
-    getFirebaseDb().then(db => {
-      if (!db) {
-          setError(new Error("A conexão com o banco de dados falhou."));
-          setLoading(false);
-          return;
-      }
-      
-      const q = query(collection(db, 'pedidos'), orderBy('timestampPedido', 'desc'));
-      unsubscribe = onSnapshot(q,
-        (snapshot) => {
-          const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-          setOrders(ordersData);
-          setLoading(false);
-        },
-        (err) => {
-          console.error("Erro no listener:", err);
-          setError(err);
-          setLoading(false);
+    const fetchInitialData = async () => {
+        setLoading(true);
+        setError(null);
+        const db = await getFirebaseDb();
+        if (!db) {
+            toast.error("Falha na conexão com o banco de dados.");
+            setLoading(false);
+            return;
         }
-      );
-    }).catch(err => {
-      console.error("Erro ao inicializar:", err);
-      setError(err);
-      setLoading(false);
-    });
 
-    return () => {
-      if (unsubscribe) unsubscribe();
+        // Busca a configuração do App
+        try {
+            const configRef = doc(db, "configuracoes", "app");
+            const configSnap = await getDoc(configRef);
+            if(configSnap.exists()) {
+                setAppConfig(configSnap.data() as AppConfig);
+            }
+        } catch(e) {
+            toast.error("Falha ao carregar configurações do app.");
+            console.error(e);
+        }
+
+        // Listener de pedidos em tempo real
+        const q = query(collection(db, 'pedidos'), orderBy('timestampPedido', 'desc'));
+        const unsubscribe = onSnapshot(q,
+            (snapshot) => {
+                const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+                setOrders(ordersData);
+                setLoading(false);
+            },
+            (err) => {
+                console.error("Erro no listener de pedidos:", err);
+                setError(err as Error);
+                setLoading(false);
+            }
+        );
+        return () => unsubscribe();
     };
+    
+    fetchInitialData();
   }, [retryFetch]);
 
   useEffect(() => {
@@ -85,7 +84,7 @@ export default function OrdersPage() {
         window.addEventListener('afterprint', handleAfterPrint, { once: true });
         const timer = setTimeout(() => {
             window.print();
-        }, 150); // Aumentado um pouco o tempo para garantir a renderização
+        }, 150);
         return () => clearTimeout(timer);
     } else {
         window.removeEventListener('afterprint', handleAfterPrint);
@@ -103,20 +102,7 @@ export default function OrdersPage() {
       toast.info("Nenhum pedido pendente para gerar resumo.");
       return;
     }
-    
-    const summary = pendingOrders.flatMap(o => o.itensPedido || []).reduce((acc: AggregatedSummary, item: ItemPedido) => {
-      const category = item.categoria || 'Outros';
-      const itemName = item.nomeItem;
-      if (!acc[category]) acc[category] = {};
-      if (!acc[category][itemName]) acc[category][itemName] = { total: 0, sabores: {} };
-      acc[category][itemName].total += item.quantidade;
-      if (item.sabor) {
-        if (!acc[category][itemName].sabores[item.sabor]) acc[category][itemName].sabores[item.sabor] = 0;
-        acc[category][itemName].sabores[item.sabor] += item.quantidade;
-      }
-      return acc;
-    }, {} as AggregatedSummary);
-    setComponentToPrint(<OrdersSummaryLayout summary={summary} pendingOrders={pendingOrders} />);
+    setComponentToPrint(<OrdersSummaryLayout orders={pendingOrders} config={appConfig} />);
   };
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
@@ -139,7 +125,7 @@ export default function OrdersPage() {
     }
   };
 
-  if (loading) return <div className="flex flex-col gap-2 items-center justify-center h-64 text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin" /><span>Carregando pedidos...</span></div>;
+  if (loading) return <div className="flex flex-col gap-2 items-center justify-center h-64 text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin" /><span>Carregando...</span></div>;
   if (error) return ( <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-4"> <AlertTriangle className="w-12 h-12 text-destructive" /> <h2 className="text-xl font-semibold">Erro ao Carregar Pedidos</h2> <p className="text-muted-foreground">{error.message}</p> <Button onClick={() => setRetryFetch(c => c + 1)}>Tentar Novamente</Button> </div> );
 
   return (
@@ -147,7 +133,7 @@ export default function OrdersPage() {
       <div>
         <div className="flex justify-end mb-4"><Button onClick={triggerSummaryPrint}><Printer className="mr-2 h-4 w-4"/>Imprimir Resumo da Cozinha</Button></div>
         <Table>
-            <TableHeader><TableRow><TableHead>Status</TableHead><TableHead>Hóspede</TableHead><TableHead>Entrega</TableHead><TableHead>Data do Pedido</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Status</TableHead><TableHead>Hóspede</TableHead><TableHead>Entrega</TableHead><TableHead>Data</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
             <TableBody>
             {orders.length > 0 ? (
                 orders.map((order) => (
@@ -186,10 +172,6 @@ export default function OrdersPage() {
         </Dialog>
       </div>
 
-      {/* O componente a ser impresso será renderizado no portal.
-        O '&&' garante que só tentamos renderizar o portal quando tanto
-        o componente quanto o container do DOM estiverem prontos.
-      */}
       {printContainer && componentToPrint && createPortal(componentToPrint, printContainer)}
     </>
   );
