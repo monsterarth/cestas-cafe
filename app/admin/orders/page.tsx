@@ -120,7 +120,7 @@ export default function OrdersPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => setViewingOrder(order)}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setViewingOrder(order); }}>
                           <FileText className="mr-2 h-4 w-4" />Ver Detalhes
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
