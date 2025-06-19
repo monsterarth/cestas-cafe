@@ -1,4 +1,3 @@
-// SUBSTITUA TODO O CONTEÚDO DE: app/page.tsx
 "use client"
 
 import type React from "react"
