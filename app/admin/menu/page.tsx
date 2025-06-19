@@ -6,11 +6,12 @@ import { getFirebaseDb } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core"
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Plus, Edit, Trash2, Sandwich } from "lucide-react"
+import { GripVertical, Plus, Edit, Trash2, Sandwich, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 // --- TIPOS DE DADOS ---
@@ -181,7 +182,8 @@ export default function MenuPage() {
     const unsubscribePromise = initializeDbAndListener();
     return () => { unsubscribePromise.then(unsubscribe => unsubscribe && unsubscribe()); };
   }, []);
-
+  
+  // Lógica de arrastar e soltar (sem alterações)
   const handleDragEnd = async (event: DragEndEvent, context: 'categories' | 'items' | 'flavors', parentId?: string, grandParentId?: string) => {
     if (!db) return;
     const { active, over } = event;
@@ -259,13 +261,15 @@ export default function MenuPage() {
     } catch (error) { console.error("Error deleting category:", error); toast.error("Erro ao excluir categoria."); }
   };
 
+  // **NOVA LÓGICA DE SALVAR ITEM (CORRIGIDA)**
   const handleSaveItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); 
-    if (!db || !itemModal.categoryId) return;
+    if (!db || !itemModal.categoryId || !itemModal.item) return;
     
     setIsSaving(true);
-    let finalImageUrl = itemModal.item?.imageUrl || '';
+    let finalImageUrl = itemModal.item.imageUrl || '';
 
+    // Upload da imagem (continua igual)
     if (imageFile) {
         try {
             const response = await fetch(`/api/upload?filename=${encodeURIComponent(imageFile.name)}`, { method: 'POST', body: imageFile });
@@ -280,29 +284,26 @@ export default function MenuPage() {
         }
     }
 
-    const formData = new FormData(e.currentTarget);
-    const itemData: Omit<MenuItem, 'id' | 'sabores' | 'posicao'> & { posicao?: number } = {
-      nomeItem: formData.get("nomeItem") as string,
-      emoji: formData.get("emoji") as string,
-      disponivel: formData.get("disponivel") === "on",
-      descricaoPorcao: formData.get("descricaoPorcao") as string,
+    // **MUDANÇA PRINCIPAL: Lendo dados do estado, não do FormData**
+    const itemData = {
+      ...itemModal.item,
       imageUrl: finalImageUrl,
     };
 
     try {
-      if (itemModal.item?.id) {
+      if (itemModal.item.id) {
+        // Editando um item existente
         await firestore.updateDoc(firestore.doc(db, "cardapio", itemModal.categoryId, "itens", itemModal.item.id), itemData);
         toast.success("Item atualizado!");
       } else {
+        // Adicionando um novo item
         const itemsColl = firestore.collection(db, "cardapio", itemModal.categoryId, "itens");
-        const itemsSnapshot = await firestore.getDocs(itemsColl);
-        itemData.posicao = itemsSnapshot.size;
-        await firestore.addDoc(itemsColl, itemData);
+        await firestore.addDoc(itemsColl, { ...itemData, posicao: categories.find(c => c.id === itemModal.categoryId)?.items.length || 0 });
         toast.success("Item criado!");
       }
       setItemModal({ open: false });
       setImageFile(null);
-    } catch (error) { console.error("Error saving item:", error); toast.error("Erro ao salvar item."); }
+    } catch (error) { console.error("Error saving item:", error); toast.error("Erro ao salvar o item."); }
     finally { setIsSaving(false); }
   };
   
@@ -357,8 +358,19 @@ export default function MenuPage() {
       toast.success("Sabor excluído!");
     } catch (error) { console.error("Error deleting flavor", error); toast.error("Erro ao excluir sabor."); }
   };
+  
+  // **NOVA FUNÇÃO para lidar com mudanças no formulário do item**
+  const handleItemFormChange = (field: keyof MenuItem, value: string | boolean) => {
+      setItemModal(prev => {
+          if(!prev.item) return prev;
+          return {
+              ...prev,
+              item: { ...prev.item, [field]: value }
+          }
+      });
+  }
 
-  if (loading) return <div className="flex justify-center items-center h-64"><div className="w-8 h-8 border-4 border-gray-300 border-t-[#97A25F] rounded-full animate-spin"></div></div>;
+  if (loading) return <div className="flex justify-center items-center h-64"><Loader2 className="w-8 h-8 text-slate-400 animate-spin"/></div>;
 
   return (
     <div className="space-y-6">
@@ -376,7 +388,7 @@ export default function MenuPage() {
                 category={category}
                 onEditCategory={(cat: MenuCategory) => setCategoryModal({ open: true, category: cat })}
                 onDeleteCategory={(catId: string) => handleDeleteCategory(catId)}
-                onAddItem={(catId: string) => setItemModal({ open: true, categoryId: catId, item: { disponivel: true, posicao: category.items.length } })}
+                onAddItem={(catId: string) => setItemModal({ open: true, categoryId: catId, item: { nomeItem: '', disponivel: true, posicao: category.items.length } })}
                 onEditItem={(catId: string, item: MenuItem) => setItemModal({ open: true, categoryId: catId, item })}
                 onDeleteItem={(catId: string, itemId: string) => handleDeleteItem(catId, itemId)}
                 onItemsDragEnd={(e: DragEndEvent) => handleDragEnd(e, 'items', category.id)}
@@ -388,9 +400,9 @@ export default function MenuPage() {
       </DndContext>
 
       {/* MODAL DE CATEGORIA */}
-      <Dialog open={categoryModal.open} onOpenChange={(open) => setCategoryModal({ open })}><DialogContent><DialogHeader><DialogTitle>{categoryModal.category ? "Editar" : "Adicionar"} Categoria</DialogTitle><DialogDescription>Crie ou edite uma seção do seu cardápio, como "Pratos Quentes" ou "Bebidas".</DialogDescription></DialogHeader><form onSubmit={handleSaveCategory} className="space-y-4 pt-4"><div><Label htmlFor="name">Nome da Categoria</Label><Input id="name" name="name" defaultValue={categoryModal.category?.nomeCategoria || ""} required /></div><div className="flex justify-end gap-2 pt-4"><Button type="button" variant="outline" onClick={() => setCategoryModal({ open: false })}>Cancelar</Button><Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar"}</Button></div></form></DialogContent></Dialog>
+      <Dialog open={categoryModal.open} onOpenChange={(open) => setCategoryModal({ open })}><DialogContent><DialogHeader><DialogTitle>{categoryModal.category ? "Editar" : "Adicionar"} Categoria</DialogTitle><DialogDescription>Crie ou edite uma seção do seu cardápio, como "Pratos Quentes" ou "Bebidas".</DialogDescription></DialogHeader><form onSubmit={handleSaveCategory} className="space-y-4 pt-4"><div><Label htmlFor="name">Nome da Categoria</Label><Input id="name" name="name" defaultValue={categoryModal.category?.nomeCategoria || ""} required /></div><div className="flex justify-end gap-2 pt-4"><Button type="button" variant="outline" onClick={() => setCategoryModal({ open: false })}>Cancelar</Button><Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : "Salvar"}</Button></div></form></DialogContent></Dialog>
       
-      {/* MODAL DE ITEM */}
+      {/* MODAL DE ITEM (CORRIGIDO) */}
       <Dialog open={itemModal.open} onOpenChange={(open) => { if (!open) { setItemModal({ open: false }); setImageFile(null); } else { setItemModal(prev => ({...prev, open: true}))} }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -398,19 +410,19 @@ export default function MenuPage() {
             <DialogDescription>Adicione ou edite um produto dentro de uma categoria.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveItem} className="space-y-4 pt-4">
-            <div><Label htmlFor="nomeItem">Nome do Item</Label><Input id="nomeItem" name="nomeItem" defaultValue={itemModal.item?.nomeItem || ""} required /></div>
-            <div><Label htmlFor="descricaoPorcao">Descrição da Porção (opcional)</Label><Input id="descricaoPorcao" name="descricaoPorcao" defaultValue={itemModal.item?.descricaoPorcao || ""} /></div>
-            <div><Label htmlFor="emoji">Emoji (opcional)</Label><Input id="emoji" name="emoji" defaultValue={itemModal.item?.emoji || ""} /></div>
+            <div><Label htmlFor="nomeItem">Nome do Item</Label><Input id="nomeItem" value={itemModal.item?.nomeItem || ""} onChange={e => handleItemFormChange('nomeItem', e.target.value)} required /></div>
+            <div><Label htmlFor="descricaoPorcao">Descrição da Porção (opcional)</Label><Input id="descricaoPorcao" value={itemModal.item?.descricaoPorcao || ""} onChange={e => handleItemFormChange('descricaoPorcao', e.target.value)} /></div>
+            <div><Label htmlFor="emoji">Emoji (opcional)</Label><Input id="emoji" value={itemModal.item?.emoji || ""} onChange={e => handleItemFormChange('emoji', e.target.value)} /></div>
             <div className="space-y-2">
               <Label htmlFor="imageFile">Imagem do Item</Label>
               {itemModal.item?.imageUrl && !imageFile && (<img src={itemModal.item.imageUrl} alt="Preview" className="w-24 h-24 object-cover rounded-md"/>)}
               {imageFile && (<img src={URL.createObjectURL(imageFile)} alt="Preview" className="w-24 h-24 object-cover rounded-md"/>)}
-              <Input id="imageFile" name="imageFile" type="file" accept="image/*" onChange={(e) => { if (e.target.files?.[0]) { setImageFile(e.target.files[0]) }}} />
+              <Input id="imageFile" type="file" accept="image/*" onChange={(e) => { if (e.target.files?.[0]) { setImageFile(e.target.files[0]) }}} />
             </div>
-            <div className="flex items-center space-x-2"><input type="checkbox" id="disponivel" name="disponivel" defaultChecked={itemModal.item?.disponivel ?? true} className="rounded w-4 h-4" /><Label htmlFor="disponivel">Disponível para seleção</Label></div>
+            <div className="flex items-center space-x-2"><Checkbox id="disponivel" checked={itemModal.item?.disponivel ?? true} onCheckedChange={checked => handleItemFormChange('disponivel', Boolean(checked))} /><Label htmlFor="disponivel">Disponível para seleção</Label></div>
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => { setItemModal({ open: false }); setImageFile(null); }}>Cancelar</Button>
-              <Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar"}</Button>
+              <Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : "Salvar"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -421,7 +433,7 @@ export default function MenuPage() {
         <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>Gerenciar Sabores: {flavorModal.itemNome}</DialogTitle><DialogDescription>Adicione, edite e reordene os sabores/preparos disponíveis.</DialogDescription></DialogHeader>
           <div className="grid md:grid-cols-2 gap-6 pt-2">
-            <div className="space-y-4"><h4 className="font-semibold text-lg border-b pb-2">{currentFlavor ? "Editar Sabor" : "Adicionar Novo Sabor"}</h4><form onSubmit={handleSaveFlavor} className="space-y-4" id="flavorForm"><div><Label htmlFor="nomeSabor">Nome do Sabor</Label><Input id="nomeSabor" name="nomeSabor" defaultValue={currentFlavor?.nomeSabor || ""} required /></div><div className="flex items-center space-x-2 pt-2"><input type="checkbox" id="disponivel" name="disponivel" defaultChecked={currentFlavor?.disponivel ?? true} className="w-4 h-4" /><Label htmlFor="disponivel">Disponível para seleção</Label></div><div className="flex gap-2 pt-2"><Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar Sabor"}</Button>{currentFlavor && <Button type="button" variant="ghost" onClick={() => { setCurrentFlavor(null); (document.getElementById('flavorForm') as HTMLFormElement)?.reset(); }}>Cancelar Edição</Button>}</div></form></div>
+            <div className="space-y-4"><h4 className="font-semibold text-lg border-b pb-2">{currentFlavor ? "Editar Sabor" : "Adicionar Novo Sabor"}</h4><form onSubmit={handleSaveFlavor} className="space-y-4" id="flavorForm"><div><Label htmlFor="nomeSabor">Nome do Sabor</Label><Input id="nomeSabor" name="nomeSabor" defaultValue={currentFlavor?.nomeSabor || ""} required /></div><div className="flex items-center space-x-2 pt-2"><input type="checkbox" id="disponivel" name="disponivel" defaultChecked={currentFlavor?.disponivel ?? true} className="w-4 h-4" /><Label htmlFor="disponivel">Disponível para seleção</Label></div><div className="flex gap-2 pt-2"><Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : "Salvar Sabor"}</Button>{currentFlavor && <Button type="button" variant="ghost" onClick={() => { setCurrentFlavor(null); (document.getElementById('flavorForm') as HTMLFormElement)?.reset(); }}>Cancelar Edição</Button>}</div></form></div>
             <div className="space-y-3"><h4 className="font-semibold text-lg border-b pb-2">Sabores Existentes</h4>
               <DndContext sensors={sensors} onDragEnd={(e) => handleDragEnd(e, 'flavors', flavorModal.itemId, flavorModal.categoryId)}>
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
