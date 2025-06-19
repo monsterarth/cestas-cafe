@@ -132,7 +132,7 @@ function SortableCategory({ category, ...props }: { category: MenuCategory; [key
   );
 }
 
-// --- PÁGINA PRINCIPAL (CORRIGIDA) ---
+// --- PÁGINA PRINCIPAL ---
 export default function MenuPage() {
   const [db, setDb] = useState<firestore.Firestore | null>(null);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
@@ -187,7 +187,6 @@ export default function MenuPage() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    // Lógica de arrastar (sem alterações)
     if (context === 'categories') {
         const oldIndex = categories.findIndex((c) => c.id === active.id);
         const newIndex = categories.findIndex((c) => c.id === over.id);
@@ -261,7 +260,7 @@ export default function MenuPage() {
   };
 
   const handleSaveItem = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+    e.preventDefault(); 
     if (!db || !itemModal.categoryId) return;
     
     setIsSaving(true);
@@ -392,12 +391,35 @@ export default function MenuPage() {
       <Dialog open={categoryModal.open} onOpenChange={(open) => setCategoryModal({ open })}><DialogContent><DialogHeader><DialogTitle>{categoryModal.category ? "Editar" : "Adicionar"} Categoria</DialogTitle><DialogDescription>Crie ou edite uma seção do seu cardápio, como "Pratos Quentes" ou "Bebidas".</DialogDescription></DialogHeader><form onSubmit={handleSaveCategory} className="space-y-4 pt-4"><div><Label htmlFor="name">Nome da Categoria</Label><Input id="name" name="name" defaultValue={categoryModal.category?.nomeCategoria || ""} required /></div><div className="flex justify-end gap-2 pt-4"><Button type="button" variant="outline" onClick={() => setCategoryModal({ open: false })}>Cancelar</Button><Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar"}</Button></div></form></DialogContent></Dialog>
       
       {/* MODAL DE ITEM */}
-      <Dialog open={itemModal.open} onOpenChange={(open) => { if (!open) { setItemModal({ open: false }); setImageFile(null); } else { setItemModal(prev => ({...prev, open: true}))} }}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{itemModal.item?.id ? "Editar" : "Adicionar"} Item</DialogTitle><DialogDescription>Adicione ou edite um produto dentro de uma categoria.</DialogDescription></DialogHeader><form onSubmit={handleSaveItem} className="space-y-4 pt-4"><div><Label htmlFor="nomeItem">Nome do Item</Label><Input id="nomeItem" name="nomeItem" defaultValue={itemModal.item?.nomeItem || ""} required /></div><div><Label htmlFor="descricaoPorcao">Descrição da Porção (opcional)</Label><Input id="descricaoPorcao" name="descricaoPorcao" defaultValue={itemModal.item?.descricaoPorcao || ""} /></div><div><Label htmlFor="emoji">Emoji (opcional)</Label><Input id="emoji" name="emoji" defaultValue={itemModal.item?.emoji || ""} /></div><div className="space-y-2"><Label htmlFor="imageFile">Imagem do Item</Label>{itemModal.item?.imageUrl && !imageFile && (<img src={itemModal.item.imageUrl} alt="Preview" className="w-24 h-24 object-cover rounded-md"/>)}{imageFile && (<img src={URL.createObjectURL(imageFile)} alt="Preview" className="w-24 h-24 object-cover rounded-md"/>)}<Input id="imageFile" name="imageFile" type="file" accept="image/*" onChange={(e) => { if (e.target.files?.[0]) { setImageFile(e.target.files[0]) }}} /></div><div className="flex items-center space-x-2"><input type="checkbox" id="disponivel" name="disponivel" defaultChecked={itemModal.item?.disponivel ?? true} className="rounded w-4 h-4" /><Label htmlFor="disponivel">Disponível para seleção</Label></div><div className="flex justify-end gap-2 pt-4"><Button type="button" variant="outline" onClick={() => { setItemModal({ open: false }); setImageFile(null); }}>Cancelar</Button><Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar"}</Button></div></form></DialogContent></Dialog>
+      <Dialog open={itemModal.open} onOpenChange={(open) => { if (!open) { setItemModal({ open: false }); setImageFile(null); } else { setItemModal(prev => ({...prev, open: true}))} }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{itemModal.item?.id ? "Editar" : "Adicionar"} Item</DialogTitle>
+            <DialogDescription>Adicione ou edite um produto dentro de uma categoria.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveItem} className="space-y-4 pt-4">
+            <div><Label htmlFor="nomeItem">Nome do Item</Label><Input id="nomeItem" name="nomeItem" defaultValue={itemModal.item?.nomeItem || ""} required /></div>
+            <div><Label htmlFor="descricaoPorcao">Descrição da Porção (opcional)</Label><Input id="descricaoPorcao" name="descricaoPorcao" defaultValue={itemModal.item?.descricaoPorcao || ""} /></div>
+            <div><Label htmlFor="emoji">Emoji (opcional)</Label><Input id="emoji" name="emoji" defaultValue={itemModal.item?.emoji || ""} /></div>
+            <div className="space-y-2">
+              <Label htmlFor="imageFile">Imagem do Item</Label>
+              {itemModal.item?.imageUrl && !imageFile && (<img src={itemModal.item.imageUrl} alt="Preview" className="w-24 h-24 object-cover rounded-md"/>)}
+              {imageFile && (<img src={URL.createObjectURL(imageFile)} alt="Preview" className="w-24 h-24 object-cover rounded-md"/>)}
+              <Input id="imageFile" name="imageFile" type="file" accept="image/*" onChange={(e) => { if (e.target.files?.[0]) { setImageFile(e.target.files[0]) }}} />
+            </div>
+            <div className="flex items-center space-x-2"><input type="checkbox" id="disponivel" name="disponivel" defaultChecked={itemModal.item?.disponivel ?? true} className="rounded w-4 h-4" /><Label htmlFor="disponivel">Disponível para seleção</Label></div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => { setItemModal({ open: false }); setImageFile(null); }}>Cancelar</Button>
+              <Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       
       {/* MODAL DE SABORES */}
       <Dialog open={flavorModal.open} onOpenChange={(open) => { if (!open) { setFlavorModal({ open: false, flavors: [], categoryId: undefined, itemId: undefined, itemNome: undefined }); setCurrentFlavor(null); }}}>
         <DialogContent className="max-w-3xl">
-          <DialogHeader><DialogTitle>Gerenciar Sabores: {flavorModal.itemNome}</DialogTitle><DialogDescription>Adicione, edite e reordene os sabores/preparos disponíveis para este prato.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Gerenciar Sabores: {flavorModal.itemNome}</DialogTitle><DialogDescription>Adicione, edite e reordene os sabores/preparos disponíveis.</DialogDescription></DialogHeader>
           <div className="grid md:grid-cols-2 gap-6 pt-2">
             <div className="space-y-4"><h4 className="font-semibold text-lg border-b pb-2">{currentFlavor ? "Editar Sabor" : "Adicionar Novo Sabor"}</h4><form onSubmit={handleSaveFlavor} className="space-y-4" id="flavorForm"><div><Label htmlFor="nomeSabor">Nome do Sabor</Label><Input id="nomeSabor" name="nomeSabor" defaultValue={currentFlavor?.nomeSabor || ""} required /></div><div className="flex items-center space-x-2 pt-2"><input type="checkbox" id="disponivel" name="disponivel" defaultChecked={currentFlavor?.disponivel ?? true} className="w-4 h-4" /><Label htmlFor="disponivel">Disponível para seleção</Label></div><div className="flex gap-2 pt-2"><Button type="submit" className="bg-[#97A25F] hover:bg-[#97A25F]/90" disabled={isSaving}>{isSaving ? "Salvando..." : "Salvar Sabor"}</Button>{currentFlavor && <Button type="button" variant="ghost" onClick={() => { setCurrentFlavor(null); (document.getElementById('flavorForm') as HTMLFormElement)?.reset(); }}>Cancelar Edição</Button>}</div></form></div>
             <div className="space-y-3"><h4 className="font-semibold text-lg border-b pb-2">Sabores Existentes</h4>
