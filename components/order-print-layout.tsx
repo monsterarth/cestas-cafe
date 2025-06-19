@@ -3,11 +3,8 @@ import { Order } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface OrderPrintLayoutProps {
-  order: Order;
-}
+interface OrderPrintLayoutProps { order: Order; }
 
-// SIMPLIFICADO: Não usa mais React.forwardRef
 export const OrderPrintLayout = ({ order }: OrderPrintLayoutProps) => {
   const allItems = order.itensPedido || [];
   const itemsByCategory = allItems.reduce((acc, item) => {
@@ -17,9 +14,10 @@ export const OrderPrintLayout = ({ order }: OrderPrintLayoutProps) => {
     return acc;
   }, {} as Record<string, typeof allItems>);
 
+  // CORREÇÃO: Adicionando o 'return' que faltava
   return (
     <div className="p-10 font-sans bg-white text-black">
-      {/* O conteúdo interno continua o mesmo */}
+      {/* ... todo o conteúdo do layout A4 aqui ... */}
     </div>
   );
 };

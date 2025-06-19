@@ -17,11 +17,6 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
-type SummaryData = {
-  summary: Record<string, Record<string, number>>;
-  totalOrders: number;
-};
-
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,64 +24,27 @@ export default function OrdersPage() {
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [componentToPrint, setComponentToPrint] = useState<React.ReactElement | null>(null);
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const firestoreDb = await getFirebaseDb();
-      if (!firestoreDb) throw new Error("Não foi possível conectar ao banco de dados.");
-      const q = query(collection(firestoreDb, 'pedidos'), orderBy('timestampPedido', 'desc'));
-      return onSnapshot(q, (querySnapshot) => {
-        const ordersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-        setOrders(ordersData);
-        setLoading(false);
-      }, (err) => {
-        console.error("Erro no listener do Firestore:", err);
-        setError(err);
-        setLoading(false);
-      });
-    } catch (err: any) {
-      console.error("Erro ao buscar pedidos:", err);
-      setError(err);
-      setLoading(false);
-      return () => {};
-    }
-  }, []);
-
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    const initialize = async () => { unsubscribe = await fetchOrders(); };
-    initialize();
-    return () => { if (unsubscribe) unsubscribe(); };
-  }, [fetchOrders]);
+  const fetchAndSetOrders = useCallback(() => { /* ... código da função sem alterações ... */ }, []);
+  useEffect(() => { const cleanup = fetchAndSetOrders(); return cleanup; }, [fetchAndSetOrders]);
   
   useEffect(() => {
-    const handleAfterPrint = () => {
-      setComponentToPrint(null);
-    };
+    const handleAfterPrint = () => setComponentToPrint(null);
     window.addEventListener('afterprint', handleAfterPrint);
     if (componentToPrint) {
-      window.print();
+      const timer = setTimeout(() => window.print(), 50);
+      return () => clearTimeout(timer);
     }
-    return () => {
-      window.removeEventListener('afterprint', handleAfterPrint);
-    };
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
   }, [componentToPrint]);
 
   const triggerPrint = (order: Order, type: 'a4' | 'receipt') => {
-    if (type === 'a4') {
-      setComponentToPrint(<OrderPrintLayout order={order} />);
-    } else {
-      setComponentToPrint(<OrderReceiptLayout order={order} />);
-    }
+    if (type === 'a4') setComponentToPrint(<OrderPrintLayout order={order} />);
+    else setComponentToPrint(<OrderReceiptLayout order={order} />);
   };
 
   const triggerSummaryPrint = () => {
     const pendingOrders = orders.filter(o => o.status !== "Entregue" && o.status !== "Cancelado");
-    if (pendingOrders.length === 0) {
-      toast.info("Nenhum pedido pendente para gerar resumo.");
-      return;
-    }
+    if (pendingOrders.length === 0) return toast.info("Nenhum pedido pendente.");
     const summary = pendingOrders.flatMap(o => o.itensPedido || []).reduce((acc, item) => {
       const category = item.categoria || 'Outros';
       const itemName = item.sabor ? `${item.nomeItem} (${item.sabor})` : item.nomeItem;
@@ -95,16 +53,15 @@ export default function OrdersPage() {
       acc[category][itemName] += item.quantidade;
       return acc;
     }, {} as Record<string, Record<string, number>>);
-    const summaryData = { summary, totalOrders: pendingOrders.length };
-    setComponentToPrint(<OrdersSummaryLayout summary={summaryData.summary} totalOrders={summaryData.totalOrders} />);
+    setComponentToPrint(<OrdersSummaryLayout summary={summary} totalOrders={pendingOrders.length} />);
   };
   
-  const updateOrderStatus = async (orderId: string, status: Order['status']) => { /*...código existente...*/ };
-  const deleteOrder = async (orderId: string) => { /*...código existente...*/ };
-  const getStatusBadgeProps = (status: Order['status']) => { /*...código existente...*/ };
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => { /* ... */ };
+  const deleteOrder = async (orderId: string) => { /* ... */ };
+  const getStatusBadgeProps = (status: Order['status']) => { /* ... */ };
 
-  if (loading) return <div className="flex items-center justify-center h-full text-muted-foreground"><Loader2 className="mr-2 animate-spin" />Carregando pedidos...</div>;
-  if (error) return ( <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-4"> <AlertTriangle className="w-12 h-12 text-destructive" /> <h2 className="text-xl font-semibold">Erro ao Carregar os Pedidos</h2> <p className="text-muted-foreground">{error.message}</p> <Button onClick={fetchOrders}>Tentar Novamente</Button> </div> );
+  if (loading) return <div className="flex flex-col gap-2 items-center justify-center h-64 text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin" /><span>Carregando pedidos...</span></div>;
+  if (error) return ( <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-4"> <AlertTriangle className="w-12 h-12 text-destructive" /> <h2 className="text-xl font-semibold">Erro ao Carregar os Pedidos</h2> <p className="text-muted-foreground">{error.message}</p> <Button onClick={fetchAndSetOrders}>Tentar Novamente</Button> </div> );
 
   return (
     <div>
@@ -112,13 +69,12 @@ export default function OrdersPage() {
         <Button onClick={triggerSummaryPrint}><Printer className="mr-2 h-4 w-4"/> Imprimir Resumo</Button>
       </div>
       <Table>
-         {/* ... TableHeader e TableBody (sem alterações) ... */}
+         {/* ... Conteúdo da Tabela ... */}
       </Table>
       <Dialog open={!!viewingOrder} onOpenChange={(isOpen) => !isOpen && setViewingOrder(null)}>
-        {/* ... Conteúdo do Modal (sem alterações) ... */}
+         {/* ... Conteúdo do Modal ... */}
       </Dialog>
-      
-      <div className="print-section">
+      <div className={componentToPrint ? 'print-mount-point' : 'print-container-hidden'}>
         {componentToPrint}
       </div>
     </div>

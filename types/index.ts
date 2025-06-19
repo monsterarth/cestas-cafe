@@ -71,17 +71,11 @@ export interface OrderState {
   specialRequests: string;
 }
 
-// ===================================================================
-// ALTERAÇÕES ABAIXO
-// ===================================================================
-
-// Criamos um tipo para os itens do pedido para facilitar
 export interface ItemPedido {
   nomeItem: string;
   quantidade: number;
   observacao?: string;
   paraPessoa?: string;
-  // Adicionamos categoria e sabor para a organização da cozinha
   categoria?: string;
   sabor?: string;
 }
@@ -94,7 +88,6 @@ export interface Order {
   numeroPessoas: number;
   status: "Novo" | "Em Preparação" | "Entregue" | "Cancelado";
   timestampPedido: Timestamp;
-  // Usamos o novo tipo ItemPedido aqui
   itensPedido: ItemPedido[];
   observacoesGerais?: string;
   observacoesPratosQuentes?: string;

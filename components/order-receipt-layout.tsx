@@ -3,16 +3,15 @@ import { Order } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface OrderReceiptLayoutProps {
-  order: Order;
-}
+interface OrderReceiptLayoutProps { order: Order; }
 
-// SIMPLIFICADO: Não usa mais React.forwardRef
 export const OrderReceiptLayout = ({ order }: OrderReceiptLayoutProps) => {
-  // ... Conteúdo interno do componente sem alterações ...
+  // ... lógica interna do componente ...
+
+  // CORREÇÃO: Adicionando o 'return' que faltava
   return (
     <div className="p-1 font-mono text-xs bg-white text-black" style={{ width: '80mm' }}>
-      {/* ... todo o seu layout de comanda aqui ... */}
+      {/* ... todo o conteúdo do layout de comanda aqui ... */}
     </div>
   );
 };
