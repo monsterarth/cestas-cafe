@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react'; // Adicionado useCallback
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc, Firestore } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase';
 import type { Order } from '@/types';
@@ -11,7 +11,7 @@ import { OrdersSummaryLayout } from '@/components/orders-summary-layout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge, badgeVariants } from '@/components/ui/badge'; // Importando badgeVariants
+import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Printer, AlertTriangle, Trash2, CheckCircle, Clock, Loader2, FileText, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -38,13 +38,57 @@ export default function OrdersPage() {
   const printReceiptRef = useRef<HTMLDivElement>(null);
   const printSummaryRef = useRef<HTMLDivElement>(null);
 
-  const fetchOrders = async () => { /* ... (código existente sem alterações) ... */ };
-  useEffect(() => { /* ... (código existente sem alterações) ... */ }, []);
+  // ===================================================================
+  // CORREÇÃO: Movendo a função para o escopo do componente
+  // ===================================================================
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const firestoreDb = await getFirebaseDb();
+      if (!firestoreDb) throw new Error("Não foi possível conectar ao banco de dados.");
+      setDb(firestoreDb);
 
-  // ===================================================================
-  // CORREÇÃO FINAL DA IMPRESSÃO COM @ts-ignore
-  // ===================================================================
-  // @ts-ignore - Ignora o erro de tipo da biblioteca, pois sabemos que a implementação está correta.
+      const q = query(collection(firestoreDb, 'pedidos'), orderBy('timestampPedido', 'desc'));
+      
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const ordersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        setOrders(ordersData);
+        setLoading(false);
+      }, (err) => {
+        console.error("Erro no listener do Firestore:", err);
+        setError(err);
+        setLoading(false);
+      });
+      
+      return unsubscribe;
+
+    } catch (err: any) {
+      console.error("Erro ao buscar pedidos:", err);
+      setError(err);
+      setLoading(false);
+      return () => {}; // Retorna uma função vazia em caso de erro na inicialização
+    }
+  }, []); // useCallback para otimização
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    const initialize = async () => {
+        const unsub = await fetchOrders();
+        if (unsub) {
+            unsubscribe = unsub;
+        }
+    };
+    initialize();
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [fetchOrders]);
+  
+  // @ts-ignore
   const handlePrintA4 = useReactToPrint({ content: () => printA4Ref.current, onAfterPrint: () => setOrderToPrint(null) });
   // @ts-ignore
   const handlePrintReceipt = useReactToPrint({ content: () => printReceiptRef.current, onAfterPrint: () => setOrderToPrint(null) });
@@ -83,24 +127,37 @@ export default function OrdersPage() {
     setPrintType('summary');
   };
 
-  const updateOrderStatus = async (orderId: string, status: Order['status']) => { /*...código existente...*/ };
-  const deleteOrder = async (orderId: string) => { /*...código existente...*/ };
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+    if (!db) return;
+    try {
+      const orderRef = doc(db, 'pedidos', orderId);
+      await updateDoc(orderRef, { status });
+      toast.success(`Pedido marcado como "${status}"!`);
+    } catch (error) {
+      toast.error('Erro ao atualizar o status do pedido.');
+      console.error(error);
+    }
+  };
 
-  // ===================================================================
-  // CORREÇÃO DO ESTILO DO BADGE
-  // ===================================================================
+  const deleteOrder = async (orderId: string) => {
+    if(!db) return;
+    if(!confirm('Tem certeza que deseja excluir este pedido permanentemente?')) return;
+    try {
+      await deleteDoc(doc(db, 'pedidos', orderId));
+      toast.success('Pedido excluído com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao excluir o pedido.');
+      console.error(error);
+    }
+  };
+  
   const getStatusBadgeProps = (status: Order['status']) => {
     switch (status) {
-      case "Novo":
-        return { variant: "secondary" as const, className: "bg-blue-100 text-blue-800 border-blue-200" };
-      case "Em Preparação":
-        return { variant: "secondary" as const, className: "bg-amber-100 text-amber-800 border-amber-200" };
-      case "Entregue":
-        return { variant: "default" as const, className: "bg-green-100 text-green-800 border-green-200" };
-      case "Cancelado":
-        return { variant: "destructive" as const, className: "bg-red-100 text-red-800 border-red-200" };
-      default:
-        return { variant: "outline" as const };
+      case "Novo": return { variant: "secondary" as const, className: "bg-blue-100 text-blue-800 border-blue-200" };
+      case "Em Preparação": return { variant: "secondary" as const, className: "bg-amber-100 text-amber-800 border-amber-200" };
+      case "Entregue": return { variant: "default" as const, className: "bg-green-100 text-green-800 border-green-200" };
+      case "Cancelado": return { variant: "destructive" as const, className: "bg-red-100 text-red-800 border-red-200" };
+      default: return { variant: "outline" as const };
     }
   };
 
@@ -127,10 +184,7 @@ export default function OrdersPage() {
         <TableBody>
           {orders.map((order) => (
             <TableRow key={order.id} onClick={() => setViewingOrder(order)} className="cursor-pointer">
-              <TableCell>
-                {/* CORREÇÃO: Usando a nova função para estilizar o Badge */}
-                <Badge {...getStatusBadgeProps(order.status)}>{order.status}</Badge>
-              </TableCell>
+              <TableCell><Badge {...getStatusBadgeProps(order.status)}>{order.status}</Badge></TableCell>
               <TableCell>{order.hospedeNome} ({order.cabanaNumero})</TableCell>
               <TableCell>{order.horarioEntrega}</TableCell>
               <TableCell>{order.timestampPedido?.toDate ? format(order.timestampPedido.toDate(), "dd/MM/yy HH:mm", { locale: ptBR }) : 'N/A'}</TableCell>
