@@ -13,9 +13,11 @@ interface OrdersSummaryLayoutProps {
   totalOrders: number;
 }
 
-export const OrdersSummaryLayout = React.forwardRef<HTMLDivElement, OrdersSummaryLayoutProps>(({ summary, totalOrders }, ref) => {
+// Removido React.forwardRef
+export const OrdersSummaryLayout = ({ summary, totalOrders }: OrdersSummaryLayoutProps) => {
   return (
-    <div ref={ref} className="p-10 font-sans bg-white text-black">
+    // Removida a 'ref' da div
+    <div className="p-10 font-sans bg-white text-black">
       <header className="text-center border-b-2 border-black pb-4 mb-6">
         <h1 className="text-3xl font-bold">Resumo da Cozinha</h1>
         <p className="text-lg">Total de Pedidos Pendentes: {totalOrders}</p>
@@ -41,6 +43,4 @@ export const OrdersSummaryLayout = React.forwardRef<HTMLDivElement, OrdersSummar
       </div>
     </div>
   );
-});
-
-OrdersSummaryLayout.displayName = 'OrdersSummaryLayout';
+};

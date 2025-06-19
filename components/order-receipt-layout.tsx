@@ -7,10 +7,10 @@ interface OrderReceiptLayoutProps {
   order: Order;
 }
 
-export const OrderReceiptLayout = React.forwardRef<HTMLDivElement, OrderReceiptLayoutProps>(({ order }, ref) => {
+// Removido React.forwardRef
+export const OrderReceiptLayout = ({ order }: OrderReceiptLayoutProps) => {
   const allItems = order.itensPedido || [];
   
-  // Agrupando itens por categoria para a cozinha
   const itemsByCategory = allItems.reduce((acc, item) => {
     const category = item.categoria || 'Outros';
     if (!acc[category]) {
@@ -21,7 +21,8 @@ export const OrderReceiptLayout = React.forwardRef<HTMLDivElement, OrderReceiptL
   }, {} as Record<string, typeof allItems>);
 
   return (
-    <div ref={ref} className="p-1 font-mono text-xs bg-white text-black" style={{ width: '80mm' }}>
+    // Removida a 'ref' da div
+    <div className="p-1 font-mono text-xs bg-white text-black" style={{ width: '80mm' }}>
       <div className="text-center mb-2">
         <h1 className="font-bold text-sm">PEDIDO - CESTA DE CAFÉ</h1>
         <p>Hóspede: {order.hospedeNome}</p>
@@ -55,6 +56,4 @@ export const OrderReceiptLayout = React.forwardRef<HTMLDivElement, OrderReceiptL
       </div>
     </div>
   );
-});
-
-OrderReceiptLayout.displayName = 'OrderReceiptLayout';
+};

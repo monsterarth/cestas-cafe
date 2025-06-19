@@ -7,7 +7,8 @@ interface OrderPrintLayoutProps {
   order: Order;
 }
 
-export const OrderPrintLayout = React.forwardRef<HTMLDivElement, OrderPrintLayoutProps>(({ order }, ref) => {
+// Removido React.forwardRef
+export const OrderPrintLayout = ({ order }: OrderPrintLayoutProps) => {
   const allItems = order.itensPedido || [];
   
   const itemsByCategory = allItems.reduce((acc, item) => {
@@ -20,7 +21,8 @@ export const OrderPrintLayout = React.forwardRef<HTMLDivElement, OrderPrintLayou
   }, {} as Record<string, typeof allItems>);
 
   return (
-    <div ref={ref} className="p-10 font-sans bg-white text-black">
+    // Removida a 'ref' da div
+    <div className="p-10 font-sans bg-white text-black">
       <header className="text-center border-b-2 border-black pb-4 mb-6">
         <h1 className="text-3xl font-bold">Relatório de Pedido</h1>
       </header>
@@ -67,6 +69,4 @@ export const OrderPrintLayout = React.forwardRef<HTMLDivElement, OrderPrintLayou
       </footer>
     </div>
   );
-});
-
-OrderPrintLayout.displayName = 'OrderPrintLayout';
+};
