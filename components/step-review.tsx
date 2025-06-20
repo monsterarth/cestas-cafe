@@ -1,12 +1,13 @@
+// Arquivo: components/step-review.tsx
 "use client"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label" // <-- IMPORTAÇÃO ADICIONADA
+import { Label } from "@/components/ui/label"
 import { CheckCircle } from "lucide-react"
 import { getFirebaseDb, isFirebaseAvailable } from "@/lib/firebase"
-import type { OrderState, HotDish, AccompanimentCategory } from "@/types"
+import type { OrderState, HotDish, AccompanimentCategory, ItemPedido } from "@/types"
 
 interface StepReviewProps {
   orderState: OrderState
@@ -75,8 +76,9 @@ export function StepReview({
     setError(null)
 
     try {
-      const itensPedido: any[] = []
+      const itensPedido: ItemPedido[] = [] // Usando o tipo correto
 
+      // Loop dos Pratos Quentes
       orderState.persons.forEach((person) => {
         const hotDish = person.hotDish
         if (hotDish && hotDish.typeId && hotDish.flavorId && hotDish.typeId !== "NONE") {
@@ -85,26 +87,31 @@ export function StepReview({
 
           if (dish && flavor) {
             itensPedido.push({
-              paraPessoa: `Hóspede ${person.id}`,
+              nomeItem: dish.nomeItem,
+              sabor: flavor.nomeSabor,
               quantidade: 1,
-              nomeItem: `${dish.nomeItem} - ${flavor.nomeSabor}`,
+              paraPessoa: `Hóspede ${person.id}`,
               observacao: person.notes || "",
+              categoria: "Pratos Quentes", // <-- INFORMAÇÃO DA CATEGORIA ADICIONADA
             })
           }
         }
       })
 
+      // Loop dos Acompanhamentos
       Object.keys(orderState.accompaniments).forEach((catId) => {
+        const category = accompaniments[catId]
         const itemsInCategory = orderState.accompaniments[catId]
+        
         Object.keys(itemsInCategory).forEach((itemId) => {
           const count = itemsInCategory[itemId]
           if (count > 0) {
-            const item = accompaniments[catId]?.items.find((i) => i.id === itemId)
-            if (item) {
+            const item = category?.items.find((i) => i.id === itemId)
+            if (item && category) {
               itensPedido.push({
-                quantidade: count,
                 nomeItem: item.nomeItem,
-                observacao: "",
+                quantidade: count,
+                categoria: category.name, // <-- INFORMAÇÃO DA CATEGORIA ADICIONADA
               })
             }
           }
