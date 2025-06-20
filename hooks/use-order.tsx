@@ -1,3 +1,4 @@
+// Arquivo: hooks/use-order.tsx
 "use client"
 
 import { useState } from "react"
@@ -56,15 +57,13 @@ export function useOrder() {
     const category = accompaniments[categoryId]
     if (!category) return
 
-    const categoryName = category.name.toLowerCase()
+    const categoryName = category.name
     const totalGuests = orderState.guestInfo.people
 
-    // Lista de categorias com limite por item
     const itemLimitedCategories = ["bebidas", "bolos", "complementos", "frios", "frutas"]
 
     if (change > 0) {
-      // Regra 1: Limite por item individual
-      if (itemLimitedCategories.includes(categoryName)) {
+      if (itemLimitedCategories.includes(categoryName.toLowerCase())) {
         const currentItemCount = orderState.accompaniments[categoryId]?.[itemId] || 0
         if (currentItemCount >= totalGuests) {
           const item = category.items.find((i: any) => i.id === itemId)
@@ -78,8 +77,7 @@ export function useOrder() {
         }
       }
 
-      // Regra 2: Limite total na categoria "Pães"
-      if (categoryName === "pães") {
+      if (categoryName.toLowerCase() === "pães") {
         const absoluteLimit = totalGuests * 2
         const currentCountInCategory = category.items.reduce((total: number, currentItem: any) => {
           return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0)
@@ -99,7 +97,6 @@ export function useOrder() {
       }
     }
 
-    // Se nenhuma regra de limite foi acionada, atualiza o estado
     setOrderState((prev) => {
       const newAccompaniments = { ...prev.accompaniments }
       if (!newAccompaniments[categoryId]) {
