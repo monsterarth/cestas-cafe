@@ -131,7 +131,7 @@ export const OrdersSummaryLayout = ({ orders, config }: OrdersSummaryLayoutProps
         <div className="text-center mb-4 pt-4">
           <h2 className="font-bold text-2xl">Comandas Individuais</h2>
         </div>
-        <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-2">
           {orders.map(order => (
               <div key={order.id} className="border-2 border-dashed border-gray-300 p-1" style={{ pageBreakInside: 'avoid' }}>
                   {/* O OrderReceiptLayout mantém seu próprio estilo de 80mm */}
