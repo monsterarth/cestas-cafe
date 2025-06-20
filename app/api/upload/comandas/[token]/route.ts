@@ -2,7 +2,7 @@ import { getFirebaseDb } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { NextResponse } from "next/server";
 
-// Função para gerar um token alfanumérico amigável. Ex: A4B9C
+// Função para gerar um token alfanumérico amigável
 function generateToken(length = 5) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let token = '';
@@ -12,42 +12,48 @@ function generateToken(length = 5) {
   return token;
 }
 
+// Esta é a função que lida com requisições POST
 export async function POST(request: Request) {
   try {
+    // 1. Pega os dados enviados pelo formulário
     const body = await request.json();
     const { guestName, cabin, numberOfGuests } = body;
 
+    // 2. Validação simples dos dados
     if (!guestName || !cabin || !numberOfGuests) {
       return NextResponse.json({ error: "Dados da comanda incompletos." }, { status: 400 });
     }
     
-    // Pega a instância do banco de dados
+    // 3. Conecta ao banco de dados
     const db = await getFirebaseDb();
     if (!db) {
         throw new Error("Falha na conexão com o banco de dados.");
     }
 
+    // 4. Cria a nova comanda
     const token = generateToken();
-
-    // Monta o objeto que será salvo no Firestore
     const newComandaData = {
       token,
       guestName,
       cabin,
       numberOfGuests: Number(numberOfGuests),
-      isActive: true, // A comanda já nasce ativa
-      createdAt: serverTimestamp(), // Usa o timestamp do servidor
+      isActive: true,
+      createdAt: serverTimestamp(),
     };
 
-    // Adiciona o novo documento na coleção 'comandas'
+    // 5. Salva a nova comanda na coleção 'comandas' do Firestore
     const docRef = await addDoc(collection(db, "comandas"), newComandaData);
 
-    // Retorna a comanda completa com seu novo ID para o frontend
+    console.log("Comanda criada com sucesso no Firestore:", docRef.id);
+
+    // 6. Retorna a comanda criada com sucesso para o frontend
     return NextResponse.json({ id: docRef.id, ...newComandaData }, { status: 201 });
 
   } catch (error) {
-    console.error("Erro ao criar comanda:", error);
-    // Retorna uma mensagem de erro genérica para o cliente
-    return NextResponse.json({ error: "Ocorreu um erro interno ao criar a comanda." }, { status: 500 });
+    console.error("Erro interno na API /api/comandas:", error);
+    if (error instanceof Error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: "Ocorreu um erro interno desconhecido." }, { status: 500 });
   }
 }
