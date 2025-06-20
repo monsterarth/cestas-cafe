@@ -9,17 +9,18 @@ import { getFirebaseDb } from '@/lib/firebase';
 import type { Order, ItemPedido, AppConfig } from '@/types';
 import { OrderPrintLayout } from '@/components/order-print-layout';
 import { OrderReceiptLayout } from '@/components/order-receipt-layout';
-// CORREÇÃO FINAL: Usando a importação nomeada com chaves
 import { OrdersSummaryLayout } from '@/components/orders-summary-layout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Printer, AlertTriangle, Loader2, CheckCircle, Clock, X } from 'lucide-react';
+import { MoreHorizontal, Printer, AlertTriangle, Loader2, CheckCircle, Clock, X, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -28,6 +29,7 @@ export default function OrdersPage() {
   const [error, setError] = useState<Error | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [componentToPrint, setComponentToPrint] = useState<React.ReactElement | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [retryFetch, setRetryFetch] = useState(0);
   const [printContainer, setPrintContainer] = useState<HTMLElement | null>(null);
 
@@ -77,31 +79,94 @@ export default function OrdersPage() {
   }, [retryFetch]);
 
   useEffect(() => {
-    const handleAfterPrint = () => setComponentToPrint(null);
-    
-    if (componentToPrint) {
-        window.addEventListener('afterprint', handleAfterPrint, { once: true });
-        const timer = setTimeout(() => {
-            window.print();
-        }, 150);
-        return () => clearTimeout(timer);
-    } else {
+    if (componentToPrint && !isGeneratingPdf) {
+      const handleAfterPrint = () => setComponentToPrint(null);
+      window.addEventListener('afterprint', handleAfterPrint, { once: true });
+      const timer = setTimeout(() => {
+          window.print();
+      }, 150);
+      return () => {
+        clearTimeout(timer);
         window.removeEventListener('afterprint', handleAfterPrint);
+      };
     }
-  }, [componentToPrint]);
+  }, [componentToPrint, isGeneratingPdf]);
+
+  const handleSaveAsPdf = async () => {
+    const pendingOrders = orders.filter(o => o.status !== "Entregue" && o.status !== "Cancelado");
+    if (pendingOrders.length === 0) {
+      toast.info("Nenhum pedido pendente para gerar PDF.");
+      return;
+    }
+    
+    setIsGeneratingPdf(true);
+    toast.info("Gerando PDF, por favor aguarde...");
+
+    // Renderiza o componente em um div temporário para captura
+    setComponentToPrint(<OrdersSummaryLayout orders={pendingOrders} config={appConfig} />);
+
+    // Aguarda um momento para garantir a renderização completa no DOM
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const printElement = document.querySelector('#print-container > div');
+    if (printElement) {
+        try {
+            const canvas = await html2canvas(printElement as HTMLElement, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+            const ratio = canvasWidth / canvasHeight;
+            const imgHeight = pdfWidth / ratio;
+            
+            let heightLeft = canvasHeight;
+            let position = 0;
+            const pageHeightInCanvas = (pdfHeight * canvasWidth) / pdfWidth;
+
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+            heightLeft -= pageHeightInCanvas;
+            
+            while (heightLeft > 0) {
+                position -= pdfHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+                heightLeft -= pageHeightInCanvas;
+            }
+
+            const dateStr = format(new Date(), 'dd-MM-yyyy');
+            pdf.save(`resumo-cozinha-${dateStr}.pdf`);
+            toast.success("PDF gerado com sucesso!");
+
+        } catch (e) {
+            console.error("Erro ao gerar PDF:", e);
+            toast.error("Ocorreu uma falha ao gerar o PDF.");
+        }
+    } else {
+        toast.error("Não foi possível encontrar o conteúdo para gerar o PDF.");
+    }
+    
+    // Limpa o componente e reseta o estado
+    setComponentToPrint(null);
+    setIsGeneratingPdf(false);
+  };
+
 
   const triggerPrint = (order: Order, type: 'a4' | 'receipt') => {
-    if (type === 'a4') {
-      setComponentToPrint(<OrderPrintLayout order={order} config={appConfig} />);
-    } else {
-      setComponentToPrint(<OrderReceiptLayout order={order} />);
-    }
+    setComponentToPrint(type === 'a4' ? <OrderPrintLayout order={order} config={appConfig} /> : <OrderReceiptLayout order={order} />);
   };
 
   const triggerSummaryPrint = () => {
     const pendingOrders = orders.filter(o => o.status !== "Entregue" && o.status !== "Cancelado");
     if (pendingOrders.length === 0) {
-      toast.info("Nenhum pedido pendente para gerar resumo.");
+      toast.info("Nenhum pedido pendente para imprimir.");
       return;
     }
     setComponentToPrint(<OrdersSummaryLayout orders={pendingOrders} config={appConfig} />);
@@ -133,7 +198,13 @@ export default function OrdersPage() {
   return (
     <>
       <div>
-        <div className="flex justify-end mb-4"><Button onClick={triggerSummaryPrint}><Printer className="mr-2 h-4 w-4"/>Imprimir Resumo da Cozinha</Button></div>
+        <div className="flex justify-end gap-2 mb-4">
+            <Button variant="outline" onClick={handleSaveAsPdf} disabled={isGeneratingPdf}>
+                {isGeneratingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                Salvar em PDF
+            </Button>
+            <Button onClick={triggerSummaryPrint}><Printer className="mr-2 h-4 w-4"/>Imprimir Resumo</Button>
+        </div>
         <Table>
             <TableHeader><TableRow><TableHead>Status</TableHead><TableHead>Hóspede</TableHead><TableHead>Entrega</TableHead><TableHead>Data</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
             <TableBody>
