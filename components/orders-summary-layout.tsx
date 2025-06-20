@@ -3,7 +3,6 @@
 
 import { Order, ItemPedido, AppConfig } from '@/types';
 import { useMemo } from 'react';
-// A importação do OrderReceiptLayout pode precisar de ajuste dependendo de como ele é exportado
 import { OrderReceiptLayout } from './order-receipt-layout';
 
 interface OrdersSummaryLayoutProps {
@@ -11,6 +10,7 @@ interface OrdersSummaryLayoutProps {
   config: AppConfig | null;
 }
 
+// A lógica de processamento de dados permanece a mesma
 const processOrdersForSummary = (orders: Order[]) => {
   const deliveryTimeSummary = orders.reduce((acc, order) => {
     const time = order.horarioEntrega;
@@ -50,7 +50,6 @@ const processOrdersForSummary = (orders: Order[]) => {
   };
 };
 
-// GARANTINDO A EXPORTAÇÃO NOMEADA
 export const OrdersSummaryLayout = ({ orders, config }: OrdersSummaryLayoutProps) => {
   const { 
     totalBaskets, 
@@ -72,56 +71,70 @@ export const OrdersSummaryLayout = ({ orders, config }: OrdersSummaryLayoutProps
   });
 
   return (
-    <div className="p-2 font-sans bg-white text-black text-sm" style={{ width: '80mm' }}>
-      <div className="text-center mb-2">
-        <h1 className="font-bold text-base">Pedidos de hoje ({currentDate})</h1>
+    // CORREÇÃO: Removido o style de largura fixa e adicionado padding maior
+    <div className="p-8 font-sans bg-white text-black text-sm">
+      {/* SEÇÃO 1: CABEÇALHO */}
+      <div className="text-center mb-6 pb-4 border-b-2 border-black">
+        <h1 className="font-bold text-2xl">Resumo de Produção da Cozinha</h1>
+        <p className="text-lg">Pedidos de hoje ({currentDate})</p>
       </div>
-      <div className="text-xs p-2 border border-black rounded">
-        <p className="font-bold">Número de Cestas: {totalBaskets}</p>
-        <div className="border-t border-dashed border-black my-1"></div>
-        {Object.entries(deliveryTimeSummary).map(([time, count]) => (
-          <p key={time}>{time}: {count} cesta(s)</p>
-        ))}
-      </div>
-      <p className="text-xs italic text-center p-2 my-2">"{motivationalMessage}"</p>
-      <div className="border-t-2 border-black"></div>
 
-      <div className="my-2 space-y-3">
+      {/* SEÇÃO 2: RESUMO DE ENTREGAS E MENSAGEM (EM COLUNAS) */}
+      <div className="grid grid-cols-2 gap-8 mb-8">
+        <div className="bg-gray-50 p-4 rounded-lg border">
+            <h2 className="font-bold text-base mb-2">Resumo de Cestas</h2>
+            <p className="font-semibold">Número Total de Cestas: {totalBaskets}</p>
+            <div className="border-t border-dashed my-2"></div>
+            <p className="font-bold mb-1">Entregas por Horário:</p>
+            {Object.entries(deliveryTimeSummary).map(([time, count]) => (
+              <p key={time} className="text-sm pl-2">{time}: {count} cesta(s)</p>
+            ))}
+        </div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-center p-4">
+           <p className="text-base italic text-yellow-800 text-center">"{motivationalMessage}"</p>
+        </div>
+      </div>
+      
+      <div className="border-t-2 border-black mb-6"></div>
+
+      {/* SEÇÃO 3: RESUMO DE ITENS AGRUPADOS (EM COLUNAS) */}
+      <h2 className="font-bold text-xl mb-4 text-center">Itens Agrupados para Preparo</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+        {/* Pratos Quentes com Sabores */}
         {Object.keys(hotDishesSummary).length > 0 && (
-          <div>
-            <p className="font-bold uppercase text-xs">PRATOS QUENTES:</p>
+          <div className="break-inside-avoid">
+            <p className="font-bold uppercase text-base border-b-2 border-gray-300 pb-1 mb-2">PRATOS QUENTES</p>
             {Object.entries(hotDishesSummary).map(([itemName, summary]) => (
-              <div key={itemName} className="pl-2">
-                <p className="font-semibold text-xs mt-1">{summary.total} {itemName}:</p>
+              <div key={itemName} className="pl-2 mb-2">
+                <p className="font-semibold text-sm mt-1">{summary.total} {itemName}:</p>
                 {Object.entries(summary.flavors).map(([flavorName, flavorCount]) => (
-                  <p key={flavorName} className="pl-4 text-xs">- {flavorCount} {flavorName.toLowerCase()}</p>
+                  <p key={flavorName} className="pl-4 text-sm">- {flavorCount} {flavorName.toLowerCase()}</p>
                 ))}
               </div>
             ))}
-            <div className="border-t border-dashed border-black mt-2"></div>
           </div>
         )}
         
+        {/* Outras Categorias */}
         {Object.entries(otherItemsSummary).map(([categoryName, items]) => (
-            <div key={categoryName}>
-                <p className="font-bold uppercase text-xs">{categoryName}:</p>
+            <div key={categoryName} className="break-inside-avoid">
+                <p className="font-bold uppercase text-base border-b-2 border-gray-300 pb-1 mb-2">{categoryName}</p>
                 {Object.entries(items).map(([itemName, quantity]) => (
-                    <p key={itemName} className="pl-2 text-xs">- {itemName}: {quantity} porções</p>
+                    <p key={itemName} className="pl-2 text-sm">- {itemName}: {quantity} porções</p>
                 ))}
-                <div className="border-t border-dashed border-black mt-2"></div>
             </div>
         ))}
       </div>
       
-      <p className="text-center text-xs font-bold py-2">--- Fim do Resumo ---</p>
-
+      {/* SEÇÃO 4: COMANDAS INDIVIDUAIS (Começam em uma nova página) */}
       <div style={{ pageBreakBefore: 'always' }}>
-        <div className="text-center mb-2">
-          <h2 className="font-bold text-lg">COMANDAS INDIVIDUAIS</h2>
+        <div className="text-center mb-4 pt-4">
+          <h2 className="font-bold text-2xl">Comandas Individuais</h2>
         </div>
         <div className="space-y-4">
           {orders.map(order => (
               <div key={order.id} className="border-2 border-dashed border-gray-300 p-1" style={{ pageBreakInside: 'avoid' }}>
+                  {/* O OrderReceiptLayout mantém seu próprio estilo de 80mm */}
                   <OrderReceiptLayout order={order} />
               </div>
           ))}
