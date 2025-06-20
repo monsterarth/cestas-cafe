@@ -1,152 +1,130 @@
-// Arquivo: hooks/use-order.tsx
-"use client"
+import { create } from 'zustand';
+import { produce } from 'immer';
+import { Comanda, Person, AccompanimentItem, AccompanimentCategory } from '@/types';
+import { toast } from 'sonner';
 
-import { useState } from "react"
-import { toast } from "sonner"
-import type { OrderState } from "@/types"
+// Define a estrutura completa do nosso estado global
+export interface OrderStore {
+  // Estado da Autenticação e Dados da Comanda
+  isAuthenticated: boolean;
+  comanda: Comanda | null;
+  isLoadingAuth: boolean;
+  
+  // Estado do Pedido
+  persons: Person[];
+  accompaniments: Record<string, Record<string, number>>; // { [categoryId]: { [itemId]: count } }
+  globalHotDishNotes: string;
+  specialRequests: string;
 
-export function useOrder() {
-  const [orderState, setOrderState] = useState<OrderState>({
-    guestInfo: {
-      name: "",
-      cabin: "",
-      people: 0,
-      time: "",
-    },
-    persons: [],
-    accompaniments: {},
-    globalHotDishNotes: "",
-    specialRequests: "",
-  })
-  const [orderSubmitted, setOrderSubmitted] = useState(false)
+  // Estado da Navegação
+  currentStep: number;
 
-  const updateOrderState = (updates: Partial<OrderState>) => {
-    setOrderState((prev) => ({ ...prev, ...updates }))
-  }
-
-  const handleSelectDish = (personIndex: number, dishId: string) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) =>
-        index === personIndex ? { ...person, hotDish: { typeId: dishId, flavorId: "" } } : person,
-      ),
-    }))
-  }
-
-  const handleSelectFlavor = (personIndex: number, flavorId: string) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) =>
-        index === personIndex && person.hotDish ? { ...person, hotDish: { ...person.hotDish, flavorId } } : person,
-      ),
-    }))
-  }
-
-  const handleUpdateNotes = (personIndex: number, notes: string) => {
-    setOrderState((prev) => ({
-      ...prev,
-      persons: prev.persons.map((person, index) => (index === personIndex ? { ...person, notes } : person)),
-    }))
-  }
-
-  const handleNotesChange = (notes: string) => {
-    setOrderState((prev) => ({ ...prev, globalHotDishNotes: notes }))
-  }
-
-  const handleUpdateAccompaniment = (categoryId: string, itemId: string, change: number, accompaniments: any) => {
-    const category = accompaniments[categoryId]
-    if (!category) return
-
-    const categoryName = category.name
-    const totalGuests = orderState.guestInfo.people
-
-    const itemLimitedCategories = ["bebidas", "bolos", "complementos", "frios", "frutas"]
-
-    if (change > 0) {
-      if (itemLimitedCategories.includes(categoryName.toLowerCase())) {
-        const currentItemCount = orderState.accompaniments[categoryId]?.[itemId] || 0
-        if (currentItemCount >= totalGuests) {
-          const item = category.items.find((i: any) => i.id === itemId)
-          toast.warning(
-            <div>
-              Limite atingido para o item: <strong>{item?.nomeItem}</strong>
-              <p className="text-xs">Cada hóspede pode selecionar até 1 unidade deste item.</p>
-            </div>,
-          )
-          return
-        }
-      }
-
-      if (categoryName.toLowerCase() === "pães") {
-        const absoluteLimit = totalGuests * 2
-        const currentCountInCategory = category.items.reduce((total: number, currentItem: any) => {
-          return total + (orderState.accompaniments[categoryId]?.[currentItem.id] || 0)
-        }, 0)
-
-        if (currentCountInCategory >= absoluteLimit) {
-          toast.warning(
-            <div>
-              Limite total da categoria <strong>Pães</strong> atingido.
-              <p className="text-xs">
-                Máximo de {absoluteLimit} unidades para {totalGuests} pessoa(s).
-              </p>
-            </div>,
-          )
-          return
-        }
-      }
-    }
-
-    setOrderState((prev) => {
-      const newAccompaniments = { ...prev.accompaniments }
-      if (!newAccompaniments[categoryId]) {
-        newAccompaniments[categoryId] = {}
-      }
-      const currentCount = newAccompaniments[categoryId][itemId] || 0
-      let newCount = currentCount + change
-      if (newCount < 0) newCount = 0
-
-      if (newCount === 0) {
-        delete newAccompaniments[categoryId][itemId]
-        if (Object.keys(newAccompaniments[categoryId]).length === 0) {
-          delete newAccompaniments[categoryId]
-        }
-      } else {
-        newAccompaniments[categoryId][itemId] = newCount
-      }
-      return { ...prev, accompaniments: newAccompaniments }
-    })
-  }
-
-  const handleSpecialRequestsChange = (requests: string) => {
-    setOrderState((prev) => ({ ...prev, specialRequests: requests }))
-  }
-
-  const handleSelectNoHotDish = (personIndex: number) => {
-    setOrderState((prev) => {
-      const personToUpdate = prev.persons[personIndex]
-      const newHotDishState = personToUpdate?.hotDish?.typeId === "NONE" ? null : { typeId: "NONE", flavorId: "NONE" }
-
-      return {
-        ...prev,
-        persons: prev.persons.map((person, index) =>
-          index === personIndex ? { ...person, hotDish: newHotDishState } : person,
-        ),
-      }
-    })
-  }
-
-  return {
-    orderState,
-    orderSubmitted,
-    setOrderSubmitted,
-    updateOrderState,
-    handleSelectDish,
-    handleSelectFlavor,
-    handleUpdateNotes,
-    handleNotesChange,
-    handleUpdateAccompaniment,
-    handleSpecialRequestsChange,
-    handleSelectNoHotDish,
-  }
+  // Ações para modificar o estado
+  authenticateComanda: (token: string) => Promise<boolean>;
+  startOrder: () => void;
+  updateAccompaniment: (categoryId: string, item: AccompanimentItem, change: number) => void;
+  selectHotDish: (personIndex: number, dishId: string) => void;
+  selectHotDishFlavor: (personIndex: number, flavorId: string) => void;
+  selectNoHotDish: (personIndex: number) => void;
+  setGlobalHotDishNotes: (notes: string) => void;
+  setSpecialRequests: (notes: string) => void;
+  setCurrentStep: (step: number) => void;
+  nextStep: () => void;
+  prevStep: () => void;
+  resetOrder: () => void;
 }
+
+const initialState = {
+  isAuthenticated: false,
+  comanda: null,
+  isLoadingAuth: false,
+  persons: [],
+  accompaniments: {},
+  globalHotDishNotes: "",
+  specialRequests: "",
+  currentStep: 0,
+};
+
+export const useOrder = create<OrderStore>((set, get) => ({
+  ...initialState,
+
+  // --- Ações ---
+
+  authenticateComanda: async (token) => {
+    set({ isLoadingAuth: true });
+    try {
+      const response = await fetch(`/api/comandas/${token}`);
+      if (!response.ok) throw new Error("Comanda não encontrada");
+      
+      const comandaData: Comanda = await response.json();
+      
+      set(produce(draft => {
+        draft.isAuthenticated = true;
+        draft.comanda = comandaData;
+        draft.currentStep = 1; // Avança para tela de confirmação
+        draft.persons = Array.from({ length: comandaData.numberOfGuests }, (_, i) => ({
+          id: i + 1,
+          hotDish: null,
+          notes: "",
+        }));
+      }));
+      return true;
+    } catch (error) {
+      console.error(error);
+      set({ isAuthenticated: false, comanda: null });
+      return false;
+    } finally {
+      set({ isLoadingAuth: false });
+    }
+  },
+
+  startOrder: () => set({ currentStep: 2 }), 
+
+  updateAccompaniment: (categoryId, item, change) => {
+    set(produce(draft => {
+      const category = draft.accompaniments[categoryId] || {};
+      const currentCount = category[item.id] || 0;
+      const newCount = Math.max(0, currentCount + change); // Garante que não seja negativo
+      
+      if (newCount > 0) {
+        category[item.id] = newCount;
+      } else {
+        delete category[item.id]; // Remove o item se a contagem for zero
+      }
+
+      if (Object.keys(category).length > 0) {
+        draft.accompaniments[categoryId] = category;
+      } else {
+        delete draft.accompaniments[categoryId]; // Remove a categoria se estiver vazia
+      }
+    }));
+  },
+  
+  selectHotDish: (personIndex, dishId) => {
+    set(produce(draft => {
+      draft.persons[personIndex].hotDish = { typeId: dishId, flavorId: null };
+    }));
+  },
+
+  selectHotDishFlavor: (personIndex, flavorId) => {
+    set(produce(draft => {
+      if (draft.persons[personIndex].hotDish) {
+        draft.persons[personIndex].hotDish!.flavorId = flavorId;
+      }
+    }));
+  },
+
+  selectNoHotDish: (personIndex) => {
+    set(produce(draft => {
+      const isAlreadyNone = get().persons[personIndex]?.hotDish?.typeId === 'NONE';
+      draft.persons[personIndex].hotDish = isAlreadyNone ? null : { typeId: 'NONE', flavorId: 'NONE' };
+    }));
+  },
+
+  setGlobalHotDishNotes: (notes) => set({ globalHotDishNotes: notes }),
+  setSpecialRequests: (notes) => set({ specialRequests: notes }),
+  setCurrentStep: (step) => set({ currentStep: step }),
+  nextStep: () => set(state => ({ currentStep: state.currentStep + 1 })),
+  prevStep: () => set(state => ({ currentStep: state.currentStep - 1 })),
+  resetOrder: () => set(initialState),
+}));

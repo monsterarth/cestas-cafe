@@ -96,3 +96,13 @@ export interface Order {
   observacoesGerais?: string;
   observacoesPratosQuentes?: string;
 }
+
+export interface Comanda {
+  id: string;
+  token: string;
+  guestName: string;
+  cabin: string;
+  numberOfGuests: number;
+  isActive: boolean;
+  createdAt: any; // Firestore Timestamp
+}
