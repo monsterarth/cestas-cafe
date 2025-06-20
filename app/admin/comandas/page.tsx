@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Comanda } from "@/types";
-import { ComandaThermalReceipt } from "@/components/comanda-thermal-receipt"; // Usaremos seu componente de layout
+import { ComandaThermalReceipt } from "@/components/comanda-thermal-receipt";
 import { Loader2, Printer } from "lucide-react";
 
 export default function ComandasPage() {
@@ -17,28 +17,34 @@ export default function ComandasPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedComanda, setGeneratedComanda] = useState<Comanda | null>(null);
 
-  // A função de imprimir agora é uma simples chamada a window.print(),
-  // exatamente como seu sistema atual deve funcionar.
+  // A função de imprimir simplesmente chama a função nativa do navegador
   const handlePrint = () => {
     window.print();
   };
 
+  // Função que envia os dados do formulário para a nossa API
   const handleGenerateComanda = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setGeneratedComanda(null);
+    setGeneratedComanda(null); // Limpa a comanda anterior
+
     try {
       const response = await fetch('/api/comandas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ guestName, cabin, numberOfGuests }),
       });
+
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Falha ao gerar comanda');
+        // Se a API retornar um erro, mostra o erro para o admin
+        throw new Error(result.error || 'Falha ao gerar comanda');
       }
-      const newComanda: Comanda = await response.json();
-      setGeneratedComanda(newComanda);
+      
+      // Se deu tudo certo, guarda a nova comanda no estado para mostrar na tela
+      setGeneratedComanda(result);
+
     } catch (error: any) {
       console.error(error);
       alert(`Erro ao gerar comanda: ${error.message}`);
@@ -70,13 +76,14 @@ export default function ComandasPage() {
               <Label htmlFor="numberOfGuests">Número de Hóspedes</Label>
               <Input id="numberOfGuests" type="number" min="1" value={numberOfGuests} onChange={(e) => setNumberOfGuests(e.target.value)} required />
             </div>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
               {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando...</> : "Gerar Comanda"}
             </Button>
           </form>
         </CardContent>
       </Card>
 
+      {/* Esta seção só aparece DEPOIS que a comanda for gerada com sucesso */}
       {generatedComanda && (
         <Card>
           <CardHeader>
@@ -86,12 +93,9 @@ export default function ComandasPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
-            {/* 1. Pré-visualização que aparece na tela para o admin */}
             <div className="p-4 border rounded-lg bg-stone-100">
                 <ComandaThermalReceipt comanda={generatedComanda} />
             </div>
-
-            {/* 2. Botão que chama a impressão */}
             <Button onClick={handlePrint} size="lg">
               <Printer className="mr-2 h-5 w-5" />
               Imprimir Comanda
@@ -100,8 +104,7 @@ export default function ComandasPage() {
         </Card>
       )}
 
-      {/* 3. O componente que será efetivamente impresso.
-             Fica 'escondido' fora da tela e usa a classe 'printable-area' que você já tem no seu CSS. */}
+      {/* Este é o gabarito para a impressão, que fica escondido mas usa sua classe CSS */}
       {generatedComanda && (
         <div className="printable-area absolute -top-full h-0 overflow-hidden">
           <ComandaThermalReceipt comanda={generatedComanda} />

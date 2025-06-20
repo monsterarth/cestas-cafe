@@ -1,51 +1,53 @@
-// Arquivo: app/api/comandas/[token]/route.ts
 import { getFirebaseDb } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { NextResponse } from "next/server";
 
-export async function GET(
-  request: Request,
-  { params }: { params: { token: string } }
-) {
+// Função para gerar um token alfanumérico amigável. Ex: A4B9C
+function generateToken(length = 5) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let token = '';
+  for (let i = 0; i < length; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+export async function POST(request: Request) {
   try {
-    const token = params.token.toUpperCase();
+    const body = await request.json();
+    const { guestName, cabin, numberOfGuests } = body;
 
-    if (!token) {
-      return NextResponse.json({ error: "Token não fornecido." }, { status: 400 });
+    if (!guestName || !cabin || !numberOfGuests) {
+      return NextResponse.json({ error: "Dados da comanda incompletos." }, { status: 400 });
     }
-
-    // CORREÇÃO APLICADA AQUI
+    
+    // Pega a instância do banco de dados
     const db = await getFirebaseDb();
     if (!db) {
-        return NextResponse.json({ error: "Falha na conexão com o banco de dados." }, { status: 500 });
+        throw new Error("Falha na conexão com o banco de dados.");
     }
 
-    const q = query(
-      collection(db, "comandas"),
-      where("token", "==", token),
-      where("isActive", "==", true)
-    );
+    const token = generateToken();
 
-    const querySnapshot = await getDocs(q);
+    // Monta o objeto que será salvo no Firestore
+    const newComandaData = {
+      token,
+      guestName,
+      cabin,
+      numberOfGuests: Number(numberOfGuests),
+      isActive: true, // A comanda já nasce ativa
+      createdAt: serverTimestamp(), // Usa o timestamp do servidor
+    };
 
-    if (querySnapshot.empty) {
-      return NextResponse.json({ error: "Comanda inválida ou expirada." }, { status: 404 });
-    }
-    
-    const doc = querySnapshot.docs[0];
-    const comandaData = doc.data();
-    
-    const response = {
-      token: comandaData.token,
-      guestName: comandaData.guestName,
-      cabin: comandaData.cabin,
-      numberOfGuests: comandaData.numberOfGuests,
-    }
+    // Adiciona o novo documento na coleção 'comandas'
+    const docRef = await addDoc(collection(db, "comandas"), newComandaData);
 
-    return NextResponse.json(response, { status: 200 });
+    // Retorna a comanda completa com seu novo ID para o frontend
+    return NextResponse.json({ id: docRef.id, ...newComandaData }, { status: 201 });
 
   } catch (error) {
-    console.error("Erro ao validar comanda:", error);
-    return NextResponse.json({ error: "Erro interno do servidor." }, { status: 500 });
+    console.error("Erro ao criar comanda:", error);
+    // Retorna uma mensagem de erro genérica para o cliente
+    return NextResponse.json({ error: "Ocorreu um erro interno ao criar a comanda." }, { status: 500 });
   }
 }
