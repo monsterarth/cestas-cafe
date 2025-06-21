@@ -1,39 +1,42 @@
 // Arquivo: app/api/cabanas/route.ts
 import { NextResponse } from 'next/server';
-import { getFirebaseDb } from '@/lib/firebase';
-import { collection, getDocs, addDoc, query, orderBy } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin'; // <-- MUDANÇA IMPORTANTE
 import { Cabin } from '@/types';
 
 export async function GET() {
     try {
-        const db = await getFirebaseDb();
-        if (!db) throw new Error("DB connection failed");
+        const cabanasRef = adminDb.collection('cabanas');
+        const snapshot = await cabanasRef.orderBy('name', 'asc').get();
 
-        const q = query(collection(db, 'cabanas'), orderBy('posicao', 'asc'));
-        const querySnapshot = await getDocs(q);
-        const cabanas = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Cabin[];
+        if (snapshot.empty) {
+            return NextResponse.json([]);
+        }
+
+        const cabanas: Cabin[] = [];
+        snapshot.forEach(doc => {
+            cabanas.push({ id: doc.id, ...doc.data() } as Cabin);
+        });
         
         return NextResponse.json(cabanas);
 
     } catch (error: any) {
-        return NextResponse.json({ message: error.message }, { status: 500 });
+        console.error("Erro ao buscar cabanas na API (Admin):", error);
+        return NextResponse.json({ message: "Erro interno do servidor ao buscar cabanas." }, { status: 500 });
     }
 }
 
 export async function POST(request: Request) {
     try {
-        const db = await getFirebaseDb();
-        if (!db) throw new Error("DB connection failed");
-
-        const newCabin = await request.json();
+        const newCabin: Partial<Cabin> = await request.json();
         if (!newCabin.name || !newCabin.capacity) {
             return NextResponse.json({ message: 'Nome e capacidade são obrigatórios.' }, { status: 400 });
         }
 
-        const docRef = await addDoc(collection(db, 'cabanas'), newCabin);
+        const docRef = await adminDb.collection('cabanas').add(newCabin);
         return NextResponse.json({ id: docRef.id, ...newCabin }, { status: 201 });
     
     } catch (error: any) {
-        return NextResponse.json({ message: error.message }, { status: 500 });
+        console.error("Erro ao criar cabana na API (Admin):", error);
+        return NextResponse.json({ message: "Erro interno do servidor ao criar cabana." }, { status: 500 });
     }
 }
