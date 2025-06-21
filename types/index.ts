@@ -66,6 +66,7 @@ export interface AppConfig {
   successFooter?: string;
   mensagemDoDia?: string;
   mensagemAtrasoPadrao?: string;
+  subtitulo? : string;
 }
 
 export interface Comanda {
