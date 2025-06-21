@@ -58,6 +58,7 @@ export interface AppConfig {
   corCartao: string;
   textoBoasVindas?: string;
   mensagensMotivacionais?: string[];
+  subtitulo?: string;
 }
 
 // MUDANÇA: Adicionado campo de status
