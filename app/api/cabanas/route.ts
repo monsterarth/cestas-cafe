@@ -1,42 +1,78 @@
-// Arquivo: app/api/cabanas/route.ts
+// Arquivo: app/api/comandas/route.ts
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin'; // <-- MUDANÇA IMPORTANTE
-import { Cabin } from '@/types';
+import { Timestamp } from 'firebase-admin/firestore'; // MUDANÇA: Importa do admin
+import { Comanda } from '@/types';
+import { adminDb } from '@/lib/firebase-admin';
 
+// Função para gerar token (sem alterações)
+function generateToken(): string {
+    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 4; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `F-${result}`;
+}
+
+// Lista todas as comandas para a página de gerenciamento
 export async function GET() {
     try {
-        const cabanasRef = adminDb.collection('cabanas');
-        const snapshot = await cabanasRef.orderBy('name', 'asc').get();
+        const comandasRef = adminDb.collection('comandas');
+        const q = comandasRef.orderBy('createdAt', 'desc');
 
-        if (snapshot.empty) {
-            return NextResponse.json([]);
-        }
-
-        const cabanas: Cabin[] = [];
-        snapshot.forEach(doc => {
-            cabanas.push({ id: doc.id, ...doc.data() } as Cabin);
-        });
+        const snapshot = await q.get();
+        const comandas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
         
-        return NextResponse.json(cabanas);
+        const serializableComandas = comandas.map(comanda => ({
+            ...comanda,
+            createdAt: (comanda.createdAt as Timestamp).toDate().toISOString(),
+            horarioLimite: comanda.horarioLimite ? (comanda.horarioLimite as Timestamp).toDate().toISOString() : null,
+            usedAt: comanda.usedAt ? (comanda.usedAt as Timestamp).toDate().toISOString() : null,
+        }));
+
+        return NextResponse.json(serializableComandas, { status: 200 });
 
     } catch (error: any) {
-        console.error("Erro ao buscar cabanas na API (Admin):", error);
-        return NextResponse.json({ message: "Erro interno do servidor ao buscar cabanas." }, { status: 500 });
+        console.error('Erro ao buscar comandas:', error);
+        return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
     }
 }
 
+// Cria uma nova comanda
 export async function POST(request: Request) {
     try {
-        const newCabin: Partial<Cabin> = await request.json();
-        if (!newCabin.name || !newCabin.capacity) {
-            return NextResponse.json({ message: 'Nome e capacidade são obrigatórios.' }, { status: 400 });
+        const { guestName, cabin, numberOfGuests, horarioLimite, mensagemAtraso } = await request.json();
+
+        if (!guestName || !cabin || !numberOfGuests) {
+            return NextResponse.json({ message: 'Dados do hóspede, cabana e n° de pessoas são obrigatórios.' }, { status: 400 });
         }
 
-        const docRef = await adminDb.collection('cabanas').add(newCabin);
-        return NextResponse.json({ id: docRef.id, ...newCabin }, { status: 201 });
-    
+        const token = generateToken();
+
+        const comandaData: { [key: string]: any } = {
+            token,
+            guestName,
+            cabin,
+            numberOfGuests: Number(numberOfGuests),
+            isActive: true,
+            status: 'ativa',
+            // CORREÇÃO: Usa o Timestamp do Admin SDK
+            createdAt: Timestamp.now(),
+        };
+
+        if (horarioLimite && horarioLimite !== '') {
+            comandaData.horarioLimite = new Date(horarioLimite);
+        }
+        if (mensagemAtraso) {
+            comandaData.mensagemAtraso = mensagemAtraso;
+        }
+
+        const docRef = await adminDb.collection('comandas').add(comandaData);
+
+        return NextResponse.json({ id: docRef.id, ...comandaData }, { status: 201 });
+
     } catch (error: any) {
-        console.error("Erro ao criar cabana na API (Admin):", error);
-        return NextResponse.json({ message: "Erro interno do servidor ao criar cabana." }, { status: 500 });
+        console.error('Erro ao criar comanda:', error);
+        return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
     }
 }

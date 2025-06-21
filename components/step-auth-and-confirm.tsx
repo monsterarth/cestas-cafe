@@ -10,9 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import type { Comanda } from "@/types";
-import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from "@/components/ui/input-otp";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
-export function StepAuthAndConfirm() {
+export default function StepAuthAndConfirm() {
     const { setAuthenticated } = useOrder();
     const [tokenPart, setTokenPart] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +27,8 @@ export function StepAuthAndConfirm() {
         let response: Response | undefined;
 
         try {
-            response = await fetch(`/api/comandas/${fullToken}`);
+            // CORREÇÃO: Aponta para a nova rota de validação
+            response = await fetch(`/api/validate-token/${fullToken}`);
             const data = await response.json();
 
             if (response.status === 410) {

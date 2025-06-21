@@ -1,11 +1,11 @@
-// Arquivo: app/api/comandas/[identifier]/route.ts
+// Arquivo: app/api/validate-token/[token]/route.ts
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-import { Timestamp, getDoc } from 'firebase/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import { Comanda } from '@/types';
 
-export async function GET(request: Request, { params }: { params: { identifier: string } }) {
-    const token = params.identifier;
+export async function GET(request: Request, { params }: { params: { token: string } }) {
+    const token = params.token;
     try {
         const comandasRef = adminDb.collection('comandas');
         const q = comandasRef.where('token', '==', token.toUpperCase()).where('isActive', '==', true).limit(1);
@@ -32,23 +32,5 @@ export async function GET(request: Request, { params }: { params: { identifier: 
         return NextResponse.json(comandaData, { status: 200 });
     } catch (error: any) {
         return NextResponse.json({ message: `Erro interno do servidor ao validar token. ${error.message}` }, { status: 500 });
-    }
-}
-
-export async function PATCH(request: Request, { params }: { params: { identifier: string } }) {
-    const id = params.identifier;
-    try {
-        const updates = await request.json();
-        
-        if (updates.horarioLimite) {
-            updates.horarioLimite = new Date(updates.horarioLimite);
-        }
-
-        const docRef = adminDb.collection('comandas').doc(id);
-        await docRef.update(updates);
-        
-        return NextResponse.json({ message: 'Comanda atualizada com sucesso.' }, { status: 200 });
-    } catch (error: any) {
-        return NextResponse.json({ message: "Erro interno do servidor." }, { status: 500 });
     }
 }

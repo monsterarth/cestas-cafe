@@ -17,7 +17,7 @@ import { MessageCircle } from "lucide-react";
 import { StepReview } from "@/components/step-review";
 import { StepSuccess } from "@/components/step-success";
 import { Toaster } from "sonner";
-import { StepAuthAndConfirm } from "@/components/step-auth-and-confirm";
+import StepAuthAndConfirm from "@/components/step-auth-and-confirm";
 import { StepConfirm } from "@/components/step-confirm";
 import { StepWelcomeMessage } from "@/components/step-welcome-message";
 import { Label } from "@/components/ui/label";
