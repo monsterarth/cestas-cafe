@@ -1,33 +1,62 @@
 // Arquivo: types/index.ts
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp } from "firebase/firestore";
 
-export interface Categoria {
+export interface HotDish {
   id: string;
-  nome: string;
-  descricao?: string;
-  itens: ItemMenu[];
-  ordem: number;
+  nomeItem: string;
+  emoji?: string;
+  disponivel: boolean;
+  sabores: Flavor[];
+  imageUrl?: string;
+  posicao?: number;
 }
 
-export interface ItemMenu {
-  id: string;
-  nome: string;
-  descricao?: string;
-  preco: number;
-  tipo: 'quente' | 'acompanhamento';
+export interface Flavor {
+  id:string;
+  nomeSabor: string;
   disponivel: boolean;
-  categoriaId: string;
+  posicao: number;
+}
+
+export interface Person {
+  id: number;
+  hotDish: {
+    typeId: string;
+    flavorId: string;
+  } | null;
+  notes?: string;
+}
+
+export interface Cabin {
+  id: string;
+  name: string;
+  capacity: number;
+  posicao?: number;
+}
+
+export interface AccompanimentCategory {
+  id: string;
+  name: string;
+  items: AccompanimentItem[];
+}
+
+export interface AccompanimentItem {
+  id: string;
+  nomeItem: string;
+  emoji?: string;
+  disponivel: boolean;
+  descricaoPorcao?: string;
 }
 
 export interface AppConfig {
-  nomeFazenda?: string;
   logoUrl?: string;
-  corPrimaria?: string;
-  corSecundaria?: string;
-  corTexto?: string;
-  mensagemDoDia?: string;
-
-  // NOVOS CAMPOS PARA MENSAGENS DO FLUXO DE PEDIDO
+  nomeFazenda: string;
+  textoAgradecimento: string;
+  corFundo: string;
+  corTexto: string;
+  corDestaque: string;
+  corDestaqueTexto: string;
+  corCartao: string;
   welcomeEmoji?: string;
   welcomeTitle?: string;
   welcomeSubtitle?: string;
@@ -35,46 +64,60 @@ export interface AppConfig {
   successSubtitle?: string;
   successGratitude?: string;
   successFooter?: string;
+  mensagemDoDia?: string;
+  mensagemAtrasoPadrao?: string;
 }
 
 export interface Comanda {
   id: string;
-  token: string;
   guestName: string;
   cabin: string;
   numberOfGuests: number;
-  createdAt: Timestamp;
-  horarioLimite?: Timestamp;
-  status: 'ativa' | 'usada' | 'expirada' | 'arquivada';
+  token: string;
   isActive: boolean;
+  status?: 'ativa' | 'arquivada';
+  createdAt: Timestamp;
   usedAt?: Timestamp;
+  horarioLimite?: Timestamp;
   mensagemAtraso?: string;
-  pedidoId?: string;
+}
+
+export interface OrderState {
+  isAuthenticated: boolean;
+  comanda: Omit<Comanda, 'id' | 'createdAt' | 'isActive' | 'usedAt'> | null;
+  currentStep: number;
+  completedSteps: number[];
+  guestInfo: {
+    name: string;
+    cabin: string;
+    people: number;
+    time: string;
+  };
+  persons: Person[];
+  accompaniments: Record<string, Record<string, number>>;
+  globalHotDishNotes: string;
+  specialRequests: string;
 }
 
 export interface ItemPedido {
-  id: string;
   nomeItem: string;
   quantidade: number;
-  tipo: 'quente' | 'acompanhamento';
-  sabor?: string; // Para itens com variações, como sucos
+  observacao?: string;
+  sabor?: string;
+  // CORREÇÃO: Adicionando as propriedades que faltavam
+  paraPessoa?: string;
+  categoria?: string;
 }
 
 export interface Order {
   id: string;
-  comandaId: string;
   hospedeNome: string;
   cabanaNumero: string;
-  numeroDePessoas: number;
   horarioEntrega: string;
-  itensPedido: ItemPedido[];
-  observacoes?: string;
-  status: 'Novo' | 'Em Preparação' | 'Entregue' | 'Cancelado';
+  numeroPessoas: number;
+  status: "Novo" | "Em Preparação" | "Entregue" | "Cancelado";
   timestampPedido: Timestamp;
-}
-
-export interface Cabin {
-    id: string;
-    name: string;
-    capacity: number;
+  itensPedido: ItemPedido[];
+  observacoesGerais?: string;
+  observacoesPratosQuentes?: string;
 }
