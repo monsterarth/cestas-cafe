@@ -49,6 +49,7 @@ export interface AppConfig {
   textoAgradecimento: string;
   mensagemAtrasoPadrao?: string;
   mensagemDoDia?: string;
+  mensagensMotivacionais?: string[];
 }
 
 export interface Cabin {
