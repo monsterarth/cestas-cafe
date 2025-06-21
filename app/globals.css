@@ -38,7 +38,7 @@
     --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 210 40% 96.1%;
+    --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
@@ -59,18 +59,53 @@
   }
 }
 
-/* --- ESTILOS DE IMPRESSÃO FINAIS --- */
+/* --- ESTILOS DE IMPRESSÃO FINAIS E OTIMIZADOS --- */
+
 @media print {
+  /* CORREÇÃO: Define o tamanho da página como automático para economizar papel */
+  @page {
+    size: auto;  /* A página se ajustará ao conteúdo */
+    margin: 0mm; /* Remove margens de impressão do navegador */
+  }
+
+  /* Garante que o corpo e o html não tenham altura fixa */
+  html, body {
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Oculta todos os elementos da interface */
   body * {
     visibility: hidden;
   }
+
+  /* Torna a nossa área de impressão e seus filhos visíveis */
   .printable-area, .printable-area * {
     visibility: visible;
   }
+
+  /* Posiciona a área de impressão no topo da página */
   .printable-area {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
   }
+}
+
+/* Classes para controlar visibilidade na tela vs. impressão (para o QR Code) */
+.screen-only {
+    display: block;
+}
+.print-only {
+    display: none;
+}
+@media print {
+    .screen-only {
+        display: none !important;
+    }
+    .print-only {
+        display: block !important;
+    }
 }
