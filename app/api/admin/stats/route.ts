@@ -1,16 +1,11 @@
 // Arquivo: app/api/admin/stats/route.ts
 import { NextResponse } from 'next/server';
-import { getFirebaseDb } from '@/lib/firebase';
-import { collection, getDocs, query } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin'; // <-- MUDANÇA IMPORTANTE
 import { Order } from '@/types';
 
 export async function GET() {
     try {
-        const db = await getFirebaseDb();
-        if (!db) throw new Error("DB connection failed");
-
-        const ordersQuery = query(collection(db, "orders"));
-        const ordersSnapshot = await getDocs(ordersQuery);
+        const ordersSnapshot = await adminDb.collection("orders").get();
         const allOrders = ordersSnapshot.docs.map(doc => doc.data() as Order);
 
         // KPI 1: Pratos Quentes mais populares
@@ -23,7 +18,7 @@ export async function GET() {
             });
         });
         const pratosPopulares = Object.entries(pratosQuentesCount)
-            .map(([name, count]) => ({ name, value: count }))
+            .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value);
 
         // KPI 2: Horários de entrega mais comuns
@@ -39,7 +34,6 @@ export async function GET() {
             
         // KPI 3: Total de pedidos
         const totalPedidos = allOrders.length;
-
 
         return NextResponse.json({
             totalPedidos,

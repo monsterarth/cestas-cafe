@@ -1,53 +1,50 @@
 // Arquivo: app/api/admin/dashboard/route.ts
 import { NextResponse } from 'next/server';
-import { getFirebaseDb } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase/firestore';
 import { startOfToday, endOfToday } from 'date-fns';
 import { Comanda } from '@/types'; // <-- CORREÇÃO: Importa o tipo Comanda
 
 export async function GET() {
     try {
-        const db = await getFirebaseDb();
-        if (!db) throw new Error("DB connection failed");
-
         const todayStart = startOfToday();
         const todayEnd = endOfToday();
 
-        const ordersQuery = query(
-            collection(db, "orders"),
-            where("timestampPedido", ">=", todayStart),
-            where("timestampPedido", "<=", todayEnd),
-            where("status", "in", ["Novo", "Em Preparação"])
-        );
-        const ordersSnapshot = await getDocs(ordersQuery);
+        // 1. Coletar pedidos de hoje
+        const ordersQuery = adminDb.collection("orders")
+            .where("timestampPedido", ">=", todayStart)
+            .where("timestampPedido", "<=", todayEnd)
+            .where("status", "in", ["Novo", "Em Preparação"]);
+            
+        const ordersSnapshot = await ordersQuery.get();
         const pedidosDoDia = ordersSnapshot.docs.map(doc => doc.data());
 
         const totalCestas = pedidosDoDia.length;
         const totalPessoas = pedidosDoDia.reduce((sum, order) => sum + (order.numeroPessoas || 0), 0);
 
-        const comandasQuery = query(
-            collection(db, "comandas"),
-            where("createdAt", ">=", todayStart),
-            where("createdAt", "<=", todayEnd),
-            where("status", "==", "ativa"),
-            orderBy("createdAt", "desc"),
-            limit(10)
-        );
-        const comandasSnapshot = await getDocs(comandasQuery);
-        // CORREÇÃO: Adiciona a tipagem explícita 'as Comanda[]'
+        // 2. Coletar comandas ativas criadas hoje
+        const comandasQuery = adminDb.collection("comandas")
+            .where("createdAt", ">=", todayStart)
+            .where("createdAt", "<=", todayEnd)
+            .where("status", "==", "ativa")
+            .orderBy("createdAt", "desc")
+            .limit(10);
+            
+        const comandasSnapshot = await comandasQuery.get();
+        // CORREÇÃO: Adiciona a tipagem explícita 'as Comanda[]' para guiar o TypeScript
         const comandasDoDia = comandasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
 
+        // 3. Coletar alertas
         const alertas: string[] = [];
         const agora = new Date();
         const umaHoraDepois = new Date(agora.getTime() + 60 * 60 * 1000);
 
-        const comandasPertoExpirarQuery = query(
-            collection(db, "comandas"),
-            where("isActive", "==", true),
-            where("horarioLimite", ">", agora),
-            where("horarioLimite", "<=", umaHoraDepois)
-        );
-        const comandasPertoExpirarSnapshot = await getDocs(comandasPertoExpirarQuery);
+        const comandasPertoExpirarQuery = adminDb.collection("comandas")
+            .where("isActive", "==", true)
+            .where("horarioLimite", ">", agora)
+            .where("horarioLimite", "<=", umaHoraDepois);
+            
+        const comandasPertoExpirarSnapshot = await comandasPertoExpirarQuery.get();
         comandasPertoExpirarSnapshot.forEach(doc => {
             const comanda = doc.data();
             alertas.push(`A comanda ${comanda.token} para ${comanda.guestName} expira em breve!`);

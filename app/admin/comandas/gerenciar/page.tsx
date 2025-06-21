@@ -1,7 +1,7 @@
 // Arquivo: app/admin/comandas/gerenciar/page.tsx
 'use client';
 
-import { useEffect, useState, useMemo } from 'react'; // Adicionado useMemo
+import { useEffect, useState, useMemo } from 'react';
 import { Comanda } from '@/types';
 import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,26 +13,39 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Loader2, Archive, Save, AlertTriangle, CircleCheck, CircleX } from 'lucide-react';
 import { format } from 'date-fns';
-import { Timestamp } from 'firebase/firestore';
 
-function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpdate: () => void }) {
-    const [isActive, setIsActive] = useState(comanda.isActive);
+interface ComandaFromAPI extends Omit<Comanda, 'createdAt' | 'horarioLimite' | 'usedAt'> {
+    createdAt: string;
+    horarioLimite?: string | null;
+    usedAt?: string | null;
+}
+
+function ComandaManagementCard({ comandaData, onUpdate }: { comandaData: ComandaFromAPI, onUpdate: () => void }) {
+    const comandaDate = useMemo(() => ({
+        ...comandaData,
+        createdAt: new Date(comandaData.createdAt),
+        horarioLimite: comandaData.horarioLimite ? new Date(comandaData.horarioLimite) : undefined,
+    }), [comandaData]);
+
+    const [isActive, setIsActive] = useState(comandaDate.isActive);
     const [horarioLimite, setHorarioLimite] = useState(
-        comanda.horarioLimite ? format(comanda.horarioLimite.toDate(), "yyyy-MM-dd'T'HH:mm") : ''
+        comandaDate.horarioLimite ? format(comandaDate.horarioLimite, "yyyy-MM-dd'T'HH:mm") : ''
     );
-    const [mensagemAtraso, setMensagemAtraso] = useState(comanda.mensagemAtraso || '');
+    const [mensagemAtraso, setMensagemAtraso] = useState(comandaDate.mensagemAtraso || '');
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleUpdate = async (updates: Partial<Comanda>) => {
+    // CORREÇÃO: A tipagem de 'updates' foi simplificada para '{ [key: string]: any }'
+    // para resolver o conflito de tipo entre Date e Timestamp no lado do cliente.
+    const handleUpdate = async (updates: { [key: string]: any }) => {
         setIsSaving(true);
         try {
-            const response = await fetch(`/api/comandas/${comanda.id}`, {
+            const response = await fetch(`/api/comandas/${comandaDate.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates),
             });
             if (!response.ok) throw new Error('Falha ao atualizar a comanda.');
-            toast.success(`Comanda ${comanda.token} atualizada!`);
+            toast.success(`Comanda ${comandaDate.token} atualizada!`);
             onUpdate();
         } catch (error: any) {
             toast.error(error.message);
@@ -46,11 +59,14 @@ function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpda
     };
     
     const handleSave = () => {
-        const updatePayload: Partial<Comanda> = {
+        const updatePayload: { [key: string]: any } = {
             mensagemAtraso: mensagemAtraso
         };
+        // Enviamos um objeto Date, a API e o JSON.stringify cuidam da conversão.
         if (horarioLimite) {
-            updatePayload.horarioLimite = Timestamp.fromDate(new Date(horarioLimite));
+            updatePayload.horarioLimite = new Date(horarioLimite);
+        } else {
+            updatePayload.horarioLimite = null; // Permite limpar o horário
         }
         handleUpdate(updatePayload);
     };
@@ -60,13 +76,19 @@ function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpda
         handleUpdate({ isActive: checked });
     }
 
-    const isExpired = comanda.horarioLimite ? comanda.horarioLimite.toDate() < new Date() : false;
+    const isExpired = comandaDate.horarioLimite ? comandaDate.horarioLimite < new Date() : false;
+    
+    const receiptComanda = {
+        ...comandaDate,
+        createdAt: { toDate: () => comandaDate.createdAt } as any,
+        horarioLimite: comandaDate.horarioLimite ? { toDate: () => comandaDate.horarioLimite } as any : undefined,
+    };
 
     return (
         <Card className="flex flex-col">
             <CardHeader className="flex-row items-start justify-between">
                 <div>
-                    <CardTitle>Comanda {comanda.token}</CardTitle>
+                    <CardTitle>Comanda {receiptComanda.token}</CardTitle>
                     <div className="flex items-center gap-2 mt-2">
                         {isActive && !isExpired && <CircleCheck className="h-4 w-4 text-green-600" />}
                         {isActive && isExpired && <AlertTriangle className="h-4 w-4 text-yellow-600" />}
@@ -77,9 +99,9 @@ function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpda
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Label htmlFor={`active-switch-${comanda.id}`}>Ativar</Label>
+                    <Label htmlFor={`active-switch-${receiptComanda.id}`}>Ativar</Label>
                     <Switch
-                        id={`active-switch-${comanda.id}`}
+                        id={`active-switch-${receiptComanda.id}`}
                         checked={isActive}
                         onCheckedChange={handleActiveToggle}
                         disabled={isSaving}
@@ -88,12 +110,12 @@ function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpda
             </CardHeader>
             <CardContent className="flex-grow space-y-4">
                 <div className="bg-gray-100 p-2 rounded-md flex justify-center">
-                    <ComandaThermalReceipt comanda={comanda} />
+                    <ComandaThermalReceipt comanda={receiptComanda as Comanda} />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor={`limite-${comanda.id}`}>Prazo de Utilização</Label>
+                    <Label htmlFor={`limite-${receiptComanda.id}`}>Prazo de Utilização</Label>
                     <Input
-                        id={`limite-${comanda.id}`}
+                        id={`limite-${receiptComanda.id}`}
                         type="datetime-local"
                         value={horarioLimite}
                         onChange={(e) => setHorarioLimite(e.target.value)}
@@ -101,9 +123,9 @@ function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpda
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor={`mensagem-${comanda.id}`}>Mensagem de Atraso</Label>
+                    <Label htmlFor={`mensagem-${receiptComanda.id}`}>Mensagem de Atraso</Label>
                     <Textarea
-                        id={`mensagem-${comanda.id}`}
+                        id={`mensagem-${receiptComanda.id}`}
                         value={mensagemAtraso}
                         onChange={(e) => setMensagemAtraso(e.target.value)}
                         disabled={isSaving}
@@ -125,7 +147,7 @@ function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpda
 }
 
 export default function GerenciarComandasPage() {
-    const [comandas, setComandas] = useState<Comanda[]>([]);
+    const [comandas, setComandas] = useState<ComandaFromAPI[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchComandas = async () => {
@@ -146,7 +168,6 @@ export default function GerenciarComandasPage() {
         fetchComandas();
     }, []);
 
-    // CORREÇÃO: Filtra as comandas no frontend para não mostrar as arquivadas.
     const comandasVisiveis = useMemo(() => {
         return comandas.filter(c => c.status !== 'arquivada');
     }, [comandas]);
@@ -166,7 +187,7 @@ export default function GerenciarComandasPage() {
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     {comandasVisiveis.map(comanda => (
-                        <ComandaManagementCard key={comanda.id} comanda={comanda} onUpdate={fetchComandas} />
+                        <ComandaManagementCard key={comanda.id} comandaData={comanda} onUpdate={fetchComandas} />
                     ))}
                 </div>
             )}
