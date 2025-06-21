@@ -52,6 +52,7 @@ export interface AppConfig {
   nomeFazenda: string;
   subtitulo: string;
   textoBoasVindas: string;
+  textoIntroducao: string;
   corFundo: string;
   corTexto: string;
   corDestaque: string;
