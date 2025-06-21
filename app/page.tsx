@@ -1,24 +1,25 @@
 // Arquivo: app/page.tsx
 "use client"
 
-import React from "react" // CORREÇÃO: Removido 'import type'
-import { useFirebaseData } from "@/hooks/use-firebase-data"
-import { useOrder, deactivateComanda } from "@/hooks/use-order"
-import { LoadingScreen } from "@/components/loading-screen"
-import { StepNavigation } from "@/components/step-navigation"
-import { GuestAccordion } from "@/components/guest-accordion"
-import { OrderSidebar } from "@/components/order-sidebar"
-import { StepDetails } from "@/components/step-details"
-import { StepAccompaniments } from "@/components/step-accompaniments"
-import { StepWelcome } from "@/components/step-welcome"
-import { AppHeader } from "@/components/app-header"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { MessageCircle } from "lucide-react"
-import { StepReview } from "@/components/step-review"
-import { StepSuccess } from "@/components/step-success"
-import { Toaster } from "sonner"
-import { StepAuthAndConfirm } from "@/components/step-auth-and-confirm"
+import React from "react";
+import { useFirebaseData } from "@/hooks/use-firebase-data";
+import { useOrder, deactivateComanda } from "@/hooks/use-order";
+import { LoadingScreen } from "@/components/loading-screen";
+import { StepNavigation } from "@/components/step-navigation";
+import { GuestAccordion } from "@/components/guest-accordion";
+import { OrderSidebar } from "@/components/order-sidebar";
+import { StepDetails } from "@/components/step-details";
+import { StepAccompaniments } from "@/components/step-accompaniments";
+// import { StepWelcome } from "@/components/step-welcome"; // REMOVIDO: Não é mais usado
+import { AppHeader } from "@/components/app-header";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { MessageCircle } from "lucide-react";
+import { StepReview } from "@/components/step-review";
+import { StepSuccess } from "@/components/step-success";
+import { Toaster } from "sonner";
+import { StepAuthAndConfirm } from "@/components/step-auth-and-confirm";
+import { StepConfirm } from "@/components/StepConfirm"; // NOVO: Importa o novo componente
 
 export default function Home() {
   const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData();
@@ -71,7 +72,6 @@ export default function Home() {
     return <LoadingScreen message="Aguardando configurações..." />;
   }
 
-  // CORREÇÃO: O objeto orderState agora inclui todas as propriedades do estado global
   const orderState = {
     isAuthenticated,
     comanda,
@@ -99,23 +99,27 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
           <div className="lg:col-span-2">
 
-            {!isAuthenticated && <StepAuthAndConfirm />}
+            {/* ETAPA 0: AUTENTICAÇÃO */}
+            {currentStep === 0 && !isAuthenticated && <StepAuthAndConfirm />}
             
+            {/* ETAPA 1: CONFIRMAÇÃO (NOVA) */}
             {isAuthenticated && currentStep === 1 && !orderSubmitted && (
-              <StepWelcome config={appConfig} onNext={() => setStep(2)} />
+              <StepConfirm deliveryTimes={deliveryTimes} />
             )}
 
+            {/* ETAPA 2: DETALHES (somente se precisar corrigir) */}
             {isAuthenticated && currentStep === 2 && !orderSubmitted && (
               <StepDetails
                 orderState={orderState}
                 cabins={cabins}
                 deliveryTimes={deliveryTimes}
                 onUpdateOrderState={(updates) => updateGuestInfo(updates.guestInfo || {})}
-                onNext={() => setStep(3)}
-                onBack={() => setStep(1)}
+                onNext={() => setStep(3)} // Após corrigir, vai para a próxima etapa
+                onBack={() => setStep(1)} // Volta para a confirmação
               />
             )}
 
+            {/* ETAPA 3: PRATOS QUENTES */}
             {isAuthenticated && currentStep === 3 && !orderSubmitted && (
               <div className="shadow-lg border-0 rounded-lg overflow-hidden bg-card">
                 <div className="text-primary-foreground p-4 md:p-6" style={{ backgroundColor: appConfig.corDestaque }}>
@@ -154,7 +158,8 @@ export default function Home() {
                       />
                     </div>
                     <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0">
-                      <Button variant="outline" onClick={() => setStep(2)}>← Voltar</Button>
+                      {/* O botão voltar agora pode levar para a etapa 1 ou 2 */}
+                      <Button variant="outline" onClick={() => setStep(guestInfo.time ? 1 : 2)}>← Voltar</Button>
                       <Button onClick={() => setStep(4)} className="text-primary-foreground hover:opacity-90" style={{ backgroundColor: appConfig.corDestaque }}>Próximo →</Button>
                     </div>
                   </div>
@@ -162,6 +167,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* ETAPA 4: ACOMPANHAMENTOS */}
             {isAuthenticated && currentStep === 4 && !orderSubmitted && (
               <StepAccompaniments
                 orderState={orderState}
@@ -172,6 +178,7 @@ export default function Home() {
               />
             )}
             
+            {/* ETAPA 5: REVISÃO */}
             {isAuthenticated && currentStep === 5 && !orderSubmitted && (
               <StepReview
                 orderState={orderState}
