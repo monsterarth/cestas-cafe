@@ -95,7 +95,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (pathname.includes("/orders")) return "Pedidos";
     if (pathname.includes("/menu")) return "Cardápio";
     if (pathname.includes("/settings")) return "Configurações";
-    if (pathname.includes("/comandas")) return "Gerar Comandas"; // Adicionado
+    if (pathname === "/admin/comandas") return "Gerar Comandas";
+    if (pathname === "/admin/comandas/gerenciar") return "Gerenciar Comandas"; // NOVO
     if (pathname === "/admin") return "Dashboard";
     return "Painel Administrativo";
   }
@@ -116,10 +117,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link href="/admin/orders" className={`flex items-center px-4 py-2 rounded-lg transition-colors hover:bg-[#97A25F] ${pathname.startsWith("/admin/orders") ? "bg-[#97A25F]" : ""}`}>
                   Pedidos
               </Link>
-              {/* Link para Comandas Adicionado */}
-              <Link href="/admin/comandas" className={`flex items-center px-4 py-2 rounded-lg transition-colors hover:bg-[#97A25F] ${pathname.startsWith("/admin/comandas") ? "bg-[#97A25F]" : ""}`}>
-                  Comandas
-              </Link>
+              <div className="pl-4 border-l-2 border-gray-600">
+                <Link href="/admin/comandas" className={`flex items-center px-4 py-2 rounded-lg transition-colors hover:bg-[#97A25F] ${pathname === "/admin/comandas" ? "bg-[#97A25F]" : ""}`}>
+                    Gerar Comanda
+                </Link>
+                <Link href="/admin/comandas/gerenciar" className={`flex items-center px-4 py-2 rounded-lg transition-colors hover:bg-[#97A25F] ${pathname === "/admin/comandas/gerenciar" ? "bg-[#97A25F]" : ""}`}>
+                    Gerenciar
+                </Link>
+              </div>
               <Link href="/admin/menu" className={`flex items-center px-4 py-2 rounded-lg transition-colors hover:bg-[#97A25F] ${pathname.startsWith("/admin/menu") ? "bg-[#97A25F]" : ""}`}>
                   Cardápio
               </Link>
@@ -146,7 +151,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </main>
         </div>
       </div>
-      <div id="print-container" className="printable-area"></div>
+      <div id="print-container-portal" className="printable-area"></div>
       <Toaster />
       {config && <ThemeInjector config={config} />}
     </div>

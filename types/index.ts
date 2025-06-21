@@ -1,5 +1,4 @@
 // Arquivo: types/index.ts
-
 import { Timestamp } from "firebase/firestore";
 
 export interface HotDish {
@@ -47,35 +46,39 @@ export interface AccompanimentItem {
   descricaoPorcao?: string;
 }
 
+// MUDANÇA: Removidos campos obsoletos
 export interface AppConfig {
   logoUrl?: string;
   nomeFazenda: string;
-  subtitulo: string;
-  textoBoasVindas: string;
-  textoIntroducao: string;
   textoAgradecimento: string;
   corFundo: string;
   corTexto: string;
   corDestaque: string;
   corDestaqueTexto: string;
   corCartao: string;
-  mensagensMotivacionais?: string[];
+  textoBoasVindas?: string;
 }
 
+// MUDANÇA: Adicionado campo de status
 export interface Comanda {
-  id: string; // Document ID from Firestore
+  id: string;
   guestName: string;
   cabin: string;
   numberOfGuests: number;
   token: string;
   isActive: boolean;
+  status?: 'ativa' | 'arquivada'; // NOVO
   createdAt: Timestamp;
   usedAt?: Timestamp;
-  horarioLimite?: Timestamp; // NOVO
-  mensagemAtraso?: string;   // NOVO
+  horarioLimite?: Timestamp;
+  mensagemAtraso?: string;
 }
 
 export interface OrderState {
+  isAuthenticated: boolean;
+  comanda: Omit<Comanda, 'id' | 'createdAt' | 'isActive' | 'usedAt'> | null;
+  currentStep: number;
+  completedSteps: number[];
   guestInfo: {
     name: string;
     cabin: string;
@@ -86,12 +89,6 @@ export interface OrderState {
   accompaniments: Record<string, Record<string, number>>;
   globalHotDishNotes: string;
   specialRequests: string;
-  
-  // --- Adições para o fluxo de Comanda/Autenticação ---
-  isAuthenticated: boolean;
-  comanda: Omit<Comanda, 'id' | 'createdAt' | 'isActive' | 'usedAt'> | null;
-  currentStep: number;
-  completedSteps: number[];
 }
 
 export interface ItemPedido {

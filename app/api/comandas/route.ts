@@ -1,9 +1,9 @@
 // Arquivo: app/api/comandas/route.ts
 import { NextResponse } from 'next/server';
 import { getFirebaseDb } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
+import { Comanda } from '@/types';
 
-// Função para gerar um token alfanumérico curto e legível
 const generateToken = (): string => {
     const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ0123456789';
     let result = '';
@@ -13,6 +13,30 @@ const generateToken = (): string => {
     return `F-${result}`;
 }
 
+// FUNÇÃO GET (NOVA) - Para listar comandas no painel de gerenciamento
+export async function GET() {
+    try {
+        const db = await getFirebaseDb();
+        if (!db) {
+            return NextResponse.json({ message: 'Conexão com banco de dados falhou.' }, { status: 500 });
+        }
+        
+        const comandasRef = collection(db, 'comandas');
+        // Busca comandas que não estão arquivadas e ordena pelas mais recentes
+        const q = query(comandasRef, where('status', '!=', 'arquivada'), orderBy('status', 'asc'), orderBy('createdAt', 'desc'));
+
+        const querySnapshot = await getDocs(q);
+        const comandas = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
+
+        return NextResponse.json(comandas, { status: 200 });
+
+    } catch (error: any) {
+        console.error('Erro ao buscar comandas:', error);
+        return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
+    }
+}
+
+
 export async function POST(request: Request) {
     try {
         const db = await getFirebaseDb();
@@ -20,22 +44,30 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Conexão com banco de dados falhou.' }, { status: 500 });
         }
 
-        const { guestName, cabin, numberOfGuests } = await request.json();
+        const { guestName, cabin, numberOfGuests, horarioLimite, mensagemAtraso } = await request.json();
 
         if (!guestName || !cabin || !numberOfGuests) {
-            return NextResponse.json({ message: 'Dados incompletos.' }, { status: 400 });
+            return NextResponse.json({ message: 'Dados do hóspede, cabana e n° de pessoas são obrigatórios.' }, { status: 400 });
         }
 
         const token = generateToken();
 
-        const comandaData = {
+        const comandaData: any = {
             token,
             guestName,
             cabin,
             numberOfGuests: Number(numberOfGuests),
             isActive: true,
+            status: 'ativa', // Status inicial
             createdAt: serverTimestamp(),
         };
+
+        if (horarioLimite) {
+            comandaData.horarioLimite = new Date(horarioLimite);
+        }
+        if (mensagemAtraso) {
+            comandaData.mensagemAtraso = mensagemAtraso;
+        }
 
         const docRef = await addDoc(collection(db, 'comandas'), comandaData);
 
