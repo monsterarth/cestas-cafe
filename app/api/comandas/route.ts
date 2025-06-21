@@ -4,13 +4,13 @@ import { getFirebaseDb } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 // Função para gerar um token alfanumérico curto e legível
-const generateToken = (length = 6): string => {
-    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789'; // Caracteres legíveis, sem O, 0
+const generateToken = (): string => {
+    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ0123456789';
     let result = '';
-    for (let i = 0; i < length; i++) {
+    for (let i = 0; i < 4; i++) {
         result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    return result;
+    return `F-${result}`;
 }
 
 export async function POST(request: Request) {

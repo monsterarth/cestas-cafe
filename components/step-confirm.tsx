@@ -4,8 +4,8 @@
 import { useState } from "react";
 import { useOrder } from "@/hooks/use-order";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Home, Users, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { User, Home, Users } from "lucide-react";
 import { toast } from "sonner";
 
 interface StepConfirmProps {
@@ -20,7 +20,7 @@ export function StepConfirm({ deliveryTimes }: StepConfirmProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-destructive-foreground">Erro de Autenticação</CardTitle>
+          <h1 className="text-xl md:text-2xl font-bold text-destructive">Erro de Autenticação</h1>
         </CardHeader>
         <CardContent>
           <p>Não foi possível carregar os dados da sua reserva. Por favor, tente autenticar novamente.</p>
@@ -34,14 +34,14 @@ export function StepConfirm({ deliveryTimes }: StepConfirmProps) {
       toast.error("Por favor, selecione um horário para a entrega.");
       return;
     }
-    // Atualiza o horário no estado e pula para a etapa 3 (Pratos Quentes)
+    // Atualiza o horário e vai para a etapa 2 (Boas-Vindas)
     updateGuestInfo({ time: selectedTime });
-    setStep(3);
+    setStep(2);
   };
 
   const handleCorrect = () => {
-    // Leva para a etapa 2 (Detalhes) para correção
-    setStep(2);
+    // Leva para a etapa 99 (Detalhes) para correção
+    setStep(99);
   };
   
   return (

@@ -1,11 +1,13 @@
 // Arquivo: app/admin/comandas/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Ticket, Printer, RotateCcw } from 'lucide-react';
 import { Comanda } from '@/types';
 import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
@@ -14,18 +16,41 @@ import { toast } from 'sonner';
 export default function ComandasPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [generatedComanda, setGeneratedComanda] = useState<Comanda | null>(null);
+    const [printContainer, setPrintContainer] = useState<HTMLElement | null>(null);
+
+    useEffect(() => {
+        let container = document.getElementById('print-container-portal');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'print-container-portal';
+            container.className = 'printable-area';
+            document.body.appendChild(container);
+        }
+        setPrintContainer(container);
+        
+        // Cleanup function
+        return () => {
+            if(container && container.parentNode) {
+                container.parentNode.removeChild(container);
+            }
+        }
+    }, []);
 
     const handleGenerateComanda = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsLoading(true);
         
         const formData = new FormData(e.currentTarget);
-        const guestName = formData.get('guestName') as string;
-        const cabin = formData.get('cabin') as string;
-        const numberOfGuests = Number(formData.get('numberOfGuests'));
+        const data = {
+            guestName: formData.get('guestName') as string,
+            cabin: formData.get('cabin') as string,
+            numberOfGuests: Number(formData.get('numberOfGuests')),
+            horarioLimite: formData.get('horarioLimite') as string,
+            mensagemAtraso: formData.get('mensagemAtraso') as string,
+        };
 
-        if (!guestName || !cabin || !numberOfGuests) {
-            toast.error("Por favor, preencha todos os campos.");
+        if (!data.guestName || !data.cabin || !data.numberOfGuests) {
+            toast.error("Por favor, preencha nome, cabana e número de hóspedes.");
             setIsLoading(false);
             return;
         }
@@ -34,7 +59,7 @@ export default function ComandasPage() {
             const response = await fetch('/api/comandas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ guestName, cabin, numberOfGuests }),
+                body: JSON.stringify(data),
             });
 
             const result = await response.json();
@@ -55,15 +80,7 @@ export default function ComandasPage() {
     };
 
     const handlePrint = () => {
-        const printContent = document.getElementById('printable-receipt');
-        if (printContent) {
-            const printableArea = document.querySelector('.printable-area');
-            if (printableArea) {
-                printableArea.innerHTML = ''; // Limpa a área
-                printableArea.appendChild(printContent.cloneNode(true));
-                window.print();
-            }
-        }
+        window.print();
     };
     
     const resetForm = () => {
@@ -78,7 +95,7 @@ export default function ComandasPage() {
                     <CardDescription>
                         {generatedComanda 
                             ? "Comanda gerada. Imprima ou gere uma nova." 
-                            : "Preencha os dados do hóspede para criar uma nova comanda de acesso."}
+                            : "Preencha os dados para criar uma comanda de acesso."}
                     </CardDescription>
                 </CardHeader>
                 {!generatedComanda ? (
@@ -95,6 +112,18 @@ export default function ComandasPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="numberOfGuests">Número de Hóspedes</Label>
                                 <Input id="numberOfGuests" name="numberOfGuests" type="number" min="1" max="10" required />
+                            </div>
+                            <div className="space-y-2 pt-4 border-t">
+                                <Label htmlFor="horarioLimite">Horário Limite para Pedido (Opcional)</Label>
+                                <Input id="horarioLimite" name="horarioLimite" type="datetime-local" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="mensagemAtraso">Mensagem para Pedidos Atrasados (Opcional)</Label>
+                                <Textarea 
+                                    id="mensagemAtraso" 
+                                    name="mensagemAtraso" 
+                                    placeholder="Ex: Opa! O limite para pedidos era até 20h. Mas não se preocupe..."
+                                />
                             </div>
                         </CardContent>
                         <CardFooter>
@@ -120,13 +149,14 @@ export default function ComandasPage() {
             <div>
                 <h3 className="text-lg font-semibold mb-2 text-muted-foreground">Pré-visualização</h3>
                 <Card className="p-2 bg-gray-200">
-                    <div id="printable-receipt">
-                       {generatedComanda ? <ComandaThermalReceipt comanda={generatedComanda} /> : <div className="text-center py-20 text-gray-500">Aguardando geração da comanda...</div>}
-                    </div>
+                    {generatedComanda ? <ComandaThermalReceipt comanda={generatedComanda} /> : <div className="text-center py-20 text-gray-500">Aguardando geração da comanda...</div>}
                 </Card>
             </div>
-            {/* Div oculta para impressão, gerenciada pelo layout */}
-            <div className="printable-area"></div>
+            
+            {printContainer && generatedComanda && ReactDOM.createPortal(
+                <ComandaThermalReceipt comanda={generatedComanda} />,
+                printContainer
+            )}
         </div>
     );
 }

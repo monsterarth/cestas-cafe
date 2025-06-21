@@ -14,33 +14,46 @@ import type { Comanda } from "@/types";
 
 export function StepAuthAndConfirm() {
     const { setAuthenticated } = useOrder();
-    const [token, setToken] = useState('');
+    const [tokenPart, setTokenPart] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const searchParams = useSearchParams();
 
-    // Renomeado para não conflitar com a função de mesmo nome no escopo global
-    const authenticate = async (tokenToAuth: string) => {
-        if (!tokenToAuth) {
-            toast.error("Por favor, insira um código de acesso.");
+    const authenticate = async (fullToken: string) => {
+        if (!fullToken || fullToken.length < 6) {
+            toast.error("Por favor, insira um código de acesso válido.");
             return;
         }
         setIsLoading(true);
+        
+        // MUDANÇA: A variável 'response' é declarada aqui, fora do try/catch.
+        let response: Response | undefined;
+
         try {
-            const response = await fetch(`/api/comandas/${tokenToAuth.toUpperCase()}`);
-            const data = await response.json(); // Pega a resposta como 'any' primeiro
+            response = await fetch(`/api/comandas/${fullToken}`); // Atribuição dentro do try
+            const data = await response.json();
+
+            if (response.status === 410) {
+                toast.error("Prazo Expirado!", {
+                    description: data.message,
+                    duration: 10000,
+                });
+                throw new Error(data.message || 'Comanda expirada.');
+            }
 
             if (!response.ok) {
-                // CORREÇÃO: Lança um erro com a mensagem da API
                 throw new Error(data.message || 'Falha na autenticação.');
             }
             
-            const comandaData = data as Comanda; // Converte para o tipo Comanda após a verificação
+            const comandaData = data as Comanda;
             toast.success(`Bem-vindo(a), ${comandaData.guestName}!`);
             setAuthenticated(comandaData);
 
         } catch (error: any) {
-            console.error("Authentication error:", error);
-            toast.error(error.message || "Código inválido ou expirado. Tente novamente.");
+            console.error("Authentication error:", error.message);
+            // Agora 'response' pode ser acessado aqui com segurança.
+            if (response?.status !== 410) {
+                 toast.error(error.message || "Código inválido. Tente novamente.");
+            }
         } finally {
             setIsLoading(false);
         }
@@ -49,15 +62,15 @@ export function StepAuthAndConfirm() {
     useEffect(() => {
         const tokenFromUrl = searchParams.get('token');
         if (tokenFromUrl) {
-            setToken(tokenFromUrl);
-            authenticate(tokenFromUrl);
+            authenticate(tokenFromUrl.toUpperCase());
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
     
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        authenticate(token);
+        const fullToken = `F-${tokenPart.toUpperCase()}`;
+        authenticate(fullToken);
     };
 
     return (
@@ -65,23 +78,27 @@ export function StepAuthAndConfirm() {
             <CardHeader>
                 <CardTitle>Acesse seu Pedido</CardTitle>
                 <CardDescription>
-                    Use o código de acesso (comanda) que você recebeu no check-in para começar.
+                    Digite os 4 caracteres da sua comanda (ex: A1B2) que você recebeu no check-in.
                 </CardDescription>
             </CardHeader>
             <form onSubmit={handleSubmit}>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="token">Código de Acesso</Label>
-                        <Input 
-                            id="token" 
-                            name="token"
-                            value={token}
-                            onChange={(e) => setToken(e.target.value.toUpperCase())}
-                            placeholder="Ex: PRAIA7"
-                            className="text-center text-lg tracking-widest"
-                            required
-                            disabled={isLoading}
-                        />
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl font-mono p-2 bg-stone-200 border border-stone-300 rounded-l-md h-10 flex items-center">F-</span>
+                            <Input 
+                                id="token" 
+                                name="token"
+                                value={tokenPart}
+                                onChange={(e) => setTokenPart(e.target.value.toUpperCase())}
+                                placeholder="A1B2"
+                                maxLength={4}
+                                className="text-center text-lg tracking-widest rounded-l-none"
+                                required
+                                disabled={isLoading}
+                            />
+                        </div>
                     </div>
                     <Button type="submit" className="w-full" disabled={isLoading}>
                         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <KeyRound className="mr-2 h-4 w-4" />}

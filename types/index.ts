@@ -51,8 +51,7 @@ export interface AppConfig {
   logoUrl?: string;
   nomeFazenda: string;
   subtitulo: string;
-  textoIntroducao: string;
-  textoAgradecimento: string;
+  textoBoasVindas: string;
   corFundo: string;
   corTexto: string;
   corDestaque: string;
@@ -70,6 +69,8 @@ export interface Comanda {
   isActive: boolean;
   createdAt: Timestamp;
   usedAt?: Timestamp;
+  horarioLimite?: Timestamp; // NOVO
+  mensagemAtraso?: string;   // NOVO
 }
 
 export interface OrderState {

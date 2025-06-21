@@ -10,7 +10,6 @@ import { GuestAccordion } from "@/components/guest-accordion";
 import { OrderSidebar } from "@/components/order-sidebar";
 import { StepDetails } from "@/components/step-details";
 import { StepAccompaniments } from "@/components/step-accompaniments";
-// import { StepWelcome } from "@/components/step-welcome"; // REMOVIDO: Não é mais usado
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +18,8 @@ import { StepReview } from "@/components/step-review";
 import { StepSuccess } from "@/components/step-success";
 import { Toaster } from "sonner";
 import { StepAuthAndConfirm } from "@/components/step-auth-and-confirm";
-import { StepConfirm } from "@/components/StepConfirm"; // NOVO: Importa o novo componente
+import { StepConfirm } from "@/components/step-confirm";
+import { StepWelcomeMessage } from "@/components/step-welcome-message";
 
 export default function Home() {
   const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData();
@@ -102,20 +102,25 @@ export default function Home() {
             {/* ETAPA 0: AUTENTICAÇÃO */}
             {currentStep === 0 && !isAuthenticated && <StepAuthAndConfirm />}
             
-            {/* ETAPA 1: CONFIRMAÇÃO (NOVA) */}
+            {/* ETAPA 1: CONFIRMAÇÃO */}
             {isAuthenticated && currentStep === 1 && !orderSubmitted && (
               <StepConfirm deliveryTimes={deliveryTimes} />
             )}
 
-            {/* ETAPA 2: DETALHES (somente se precisar corrigir) */}
+            {/* ETAPA 2: MENSAGEM DE BOAS-VINDAS */}
             {isAuthenticated && currentStep === 2 && !orderSubmitted && (
+                <StepWelcomeMessage config={appConfig} />
+            )}
+
+            {/* ETAPA 99: DETALHES (para correção) */}
+            {isAuthenticated && currentStep === 99 && !orderSubmitted && (
               <StepDetails
                 orderState={orderState}
                 cabins={cabins}
                 deliveryTimes={deliveryTimes}
                 onUpdateOrderState={(updates) => updateGuestInfo(updates.guestInfo || {})}
-                onNext={() => setStep(3)} // Após corrigir, vai para a próxima etapa
-                onBack={() => setStep(1)} // Volta para a confirmação
+                onNext={() => setStep(3)}
+                onBack={() => setStep(1)}
               />
             )}
 
@@ -158,8 +163,7 @@ export default function Home() {
                       />
                     </div>
                     <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0">
-                      {/* O botão voltar agora pode levar para a etapa 1 ou 2 */}
-                      <Button variant="outline" onClick={() => setStep(guestInfo.time ? 1 : 2)}>← Voltar</Button>
+                      <Button variant="outline" onClick={() => setStep(2)}>← Voltar</Button>
                       <Button onClick={() => setStep(4)} className="text-primary-foreground hover:opacity-90" style={{ backgroundColor: appConfig.corDestaque }}>Próximo →</Button>
                     </div>
                   </div>

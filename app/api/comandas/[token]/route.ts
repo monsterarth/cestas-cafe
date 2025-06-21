@@ -1,7 +1,7 @@
 // Arquivo: app/api/comandas/[token]/route.ts
 import { NextResponse } from 'next/server';
 import { getFirebaseDb } from '@/lib/firebase';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, Timestamp } from 'firebase/firestore';
 import { Comanda } from '@/types';
 
 export async function GET(request: Request, { params }: { params: { token: string } }) {
@@ -33,6 +33,20 @@ export async function GET(request: Request, { params }: { params: { token: strin
         
         const comandaDoc = querySnapshot.docs[0];
         const comandaData = { id: comandaDoc.id, ...comandaDoc.data() } as Comanda;
+
+        // Lógica de verificação do horário limite
+        if (comandaData.horarioLimite) {
+            const limite = (comandaData.horarioLimite as Timestamp).toDate();
+            const agora = new Date();
+
+            if (agora > limite) {
+                // Retorna um status específico e a mensagem de atraso
+                return NextResponse.json({ 
+                    expired: true, 
+                    message: comandaData.mensagemAtraso || "O prazo para fazer o pedido com esta comanda já encerrou."
+                }, { status: 410 }); // 410 Gone
+            }
+        }
 
         return NextResponse.json(comandaData, { status: 200 });
 
