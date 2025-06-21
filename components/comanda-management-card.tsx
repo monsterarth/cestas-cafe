@@ -11,10 +11,11 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ComandaThermalReceipt } from './comanda-thermal-receipt';
 import { toast } from 'sonner';
-import { Loader2, Archive, Save, AlertTriangle, CircleCheck, CircleX } from 'lucide-react';
+import { Loader2, Archive, Save, AlertTriangle, CircleCheck, CircleX, Printer } from 'lucide-react';
 import { format } from 'date-fns';
+import { usePrint } from '@/hooks/use-print';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-// A interface foi movida para este arquivo também
 interface ComandaFromAPI extends Omit<Comanda, 'createdAt' | 'horarioLimite' | 'usedAt'> {
     createdAt: string;
     horarioLimite?: string | null;
@@ -39,6 +40,7 @@ export function ComandaManagementCard({ comandaData, onUpdate }: ComandaManageme
     );
     const [mensagemAtraso, setMensagemAtraso] = useState(comandaDate.mensagemAtraso || '');
     const [isSaving, setIsSaving] = useState(false);
+    const { printComponent, isPrinting } = usePrint();
 
     const handleUpdate = async (updates: { [key: string]: any }) => {
         setIsSaving(true);
@@ -74,6 +76,10 @@ export function ComandaManagementCard({ comandaData, onUpdate }: ComandaManageme
         setIsActive(checked);
         handleUpdate({ isActive: checked });
     }
+
+    const handlePrint = () => {
+        printComponent(<ComandaThermalReceipt comanda={receiptComanda as Comanda} />);
+    };
 
     const isExpired = comandaDate.horarioLimite ? comandaDate.horarioLimite < new Date() : false;
     
@@ -133,13 +139,26 @@ export function ComandaManagementCard({ comandaData, onUpdate }: ComandaManageme
                 </div>
             </CardContent>
             <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={handleArchive} disabled={isSaving}>
-                    <Archive className="mr-2 h-4 w-4" /> Arquivar
-                </Button>
-                <Button onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Salvar
-                </Button>
+                <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={handlePrint} disabled={isPrinting}>
+                                {isPrinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Imprimir Comanda</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleArchive} disabled={isSaving}>
+                        <Archive className="mr-2 h-4 w-4" /> Arquivar
+                    </Button>
+                    <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Salvar
+                    </Button>
+                </div>
             </CardFooter>
         </Card>
     );

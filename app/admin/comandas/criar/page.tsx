@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import ReactDOM from 'react-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,23 +12,16 @@ import { Comanda, Cabin } from '@/types';
 import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { usePrint } from '@/hooks/use-print';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function CriarComandaPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [generatedComanda, setGeneratedComanda] = useState<Comanda | null>(null);
     const [cabanas, setCabanas] = useState<Cabin[]>([]);
-    const [printContainer, setPrintContainer] = useState<HTMLElement | null>(null);
+    const { printComponent, isPrinting } = usePrint();
 
     useEffect(() => {
-        let container = document.getElementById('print-container-portal');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'print-container-portal';
-            container.className = 'printable-area';
-            document.body.appendChild(container);
-        }
-        setPrintContainer(container);
-
         const fetchCabanas = async () => {
             try {
                 const res = await fetch('/api/cabanas');
@@ -41,18 +33,11 @@ export default function CriarComandaPage() {
             }
         };
         fetchCabanas();
-        
-        return () => {
-            if(container?.parentNode) {
-                container.parentNode.removeChild(container);
-            }
-        }
     }, []);
 
     const handleGenerateComanda = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setIsLoading(true);
-        
         const formData = new FormData(e.currentTarget);
         const data = {
             guestName: formData.get('guestName') as string,
@@ -76,7 +61,6 @@ export default function CriarComandaPage() {
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
-
             setGeneratedComanda(result);
             toast.success(`Comanda ${result.token} gerada com sucesso!`);
         } catch (error: any) {
@@ -86,7 +70,11 @@ export default function CriarComandaPage() {
         }
     };
 
-    const handlePrint = () => window.print();
+    const handlePrint = () => {
+        if (!generatedComanda) return;
+        printComponent(<ComandaThermalReceipt comanda={generatedComanda} />);
+    };
+
     const resetForm = () => setGeneratedComanda(null);
 
     return (
@@ -95,13 +83,11 @@ export default function CriarComandaPage() {
                 <CardHeader>
                     <CardTitle>Gerador de Comandas</CardTitle>
                     <CardDescription>
-                        {generatedComanda 
-                            ? "Comanda gerada. Imprima ou gere uma nova." 
-                            : "Preencha os dados para criar uma comanda de acesso."}
+                        {generatedComanda ? "Comanda gerada. Imprima ou gere uma nova." : "Preencha os dados para criar uma comanda de acesso."}
                     </CardDescription>
                 </CardHeader>
                 {!generatedComanda ? (
-                    <form onSubmit={handleGenerateComanda}>
+                    <form id="comanda-form" onSubmit={handleGenerateComanda}>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="guestName">Nome do Hóspede</Label>
@@ -111,15 +97,10 @@ export default function CriarComandaPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="cabin">Cabana / Quarto</Label>
                                     <Select name="cabin" required>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Selecione..." />
-                                        </SelectTrigger>
+                                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                                         <SelectContent>
-                                            {/* CORREÇÃO AQUI */}
                                             {cabanas.length === 0 && <div className="p-2 text-sm text-muted-foreground">Carregando...</div>}
-                                            {cabanas.map(c => (
-                                                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                                            ))}
+                                            {cabanas.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -134,42 +115,40 @@ export default function CriarComandaPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="mensagemAtraso">Mensagem para Pedidos Atrasados (Opcional)</Label>
-                                <Textarea 
-                                    id="mensagemAtraso" 
-                                    name="mensagemAtraso" 
-                                    placeholder="Ex: Opa! O limite para pedidos era até 20h..."
-                                />
+                                <Textarea id="mensagemAtraso" name="mensagemAtraso" placeholder="Ex: Opa! O limite para pedidos era até 20h..." />
                             </div>
                         </CardContent>
                         <CardFooter>
-                            <Button type="submit" disabled={isLoading}>
+                             <Button type="submit" form="comanda-form" disabled={isLoading}>
                                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ticket className="mr-2 h-4 w-4" />}
                                 Gerar Comanda
                             </Button>
                         </CardFooter>
                     </form>
                 ) : (
-                    <>
-                        <CardContent>
-                            <p className="text-center text-green-700 font-semibold">Comanda gerada com sucesso!</p>
-                        </CardContent>
-                        <CardFooter className="flex-col sm:flex-row gap-2">
-                           <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4" />Imprimir Comanda</Button>
-                           <Button variant="outline" onClick={resetForm}><RotateCcw className="mr-2 h-4 w-4" />Gerar Nova</Button>
-                        </CardFooter>
-                    </>
+                    <CardFooter className="flex justify-between items-center">
+                        <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="outline" size="icon" onClick={handlePrint} disabled={isPrinting}>
+                                        {isPrinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Imprimir em Impressora Térmica</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                       <Button variant="secondary" onClick={resetForm}>Criar Nova</Button>
+                    </CardFooter>
                 )}
             </Card>
             <div>
                 <h3 className="text-lg font-semibold mb-2 text-muted-foreground">Pré-visualização</h3>
                 <Card className="p-2 bg-gray-200">
-                    {generatedComanda ? <ComandaThermalReceipt comanda={generatedComanda} /> : <div className="text-center py-20 text-gray-500">Aguardando geração da comanda...</div>}
+                    <div>
+                        {generatedComanda ? <ComandaThermalReceipt comanda={generatedComanda} /> : <div className="text-center py-20 text-gray-500">Aguardando geração da comanda...</div>}
+                    </div>
                 </Card>
             </div>
-            {printContainer && generatedComanda && ReactDOM.createPortal(
-                <ComandaThermalReceipt comanda={generatedComanda} />,
-                printContainer
-            )}
         </div>
     );
 }

@@ -38,7 +38,7 @@
     --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 210 40% 96.1%;
     --muted-foreground: 215 20.2% 65.1%;
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
@@ -59,31 +59,18 @@
   }
 }
 
-/* --- ESTILOS DE IMPRESSÃO REVISADOS --- */
-
-/* Por padrão, o container de impressão fica totalmente oculto */
-#print-container, .printable-area {
-  display: none;
-}
-
+/* --- ESTILOS DE IMPRESSÃO FINAIS --- */
 @media print {
-  /* 1. Esconde tudo que não é para imprimir */
-  body > *:not(.printable-area) {
-    display: none !important;
+  body * {
+    visibility: hidden;
   }
-
-  /* 2. Mostra o container de impressão e garante que ele seja o único elemento visível */
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
   .printable-area {
-    display: block !important;
     position: absolute;
-    top: 0;
     left: 0;
+    top: 0;
     width: 100%;
-  }
-  
-  /* 3. Garante que todo o corpo da página não tenha preenchimento/margem extra */
-  body {
-    padding: 0 !important;
-    margin: 0 !important;
   }
 }

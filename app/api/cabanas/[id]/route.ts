@@ -1,6 +1,6 @@
 // Arquivo: app/api/cabanas/[id]/route.ts
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin'; // <-- MUDANÇA IMPORTANTE
+import { adminDb } from '@/lib/firebase-admin'; // <-- Usa o Admin SDK
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
     const id = params.id;
@@ -12,8 +12,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         return NextResponse.json({ message: 'Cabana atualizada com sucesso.' }, { status: 200 });
 
     } catch (error: any) {
-        console.error(`Erro ao atualizar cabana ${id}:`, error);
-        return NextResponse.json({ message: "Erro interno do servidor." }, { status: 500 });
+        return NextResponse.json({ message: error.message }, { status: 500 });
     }
 }
 
@@ -26,7 +25,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
         return NextResponse.json({ message: 'Cabana deletada com sucesso.' }, { status: 200 });
 
     } catch (error: any) {
-        console.error(`Erro ao deletar cabana ${id}:`, error);
-        return NextResponse.json({ message: "Erro interno do servidor." }, { status: 500 });
+        return NextResponse.json({ message: error.message }, { status: 500 });
     }
 }
