@@ -12,11 +12,10 @@ import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase';
 import Link from 'next/link';
 
-// Interface para os dados recebidos da API
 interface DashboardData {
     totalCestas: number;
     totalPessoas: number;
-    comandasDoDia: Comanda[]; // Usamos o tipo Comanda, mas os Timestamps virão como strings
+    comandasDoDia: Comanda[];
     alertas: string[];
 }
 
@@ -40,7 +39,6 @@ export default function DashboardPage() {
                 
                 const dashboardData = await dashboardRes.json();
                 
-                // Converte as datas de string de volta para objetos Timestamp para o componente de recibo
                 dashboardData.comandasDoDia.forEach((comanda: any) => {
                     comanda.createdAt = Timestamp.fromDate(new Date(comanda.createdAt));
                     if (comanda.horarioLimite) {
@@ -70,7 +68,8 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-8">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Seção de Resumo - AGORA RESPONSIVA */}
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Cestas para Hoje</CardTitle>
@@ -78,7 +77,7 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{data?.totalCestas ?? 0}</div>
-                        <p className="text-xs text-muted-foreground">Pedidos com status "Novo" ou "Em Preparação"</p>
+                        <p className="text-xs text-muted-foreground">Pedidos "Novo" ou "Em Preparação"</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -91,7 +90,7 @@ export default function DashboardPage() {
                         <p className="text-xs text-muted-foreground">Com base nos pedidos do dia</p>
                     </CardContent>
                 </Card>
-                 <Card className="col-span-1 md:col-span-2 bg-blue-50 border-blue-200">
+                 <Card className="col-span-1 sm:col-span-2 bg-blue-50 border-blue-200">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-blue-800">Mensagem do Dia</CardTitle>
                         <Megaphone className="h-4 w-4 text-blue-600" />
@@ -102,7 +101,8 @@ export default function DashboardPage() {
                 </Card>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            {/* Seção de Comandas e Alertas - AGORA RESPONSIVA */}
+            <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
                 <Card className="lg:col-span-4">
                     <CardHeader>
                         <CardTitle>Comandas Recentes do Dia</CardTitle>
@@ -112,7 +112,7 @@ export default function DashboardPage() {
                             <Carousel opts={{ align: "start", loop: false }} className="w-full">
                                 <CarouselContent className="-ml-4">
                                     {data.comandasDoDia.map((comanda) => (
-                                        <CarouselItem key={comanda.id} className="pl-4 md:basis-1/2 lg:basis-1/3">
+                                        <CarouselItem key={comanda.id} className="pl-4 md:basis-1/2 lg:basis-full xl:basis-1/2">
                                             <div className="p-1">
                                                 <ComandaThermalReceipt comanda={comanda} />
                                             </div>

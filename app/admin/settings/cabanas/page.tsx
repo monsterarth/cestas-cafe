@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, PlusCircle, Trash, Edit } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 function CabinForm({ cabin, onSave, children }: { cabin?: Cabin, onSave: () => void, children: React.ReactNode }) {
     const [name, setName] = useState(cabin?.name || '');
@@ -51,7 +51,6 @@ function CabinForm({ cabin, onSave, children }: { cabin?: Cabin, onSave: () => v
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{cabin ? 'Editar Cabana' : 'Adicionar Nova Cabana'}</DialogTitle>
-                    {/* CORREÇÃO: Adicionada a descrição para acessibilidade */}
                     <DialogDescription>
                         Preencha os detalhes da acomodação. Clique em salvar para aplicar as mudanças.
                     </DialogDescription>
@@ -90,7 +89,6 @@ export default function CabanasSettingsPage() {
                  throw new Error(errorData.message || "Falha ao carregar cabanas");
             }
             const data: Cabin[] = await res.json();
-            // CORREÇÃO: Ordenação movida para o frontend
             data.sort((a, b) => a.name.localeCompare(b.name));
             setCabanas(data);
         } catch (error: any) {
@@ -121,7 +119,7 @@ export default function CabanasSettingsPage() {
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold">Gerenciar Cabanas</h1>
                     <p className="text-muted-foreground">Adicione, edite ou remova as acomodações disponíveis.</p>
@@ -131,46 +129,51 @@ export default function CabanasSettingsPage() {
                 </CabinForm>
             </div>
             <Card>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Nome</TableHead>
-                            <TableHead>Capacidade</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {cabanas.map(cabin => (
-                            <TableRow key={cabin.id}>
-                                <TableCell className="font-medium">{cabin.name}</TableCell>
-                                <TableCell>{cabin.capacity} pessoas</TableCell>
-                                <TableCell className="text-right space-x-2">
-                                    <CabinForm cabin={cabin} onSave={fetchCabanas}>
-                                        <Button variant="outline" size="sm"><Edit className="h-4 w-4"/></Button>
-                                    </CabinForm>
-                                    
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="destructive" size="sm"><Trash className="h-4 w-4"/></Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Esta ação não pode ser desfeita e removerá permanentemente a cabana.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDelete(cabin.id)}>Deletar</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Nome</TableHead>
+                                    <TableHead>Capacidade</TableHead>
+                                    <TableHead className="text-right pr-6">Ações</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {cabanas.map(cabin => (
+                                    <TableRow key={cabin.id}>
+                                        <TableCell className="font-medium">{cabin.name}</TableCell>
+                                        <TableCell>{cabin.capacity} pessoas</TableCell>
+                                        <TableCell className="text-right pr-6">
+                                          <div className="flex gap-2 justify-end">
+                                            <CabinForm cabin={cabin} onSave={fetchCabanas}>
+                                                <Button variant="outline" size="sm"><Edit className="h-4 w-4"/></Button>
+                                            </CabinForm>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="destructive" size="sm"><Trash className="h-4 w-4"/></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Esta ação não pode ser desfeita e removerá permanentemente a cabana.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDelete(cabin.id)}>Deletar</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                          </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
             </Card>
         </div>
     );

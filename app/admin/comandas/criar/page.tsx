@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Ticket, Printer, RotateCcw } from 'lucide-react';
+import { Loader2, Ticket, Printer, RotateCcw, FileDown } from 'lucide-react';
 import { Comanda, Cabin } from '@/types';
 import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
 import { toast } from 'sonner';
@@ -93,7 +93,7 @@ export default function CriarComandaPage() {
                                 <Label htmlFor="guestName">Nome do Hóspede</Label>
                                 <Input id="guestName" name="guestName" placeholder="Ex: João da Silva" required />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="cabin">Cabana / Quarto</Label>
                                     <Select name="cabin" required>
@@ -144,7 +144,7 @@ export default function CriarComandaPage() {
             <div>
                 <h3 className="text-lg font-semibold mb-2 text-muted-foreground">Pré-visualização</h3>
                 <Card className="p-2 bg-gray-200">
-                    <div>
+                    <div id="comanda-preview-area">
                         {generatedComanda ? <ComandaThermalReceipt comanda={generatedComanda} /> : <div className="text-center py-20 text-gray-500">Aguardando geração da comanda...</div>}
                     </div>
                 </Card>
