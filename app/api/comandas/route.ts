@@ -13,7 +13,6 @@ const generateToken = (): string => {
     return `F-${result}`;
 }
 
-// FUNÇÃO GET (NOVA) - Para listar comandas no painel de gerenciamento
 export async function GET() {
     try {
         const db = await getFirebaseDb();
@@ -22,8 +21,10 @@ export async function GET() {
         }
         
         const comandasRef = collection(db, 'comandas');
-        // Busca comandas que não estão arquivadas e ordena pelas mais recentes
-        const q = query(comandasRef, where('status', '!=', 'arquivada'), orderBy('status', 'asc'), orderBy('createdAt', 'desc'));
+        
+        // CORREÇÃO: Consulta simplificada para evitar a necessidade de um índice composto manual.
+        // Busca apenas comandas ativas e ordena pelas mais recentes.
+        const q = query(comandasRef, where('status', '==', 'ativa'), orderBy('createdAt', 'desc'));
 
         const querySnapshot = await getDocs(q);
         const comandas = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
@@ -35,7 +36,6 @@ export async function GET() {
         return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
     }
 }
-
 
 export async function POST(request: Request) {
     try {
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
             cabin,
             numberOfGuests: Number(numberOfGuests),
             isActive: true,
-            status: 'ativa', // Status inicial
+            status: 'ativa',
             createdAt: serverTimestamp(),
         };
 

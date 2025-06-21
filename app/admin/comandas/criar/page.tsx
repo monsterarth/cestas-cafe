@@ -1,4 +1,4 @@
-// Arquivo: app/admin/comandas/page.tsx
+// Arquivo: app/admin/comandas/criar/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,13 +9,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Ticket, Printer, RotateCcw } from 'lucide-react';
-import { Comanda } from '@/types';
+import { Comanda, Cabin } from '@/types';
 import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
 import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export default function ComandasPage() {
+export default function CriarComandaPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [generatedComanda, setGeneratedComanda] = useState<Comanda | null>(null);
+    const [cabanas, setCabanas] = useState<Cabin[]>([]);
     const [printContainer, setPrintContainer] = useState<HTMLElement | null>(null);
 
     useEffect(() => {
@@ -27,10 +29,21 @@ export default function ComandasPage() {
             document.body.appendChild(container);
         }
         setPrintContainer(container);
+
+        const fetchCabanas = async () => {
+            try {
+                const res = await fetch('/api/cabanas');
+                if (!res.ok) throw new Error("Falha ao buscar cabanas");
+                const data = await res.json();
+                setCabanas(data);
+            } catch (error: any) {
+                toast.error(error.message);
+            }
+        };
+        fetchCabanas();
         
-        // Cleanup function
         return () => {
-            if(container && container.parentNode) {
+            if(container?.parentNode) {
                 container.parentNode.removeChild(container);
             }
         }
@@ -61,31 +74,20 @@ export default function ComandasPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-
             const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || "Falha ao gerar comanda.");
-            }
+            if (!response.ok) throw new Error(result.message);
 
             setGeneratedComanda(result);
             toast.success(`Comanda ${result.token} gerada com sucesso!`);
-
         } catch (error: any) {
-            console.error(error);
             toast.error(error.message);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handlePrint = () => {
-        window.print();
-    };
-    
-    const resetForm = () => {
-        setGeneratedComanda(null);
-    }
+    const handlePrint = () => window.print();
+    const resetForm = () => setGeneratedComanda(null);
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
@@ -105,13 +107,26 @@ export default function ComandasPage() {
                                 <Label htmlFor="guestName">Nome do Hóspede</Label>
                                 <Input id="guestName" name="guestName" placeholder="Ex: João da Silva" required />
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="cabin">Cabana / Quarto</Label>
-                                <Input id="cabin" name="cabin" placeholder="Ex: Cabana 04" required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="numberOfGuests">Número de Hóspedes</Label>
-                                <Input id="numberOfGuests" name="numberOfGuests" type="number" min="1" max="10" required />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="cabin">Cabana / Quarto</Label>
+                                    <Select name="cabin" required>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecione..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {/* CORREÇÃO AQUI */}
+                                            {cabanas.length === 0 && <div className="p-2 text-sm text-muted-foreground">Carregando...</div>}
+                                            {cabanas.map(c => (
+                                                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="numberOfGuests">Nº de Hóspedes</Label>
+                                    <Input id="numberOfGuests" name="numberOfGuests" type="number" min="1" max="10" required />
+                                </div>
                             </div>
                             <div className="space-y-2 pt-4 border-t">
                                 <Label htmlFor="horarioLimite">Horário Limite para Pedido (Opcional)</Label>
@@ -122,7 +137,7 @@ export default function ComandasPage() {
                                 <Textarea 
                                     id="mensagemAtraso" 
                                     name="mensagemAtraso" 
-                                    placeholder="Ex: Opa! O limite para pedidos era até 20h. Mas não se preocupe..."
+                                    placeholder="Ex: Opa! O limite para pedidos era até 20h..."
                                 />
                             </div>
                         </CardContent>
@@ -145,14 +160,12 @@ export default function ComandasPage() {
                     </>
                 )}
             </Card>
-
             <div>
                 <h3 className="text-lg font-semibold mb-2 text-muted-foreground">Pré-visualização</h3>
                 <Card className="p-2 bg-gray-200">
                     {generatedComanda ? <ComandaThermalReceipt comanda={generatedComanda} /> : <div className="text-center py-20 text-gray-500">Aguardando geração da comanda...</div>}
                 </Card>
             </div>
-            
             {printContainer && generatedComanda && ReactDOM.createPortal(
                 <ComandaThermalReceipt comanda={generatedComanda} />,
                 printContainer

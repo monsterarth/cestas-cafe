@@ -20,6 +20,7 @@ import { Toaster } from "sonner";
 import { StepAuthAndConfirm } from "@/components/step-auth-and-confirm";
 import { StepConfirm } from "@/components/step-confirm";
 import { StepWelcomeMessage } from "@/components/step-welcome-message";
+import { Label } from "@/components/ui/label";
 
 export default function Home() {
   const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData();
@@ -99,20 +100,16 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
           <div className="lg:col-span-2">
 
-            {/* ETAPA 0: AUTENTICAÇÃO */}
             {currentStep === 0 && !isAuthenticated && <StepAuthAndConfirm />}
             
-            {/* ETAPA 1: CONFIRMAÇÃO */}
             {isAuthenticated && currentStep === 1 && !orderSubmitted && (
               <StepConfirm deliveryTimes={deliveryTimes} />
             )}
 
-            {/* ETAPA 2: MENSAGEM DE BOAS-VINDAS */}
             {isAuthenticated && currentStep === 2 && !orderSubmitted && (
                 <StepWelcomeMessage config={appConfig} />
             )}
 
-            {/* ETAPA 99: DETALHES (para correção) */}
             {isAuthenticated && currentStep === 99 && !orderSubmitted && (
               <StepDetails
                 orderState={orderState}
@@ -124,7 +121,6 @@ export default function Home() {
               />
             )}
 
-            {/* ETAPA 3: PRATOS QUENTES */}
             {isAuthenticated && currentStep === 3 && !orderSubmitted && (
               <div className="shadow-lg border-0 rounded-lg overflow-hidden bg-card">
                 <div className="text-primary-foreground p-4 md:p-6" style={{ backgroundColor: appConfig.corDestaque }}>
@@ -133,7 +129,7 @@ export default function Home() {
                     <div>
                       <h1 className="text-xl md:text-2xl font-bold">Escolha dos Pratos Quentes</h1>
                       <p className="opacity-90 mt-1 text-sm md:text-base">
-                        Cada hóspede deve escolher <strong>1 prato quente</strong>. Toque no nome para ver as opções.
+                        Cada hóspede deve escolher <strong>1 prato quente</strong>.
                       </p>
                     </div>
                   </div>
@@ -150,12 +146,12 @@ export default function Home() {
 
                   <div className="pt-6 md:pt-8 border-t">
                     <div className="space-y-3 mb-6">
-                      <label className="text-base md:text-lg font-bold flex items-center gap-2">
+                      <Label className="text-base md:text-lg font-bold flex items-center gap-2">
                         <MessageCircle className="w-4 h-4 md:w-5 md:h-5" style={{ color: appConfig.corDestaque }} />
                         Observações Gerais para Pratos Quentes
-                      </label>
+                      </Label>
                       <Textarea
-                        placeholder="Observações que se aplicam a todos os pratos quentes (ex: sem cebola, alergias, preferências...)"
+                        placeholder="Ex: sem cebola, alergias, preferências..."
                         value={globalHotDishNotes}
                         onChange={(e) => handleNotesChange(e.target.value)}
                         className="resize-none"
@@ -171,7 +167,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* ETAPA 4: ACOMPANHAMENTOS */}
             {isAuthenticated && currentStep === 4 && !orderSubmitted && (
               <StepAccompaniments
                 orderState={orderState}
@@ -182,7 +177,6 @@ export default function Home() {
               />
             )}
             
-            {/* ETAPA 5: REVISÃO */}
             {isAuthenticated && currentStep === 5 && !orderSubmitted && (
               <StepReview
                 orderState={orderState}

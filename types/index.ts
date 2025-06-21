@@ -1,6 +1,7 @@
 // Arquivo: types/index.ts
 import { Timestamp } from "firebase/firestore";
 
+// --- Tipos de Dados do Cardápio ---
 export interface HotDish {
   id: string;
   nomeItem: string;
@@ -18,20 +19,6 @@ export interface Flavor {
   posicao: number;
 }
 
-export interface Person {
-  id: number;
-  hotDish: {
-    typeId: string;
-    flavorId: string;
-  } | null;
-  notes?: string;
-}
-
-export interface Cabin {
-  name: string;
-  capacity: number;
-}
-
 export interface AccompanimentCategory {
   id: string;
   name: string;
@@ -46,23 +33,40 @@ export interface AccompanimentItem {
   descricaoPorcao?: string;
 }
 
-// MUDANÇA: Removidos campos obsoletos
+// --- Tipos de Configuração (Refatorado) ---
 export interface AppConfig {
+  // Aparência
   logoUrl?: string;
   nomeFazenda: string;
-  textoAgradecimento: string;
   corFundo: string;
   corTexto: string;
   corDestaque: string;
   corDestaqueTexto: string;
   corCartao: string;
+  // Mensagens
   textoBoasVindas?: string;
-  mensagensMotivacionais?: string[];
-  subtitulo?: string;
-  textoIntroducao?: string;
+  textoAgradecimento: string;
+  mensagemAtrasoPadrao?: string;
+  mensagemDoDia?: string;
 }
 
-// MUDANÇA: Adicionado campo de status
+export interface Cabin {
+  id: string;
+  name: string;
+  capacity: number;
+  posicao?: number;
+}
+
+// --- Tipos de Pedidos e Comandas ---
+export interface Person {
+  id: number;
+  hotDish: {
+    typeId: string;
+    flavorId: string;
+  } | null;
+  notes?: string;
+}
+
 export interface Comanda {
   id: string;
   guestName: string;
@@ -70,7 +74,7 @@ export interface Comanda {
   numberOfGuests: number;
   token: string;
   isActive: boolean;
-  status?: 'ativa' | 'arquivada'; // NOVO
+  status?: 'ativa' | 'arquivada';
   createdAt: Timestamp;
   usedAt?: Timestamp;
   horarioLimite?: Timestamp;
