@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getFirebaseDb } from '@/lib/firebase';
 import { collection, addDoc, getDocs, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
 import { Comanda } from '@/types';
+import { adminDb } from '@/lib/firebase-admin';
 
 const generateToken = (): string => {
     const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ0123456789';
@@ -13,21 +14,18 @@ const generateToken = (): string => {
     return `F-${result}`;
 }
 
+// Para o painel de gerenciamento
 export async function GET() {
     try {
-        const db = await getFirebaseDb();
-        if (!db) {
-            return NextResponse.json({ message: 'Conexão com banco de dados falhou.' }, { status: 500 });
-        }
+        // Usa o Admin SDK para ter acesso privilegiado
+        const comandasRef = adminDb.collection('comandas');
         
-        const comandasRef = collection(db, 'comandas');
-        
-        // CORREÇÃO: Consulta simplificada para evitar a necessidade de um índice composto manual.
-        // Busca apenas comandas ativas e ordena pelas mais recentes.
-        const q = query(comandasRef, where('status', '==', 'ativa'), orderBy('createdAt', 'desc'));
+        // CORREÇÃO: Consulta ultra simplificada para garantir que funcione sem índices manuais.
+        // Apenas ordena pelas mais recentes. O filtro de "status" será feito no frontend.
+        const q = comandasRef.orderBy('createdAt', 'desc');
 
-        const querySnapshot = await getDocs(q);
-        const comandas = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
+        const snapshot = await q.get();
+        const comandas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
 
         return NextResponse.json(comandas, { status: 200 });
 
@@ -37,13 +35,9 @@ export async function GET() {
     }
 }
 
+// Para a página de criar comanda
 export async function POST(request: Request) {
     try {
-        const db = await getFirebaseDb();
-        if (!db) {
-            return NextResponse.json({ message: 'Conexão com banco de dados falhou.' }, { status: 500 });
-        }
-
         const { guestName, cabin, numberOfGuests, horarioLimite, mensagemAtraso } = await request.json();
 
         if (!guestName || !cabin || !numberOfGuests) {
@@ -69,7 +63,7 @@ export async function POST(request: Request) {
             comandaData.mensagemAtraso = mensagemAtraso;
         }
 
-        const docRef = await addDoc(collection(db, 'comandas'), comandaData);
+        const docRef = await adminDb.collection('comandas').add(comandaData);
 
         return NextResponse.json({ id: docRef.id, ...comandaData }, { status: 201 });
 

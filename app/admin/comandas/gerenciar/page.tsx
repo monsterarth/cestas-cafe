@@ -1,7 +1,7 @@
 // Arquivo: app/admin/comandas/gerenciar/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react'; // Adicionado useMemo
 import { Comanda } from '@/types';
 import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Loader2, Archive, Save, AlertTriangle, CircleCheck, CircleX } from 'lucide-react';
 import { format } from 'date-fns';
-import { Timestamp } from 'firebase/firestore'; // NOVO: Importa o tipo Timestamp
+import { Timestamp } from 'firebase/firestore';
 
 function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpdate: () => void }) {
     const [isActive, setIsActive] = useState(comanda.isActive);
@@ -46,15 +46,12 @@ function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpda
     };
     
     const handleSave = () => {
-        // CORREÇÃO: Converte o objeto Date para um Timestamp do Firestore antes de enviar
         const updatePayload: Partial<Comanda> = {
             mensagemAtraso: mensagemAtraso
         };
-
         if (horarioLimite) {
             updatePayload.horarioLimite = Timestamp.fromDate(new Date(horarioLimite));
         }
-
         handleUpdate(updatePayload);
     };
 
@@ -127,7 +124,6 @@ function ComandaManagementCard({ comanda, onUpdate }: { comanda: Comanda, onUpda
     );
 }
 
-
 export default function GerenciarComandasPage() {
     const [comandas, setComandas] = useState<Comanda[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -150,6 +146,11 @@ export default function GerenciarComandasPage() {
         fetchComandas();
     }, []);
 
+    // CORREÇÃO: Filtra as comandas no frontend para não mostrar as arquivadas.
+    const comandasVisiveis = useMemo(() => {
+        return comandas.filter(c => c.status !== 'arquivada');
+    }, [comandas]);
+
     if (isLoading) {
         return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
@@ -160,11 +161,11 @@ export default function GerenciarComandasPage() {
                 <h1 className="text-3xl font-bold">Gerenciamento de Comandas</h1>
                 <p className="text-muted-foreground">Visualize, edite e arquive as comandas geradas.</p>
             </div>
-            {comandas.length === 0 ? (
+            {comandasVisiveis.length === 0 ? (
                 <p>Nenhuma comanda ativa encontrada.</p>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {comandas.map(comanda => (
+                    {comandasVisiveis.map(comanda => (
                         <ComandaManagementCard key={comanda.id} comanda={comanda} onUpdate={fetchComandas} />
                     ))}
                 </div>
