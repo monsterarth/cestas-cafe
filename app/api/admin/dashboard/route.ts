@@ -3,14 +3,13 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase/firestore';
 import { startOfToday, endOfToday } from 'date-fns';
-import { Comanda } from '@/types'; // <-- CORREÇÃO: Importa o tipo Comanda
+import { Comanda } from '@/types';
 
 export async function GET() {
     try {
         const todayStart = startOfToday();
         const todayEnd = endOfToday();
 
-        // 1. Coletar pedidos de hoje
         const ordersQuery = adminDb.collection("orders")
             .where("timestampPedido", ">=", todayStart)
             .where("timestampPedido", "<=", todayEnd)
@@ -22,7 +21,6 @@ export async function GET() {
         const totalCestas = pedidosDoDia.length;
         const totalPessoas = pedidosDoDia.reduce((sum, order) => sum + (order.numeroPessoas || 0), 0);
 
-        // 2. Coletar comandas ativas criadas hoje
         const comandasQuery = adminDb.collection("comandas")
             .where("createdAt", ">=", todayStart)
             .where("createdAt", "<=", todayEnd)
@@ -31,10 +29,8 @@ export async function GET() {
             .limit(10);
             
         const comandasSnapshot = await comandasQuery.get();
-        // CORREÇÃO: Adiciona a tipagem explícita 'as Comanda[]' para guiar o TypeScript
         const comandasDoDia = comandasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
 
-        // 3. Coletar alertas
         const alertas: string[] = [];
         const agora = new Date();
         const umaHoraDepois = new Date(agora.getTime() + 60 * 60 * 1000);

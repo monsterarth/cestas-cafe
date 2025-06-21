@@ -20,8 +20,7 @@ export async function GET() {
 
         const snapshot = await q.get();
         const comandas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
-
-        // CORREÇÃO: Padroniza as datas para string antes de enviar para o cliente
+        
         const serializableComandas = comandas.map(comanda => ({
             ...comanda,
             createdAt: (comanda.createdAt as Timestamp).toDate().toISOString(),
@@ -54,10 +53,10 @@ export async function POST(request: Request) {
             numberOfGuests: Number(numberOfGuests),
             isActive: true,
             status: 'ativa',
-            createdAt: Timestamp.now(), // Usa Timestamp para consistência
+            createdAt: Timestamp.now(),
         };
 
-        if (horarioLimite) {
+        if (horarioLimite && horarioLimite !== '') {
             comandaData.horarioLimite = new Date(horarioLimite);
         }
         if (mensagemAtraso) {

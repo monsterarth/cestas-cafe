@@ -1,35 +1,15 @@
 // Arquivo: app/api/comandas/[identifier]/route.ts
 import { NextResponse } from 'next/server';
-import { getFirebaseDb } from '@/lib/firebase';
-import { collection, query, where, getDocs, limit, Timestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin';
+import { Timestamp, getDoc } from 'firebase/firestore';
 import { Comanda } from '@/types';
 
-/**
- * Lida com a validação de uma comanda por TOKEN.
- * Usado pelo hóspede para autenticar.
- */
 export async function GET(request: Request, { params }: { params: { identifier: string } }) {
-    const token = params.identifier; // Aqui, o identifier é o TOKEN
-
-    if (!token) {
-        return NextResponse.json({ message: 'Token não fornecido.' }, { status: 400 });
-    }
-
+    const token = params.identifier;
     try {
-        const db = await getFirebaseDb();
-        if (!db) {
-            return NextResponse.json({ message: 'Conexão com banco de dados falhou.' }, { status: 500 });
-        }
-
-        const comandasRef = collection(db, 'comandas');
-        const q = query(
-            comandasRef,
-            where('token', '==', token.toUpperCase()),
-            where('isActive', '==', true),
-            limit(1)
-        );
-
-        const querySnapshot = await getDocs(q);
+        const comandasRef = adminDb.collection('comandas');
+        const q = comandasRef.where('token', '==', token.toUpperCase()).where('isActive', '==', true).limit(1);
+        const querySnapshot = await q.get();
 
         if (querySnapshot.empty) {
             return NextResponse.json({ message: 'Comanda inválida ou já utilizada.' }, { status: 404 });
@@ -38,10 +18,9 @@ export async function GET(request: Request, { params }: { params: { identifier: 
         const comandaDoc = querySnapshot.docs[0];
         const comandaData = { id: comandaDoc.id, ...comandaDoc.data() } as Comanda;
 
-        if (comandaData.horarioLimite && comandaData.horarioLimite.seconds) {
+        if (comandaData.horarioLimite && (comandaData.horarioLimite as any).toDate) {
             const limite = (comandaData.horarioLimite as Timestamp).toDate();
             const agora = new Date();
-
             if (agora > limite) {
                 return NextResponse.json({ 
                     expired: true, 
@@ -51,45 +30,25 @@ export async function GET(request: Request, { params }: { params: { identifier: 
         }
 
         return NextResponse.json(comandaData, { status: 200 });
-
     } catch (error: any) {
-        console.error(`Erro ao validar comanda ${token}:`, error);
-        return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
+        return NextResponse.json({ message: `Erro interno do servidor ao validar token. ${error.message}` }, { status: 500 });
     }
 }
 
-/**
- * Lida com a atualização de uma comanda por ID.
- * Usado pelo painel de gerenciamento do admin.
- */
 export async function PATCH(request: Request, { params }: { params: { identifier: string } }) {
-    const id = params.identifier; // Aqui, o identifier é o ID do documento
-
-    if (!id) {
-        return NextResponse.json({ message: 'ID da comanda não fornecido.' }, { status: 400 });
-    }
-
+    const id = params.identifier;
     try {
-        const db = await getFirebaseDb();
-        if (!db) {
-            return NextResponse.json({ message: 'Conexão com banco de dados falhou.' }, { status: 500 });
-        }
-
         const updates = await request.json();
         
         if (updates.horarioLimite) {
             updates.horarioLimite = new Date(updates.horarioLimite);
         }
 
-        const comandaRef = doc(db, 'comandas', id);
-        await updateDoc(comandaRef, updates);
-
-        const updatedDoc = await getDoc(comandaRef);
+        const docRef = adminDb.collection('comandas').doc(id);
+        await docRef.update(updates);
         
-        return NextResponse.json({ id: updatedDoc.id, ...updatedDoc.data() } as Comanda, { status: 200 });
-
+        return NextResponse.json({ message: 'Comanda atualizada com sucesso.' }, { status: 200 });
     } catch (error: any) {
-        console.error(`Erro ao atualizar comanda ${id}:`, error);
-        return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
+        return NextResponse.json({ message: "Erro interno do servidor." }, { status: 500 });
     }
 }

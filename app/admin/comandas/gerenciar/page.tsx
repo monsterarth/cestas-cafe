@@ -34,11 +34,10 @@ function ComandaManagementCard({ comandaData, onUpdate }: { comandaData: Comanda
     const [mensagemAtraso, setMensagemAtraso] = useState(comandaDate.mensagemAtraso || '');
     const [isSaving, setIsSaving] = useState(false);
 
-    // CORREÇÃO: A tipagem de 'updates' foi simplificada para '{ [key: string]: any }'
-    // para resolver o conflito de tipo entre Date e Timestamp no lado do cliente.
     const handleUpdate = async (updates: { [key: string]: any }) => {
         setIsSaving(true);
         try {
+            // A chamada aqui usa o ID da comanda, que será o [identifier] na API
             const response = await fetch(`/api/comandas/${comandaDate.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -60,14 +59,10 @@ function ComandaManagementCard({ comandaData, onUpdate }: { comandaData: Comanda
     
     const handleSave = () => {
         const updatePayload: { [key: string]: any } = {
-            mensagemAtraso: mensagemAtraso
+            mensagemAtraso: mensagemAtraso,
+            // Permite limpar o horário se o campo estiver vazio
+            horarioLimite: horarioLimite ? new Date(horarioLimite) : null,
         };
-        // Enviamos um objeto Date, a API e o JSON.stringify cuidam da conversão.
-        if (horarioLimite) {
-            updatePayload.horarioLimite = new Date(horarioLimite);
-        } else {
-            updatePayload.horarioLimite = null; // Permite limpar o horário
-        }
         handleUpdate(updatePayload);
     };
 
@@ -82,7 +77,7 @@ function ComandaManagementCard({ comandaData, onUpdate }: { comandaData: Comanda
         ...comandaDate,
         createdAt: { toDate: () => comandaDate.createdAt } as any,
         horarioLimite: comandaDate.horarioLimite ? { toDate: () => comandaDate.horarioLimite } as any : undefined,
-    };
+    }
 
     return (
         <Card className="flex flex-col">
