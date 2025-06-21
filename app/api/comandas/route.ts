@@ -3,15 +3,7 @@ import { NextResponse } from 'next/server';
 import { Timestamp } from 'firebase/firestore';
 import { Comanda } from '@/types';
 import { adminDb } from '@/lib/firebase-admin';
-
-const generateToken = (): string => {
-    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 4; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return `F-${result}`;
-}
+import { FieldValue } from 'firebase-admin/firestore'; // <-- MUDANÇA: Importação correta para o Admin SDK
 
 export async function GET() {
     try {
@@ -53,7 +45,8 @@ export async function POST(request: Request) {
             numberOfGuests: Number(numberOfGuests),
             isActive: true,
             status: 'ativa',
-            createdAt: Timestamp.now(),
+            // CORREÇÃO: Usa o método correto do Admin SDK para gerar a data no servidor
+            createdAt: FieldValue.serverTimestamp(),
         };
 
         if (horarioLimite && horarioLimite !== '') {
@@ -71,4 +64,14 @@ export async function POST(request: Request) {
         console.error('Erro ao criar comanda:', error);
         return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
     }
+}
+
+// A função generateToken permanece a mesma
+function generateToken(): string {
+    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 4; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `F-${result}`;
 }
