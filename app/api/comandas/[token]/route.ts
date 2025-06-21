@@ -1,65 +1,43 @@
-import { getFirebaseDb } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { NextResponse } from "next/server";
+// Arquivo: app/api/comandas/[token]/route.ts
+import { NextResponse } from 'next/server';
+import { getFirebaseDb } from '@/lib/firebase';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { Comanda } from '@/types';
 
-// ===================================================================
-// FUNÇÃO DE TESTE GET
-// ===================================================================
-export async function GET(request: Request) {
-  // Esta função serve apenas para testar se a rota está acessível.
-  return NextResponse.json(
-    { 
-      status: "sucesso",
-      message: "A rota /api/comandas está no ar e respondendo a requisições GET!",
-      timestamp: new Date().toISOString()
-    },
-    { status: 200 }
-  );
-}
-// ===================================================================
+export async function GET(request: Request, { params }: { params: { token: string } }) {
+    const token = params.token;
 
-function generateToken(length = 5) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let token = '';
-  for (let i = 0; i < length; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
-}
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { guestName, cabin, numberOfGuests } = body;
-
-    if (!guestName || !cabin || !numberOfGuests) {
-      return NextResponse.json({ error: "Dados da comanda incompletos." }, { status: 400 });
-    }
-    
-    const db = await getFirebaseDb();
-    if (!db) {
-        throw new Error("Falha na conexão com o banco de dados.");
+    if (!token) {
+        return NextResponse.json({ message: 'Token não fornecido.' }, { status: 400 });
     }
 
-    const token = generateToken();
-    const newComandaData = {
-      token,
-      guestName,
-      cabin,
-      numberOfGuests: Number(numberOfGuests),
-      isActive: true,
-      createdAt: serverTimestamp(),
-    };
+    try {
+        const db = await getFirebaseDb();
+        if (!db) {
+            return NextResponse.json({ message: 'Conexão com banco de dados falhou.' }, { status: 500 });
+        }
 
-    const docRef = await addDoc(collection(db, "comandas"), newComandaData);
+        const comandasRef = collection(db, 'comandas');
+        const q = query(
+            comandasRef,
+            where('token', '==', token.toUpperCase()),
+            where('isActive', '==', true),
+            limit(1)
+        );
 
-    return NextResponse.json({ id: docRef.id, ...newComandaData }, { status: 201 });
+        const querySnapshot = await getDocs(q);
 
-  } catch (error) {
-    console.error("Erro interno na API /api/comandas [POST]:", error);
-    if (error instanceof Error) {
-        return NextResponse.json({ error: `Erro no servidor: ${error.message}` }, { status: 500 });
+        if (querySnapshot.empty) {
+            return NextResponse.json({ message: 'Comanda inválida ou já utilizada.' }, { status: 404 });
+        }
+        
+        const comandaDoc = querySnapshot.docs[0];
+        const comandaData = { id: comandaDoc.id, ...comandaDoc.data() } as Comanda;
+
+        return NextResponse.json(comandaData, { status: 200 });
+
+    } catch (error: any) {
+        console.error(`Erro ao validar comanda ${token}:`, error);
+        return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ error: "Ocorreu um erro interno desconhecido." }, { status: 500 });
-  }
 }

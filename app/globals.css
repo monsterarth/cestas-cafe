@@ -1,3 +1,4 @@
+/* Arquivo: app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -61,25 +62,25 @@
 /* --- ESTILOS DE IMPRESSÃO REVISADOS --- */
 
 /* Por padrão, o container de impressão fica totalmente oculto */
-#print-container {
+#print-container, .printable-area {
   display: none;
 }
 
 @media print {
-  /* 1. Esconde a raiz do layout do admin */
-  #admin-root {
+  /* 1. Esconde tudo que não é para imprimir */
+  body > *:not(.printable-area) {
     display: none !important;
   }
 
   /* 2. Mostra o container de impressão e garante que ele seja o único elemento visível */
-  #print-container {
+  .printable-area {
     display: block !important;
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
   }
-
+  
   /* 3. Garante que todo o corpo da página não tenha preenchimento/margem extra */
   body {
     padding: 0 !important;

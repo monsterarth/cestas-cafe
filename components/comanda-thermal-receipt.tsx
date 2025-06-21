@@ -1,60 +1,57 @@
 // Arquivo: components/comanda-thermal-receipt.tsx
+'use client';
+
 import { Comanda } from "@/types";
-import QRCode from "react-qr-code";
-import React from "react";
+import { QRCodeCanvas } from 'qrcode.react';
 
 interface ComandaThermalReceiptProps {
-  comanda: Comanda;
-  pousadaName?: string;
+    comanda: Comanda | null;
 }
 
-// Não precisa mais do React.forwardRef
-export function ComandaThermalReceipt({
-  comanda,
-  pousadaName = "Pousada Aconchego",
-}: ComandaThermalReceiptProps) {
-  // Verificação para garantir que window está disponível (evita erros no lado do servidor)
-  const orderUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/?token=${comanda.token}` 
-    : '';
+export function ComandaThermalReceipt({ comanda }: ComandaThermalReceiptProps) {
+    if (!comanda) return null;
 
-  return (
-    // A ref será colocada aqui pelo componente pai
-    <div className="w-[80mm] p-2 bg-white text-black font-mono text-sm">
-      <div className="text-center space-y-2">
-        <h1 className="text-lg font-bold">{pousadaName}</h1>
-        <p>Seu acesso para a Cesta de Café da Manhã</p>
-      </div>
+    const qrCodeUrl = `${window.location.origin}/?token=${comanda.token}`;
 
-      <hr className="my-3 border-dashed border-black" />
+    return (
+        <div 
+            className="p-4 font-mono text-black bg-white"
+            style={{ width: '80mm', boxSizing: 'border-box' }}
+        >
+            <div className="text-center mb-4">
+                <h1 className="text-lg font-bold">Fazenda do Rosa</h1>
+                <p className="text-xs">Sua Comanda de Café da Manhã</p>
+            </div>
 
-      <div className="space-y-1">
-        <p><strong>Hóspede:</strong> {comanda.guestName}</p>
-        <p><strong>Cabana:</strong> {comanda.cabin}</p>
-      </div>
+            <div className="text-sm space-y-1 mb-4">
+                <p><strong>Hóspede:</strong> {comanda.guestName}</p>
+                <p><strong>Cabana:</strong> {comanda.cabin}</p>
+                <p><strong>Pessoas:</strong> {comanda.numberOfGuests}</p>
+            </div>
+            
+            <div className="text-center my-4">
+                <p className="text-xs uppercase">Seu código de acesso:</p>
+                <p className="text-3xl font-bold tracking-widest bg-gray-200 p-2 rounded-md my-1">
+                    {comanda.token}
+                </p>
+            </div>
+            
+            <div className="flex flex-col items-center justify-center text-center my-4">
+                <QRCodeCanvas
+                    value={qrCodeUrl}
+                    size={128}
+                    bgColor={"#ffffff"}
+                    fgColor={"#000000"}
+                    level={"L"}
+                    includeMargin={false}
+                />
+                <p className="text-xs mt-2">Escaneie para iniciar o pedido</p>
+            </div>
 
-      <hr className="my-3 border-dashed border-black" />
-
-      <p className="text-center">Use o QR Code ou o código abaixo para iniciar seu pedido:</p>
-
-      <div className="flex justify-center my-4">
-        <div className="p-2 bg-white inline-block">
-          {/* Garante que o QR Code só renderize no cliente */}
-          {orderUrl && <QRCode value={orderUrl} size={160} />}
+            <div className="border-t border-dashed border-black pt-2 text-center text-xs">
+                <p>Apresente este ticket se necessário.</p>
+                <p>Bom apetite!</p>
+            </div>
         </div>
-      </div>
-
-      <div className="text-center">
-        <p>Seu código:</p>
-        <p className="text-3xl font-bold tracking-widest my-2 p-2 border border-black">
-          {comanda.token}
-        </p>
-      </div>
-
-      <hr className="my-3 border-dashed border-black" />
-      <p className="text-xs text-center">
-        Apresente esta comanda no café da manhã. Válido apenas durante a sua estadia.
-      </p>
-    </div>
-  );
+    );
 }

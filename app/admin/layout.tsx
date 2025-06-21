@@ -1,3 +1,4 @@
+// Arquivo: app/admin/layout.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
 
-  // Efeito para buscar as configurações do app
   useEffect(() => {
     const fetchConfig = async () => {
       try {
@@ -40,13 +40,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     fetchConfig();
   }, []);
 
-  // Efeito para verificar a autenticação do usuário
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const auth = await getFirebaseAuth();
         if (!auth) {
-          // Se o Firebase Auth não inicializar, redireciona para login
           if (pathname !== "/admin/login") router.push("/admin/login");
           setLoading(false);
           return;
@@ -56,7 +54,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           if (currentUser) {
             setUser(currentUser);
           } else {
-            // Se não houver usuário e não estiver na página de login, redireciona
             if (pathname !== "/admin/login") {
               router.push("/admin/login");
             }
@@ -82,14 +79,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  // Enquanto verifica o login, mostra uma tela de carregamento
   if (loading) {
     return <LoadingScreen message="Verificando acesso..." />;
   }
   
-  // Se o usuário não estiver logado, a página de login será renderizada sem o layout do admin
   if (!user && pathname !== "/admin/login") {
-    // Normalmente o useEffect já redirecionou, mas isso serve como uma garantia
     return <LoadingScreen message="Redirecionando para o login..." />;
   }
   
@@ -97,7 +91,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return <>{children}</>;
   }
 
-  // Se o usuário está logado, renderiza o layout completo do admin
+  const getHeaderText = () => {
+    if (pathname.includes("/orders")) return "Pedidos";
+    if (pathname.includes("/menu")) return "Cardápio";
+    if (pathname.includes("/settings")) return "Configurações";
+    if (pathname.includes("/comandas")) return "Gerar Comandas"; // Adicionado
+    if (pathname === "/admin") return "Dashboard";
+    return "Painel Administrativo";
+  }
+
   return (
     <div className="min-h-screen bg-[#F7FDF2]">
       <div id="admin-root">
@@ -113,6 +115,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </Link>
               <Link href="/admin/orders" className={`flex items-center px-4 py-2 rounded-lg transition-colors hover:bg-[#97A25F] ${pathname.startsWith("/admin/orders") ? "bg-[#97A25F]" : ""}`}>
                   Pedidos
+              </Link>
+              {/* Link para Comandas Adicionado */}
+              <Link href="/admin/comandas" className={`flex items-center px-4 py-2 rounded-lg transition-colors hover:bg-[#97A25F] ${pathname.startsWith("/admin/comandas") ? "bg-[#97A25F]" : ""}`}>
+                  Comandas
               </Link>
               <Link href="/admin/menu" className={`flex items-center px-4 py-2 rounded-lg transition-colors hover:bg-[#97A25F] ${pathname.startsWith("/admin/menu") ? "bg-[#97A25F]" : ""}`}>
                   Cardápio
@@ -132,10 +138,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <main className="flex-1 flex flex-col overflow-hidden">
             <header className="h-20 bg-white flex items-center justify-between px-8 border-b border-[#ADA192]">
               <h2 className="text-2xl font-semibold text-[#4B4F36]">
-                {pathname.includes("/orders") && "Pedidos"}
-                {pathname.includes("/menu") && "Cardápio"}
-                {pathname.includes("/settings") && "Configurações"}
-                {pathname === "/admin" && "Dashboard"}
+                {getHeaderText()}
               </h2>
               {user && <span className="mr-4 text-[#ADA192]">{user.email}</span>}
             </header>
@@ -143,7 +146,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </main>
         </div>
       </div>
-      <div id="print-container"></div>
+      <div id="print-container" className="printable-area"></div>
       <Toaster />
       {config && <ThemeInjector config={config} />}
     </div>

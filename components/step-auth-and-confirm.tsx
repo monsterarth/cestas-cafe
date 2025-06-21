@@ -1,96 +1,94 @@
-"use client";
+// Arquivo: components/step-auth-and-confirm.tsx
+'use client';
 
-import { useOrder } from "@/hooks/use-order";
-import { Button } from "./ui/button";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "./ui/input-otp";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, PartyPopper } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { useOrder } from "@/hooks/use-order";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, KeyRound } from "lucide-react";
+import { toast } from "sonner";
+import type { Comanda } from "@/types";
 
 export function StepAuthAndConfirm() {
-  const { 
-    isAuthenticated, 
-    comanda, 
-    authenticateComanda, 
-    isLoadingAuth,
-    startOrder
-  } = useOrder();
+    const { setAuthenticated } = useOrder();
+    const [token, setToken] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const searchParams = useSearchParams();
 
-  const [token, setToken] = useState("");
-  const searchParams = useSearchParams();
+    // Renomeado para não conflitar com a função de mesmo nome no escopo global
+    const authenticate = async (tokenToAuth: string) => {
+        if (!tokenToAuth) {
+            toast.error("Por favor, insira um código de acesso.");
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const response = await fetch(`/api/comandas/${tokenToAuth.toUpperCase()}`);
+            const data = await response.json(); // Pega a resposta como 'any' primeiro
 
-  // Efeito para autenticar automaticamente se o token vier na URL
-  useEffect(() => {
-    const tokenFromUrl = searchParams.get('token');
-    if (tokenFromUrl && !isAuthenticated) {
-      authenticateComanda(tokenFromUrl.toUpperCase());
-    }
-  }, [searchParams, isAuthenticated, authenticateComanda]);
+            if (!response.ok) {
+                // CORREÇÃO: Lança um erro com a mensagem da API
+                throw new Error(data.message || 'Falha na autenticação.');
+            }
+            
+            const comandaData = data as Comanda; // Converte para o tipo Comanda após a verificação
+            toast.success(`Bem-vindo(a), ${comandaData.guestName}!`);
+            setAuthenticated(comandaData);
 
-  const handleAuth = async () => {
-    if (token.length < 5) return;
-    const success = await authenticateComanda(token.toUpperCase());
-    if (!success) {
-      alert("Comanda inválida. Por favor, verifique o código e tente novamente.");
-      setToken("");
-    }
-  };
+        } catch (error: any) {
+            console.error("Authentication error:", error);
+            toast.error(error.message || "Código inválido ou expirado. Tente novamente.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    useEffect(() => {
+        const tokenFromUrl = searchParams.get('token');
+        if (tokenFromUrl) {
+            setToken(tokenFromUrl);
+            authenticate(tokenFromUrl);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+    
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        authenticate(token);
+    };
 
-  if (isLoadingAuth) {
     return (
-      <div className="flex flex-col items-center justify-center text-center p-8">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg">Validando sua comanda...</p>
-      </div>
-    );
-  }
-
-  // TELA DE CONFIRMAÇÃO (depois de autenticar)
-  if (isAuthenticated && comanda) {
-    return (
-        <Card className="w-full max-w-lg mx-auto">
-            <CardHeader className="items-center text-center">
-                <PartyPopper className="h-12 w-12 text-amber-500" />
-                <CardTitle className="text-2xl">Olá, {comanda.guestName}!</CardTitle>
-                <CardDescription>Bem-vindo(a) ao nosso sistema de cestas.</CardDescription>
+        <Card className="max-w-lg mx-auto">
+            <CardHeader>
+                <CardTitle>Acesse seu Pedido</CardTitle>
+                <CardDescription>
+                    Use o código de acesso (comanda) que você recebeu no check-in para começar.
+                </CardDescription>
             </CardHeader>
-            <CardContent className="text-center space-y-4">
-                <p className="text-lg">
-                    Seu pedido será para a <strong>{comanda.cabin}</strong> com <strong>{comanda.numberOfGuests}</strong> pessoa(s).
-                </p>
-                <p>Os dados estão corretos?</p>
-                <Button size="lg" className="w-full" onClick={startOrder}>
-                    Sim, iniciar meu pedido!
-                </Button>
-            </CardContent>
+            <form onSubmit={handleSubmit}>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="token">Código de Acesso</Label>
+                        <Input 
+                            id="token" 
+                            name="token"
+                            value={token}
+                            onChange={(e) => setToken(e.target.value.toUpperCase())}
+                            placeholder="Ex: PRAIA7"
+                            className="text-center text-lg tracking-widest"
+                            required
+                            disabled={isLoading}
+                        />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <KeyRound className="mr-2 h-4 w-4" />}
+                        {isLoading ? 'Verificando...' : 'Entrar'}
+                    </Button>
+                </CardContent>
+            </form>
         </Card>
-    )
-  }
-
-  // TELA DE AUTENTICAÇÃO (inicial)
-  return (
-    <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center">
-            <CardTitle>Bem-Vindo(a)!</CardTitle>
-            <CardDescription>
-                Escaneie o QR Code ou digite o código da sua comanda para começar.
-            </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center gap-6">
-            <InputOTP maxLength={5} value={token} onChange={(value) => setToken(value)}>
-                <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                </InputOTPGroup>
-            </InputOTP>
-            <Button className="w-full" onClick={handleAuth} disabled={token.length < 5}>
-                Confirmar Comanda
-            </Button>
-        </CardContent>
-    </Card>
-  );
+    );
 }

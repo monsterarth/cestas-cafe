@@ -61,7 +61,17 @@ export interface AppConfig {
   mensagensMotivacionais?: string[];
 }
 
-// CORREÇÃO PRINCIPAL AQUI
+export interface Comanda {
+  id: string; // Document ID from Firestore
+  guestName: string;
+  cabin: string;
+  numberOfGuests: number;
+  token: string;
+  isActive: boolean;
+  createdAt: Timestamp;
+  usedAt?: Timestamp;
+}
+
 export interface OrderState {
   guestInfo: {
     name: string;
@@ -69,10 +79,16 @@ export interface OrderState {
     people: number;
     time: string;
   };
-  persons: Person[]; // Propriedade adicionada
+  persons: Person[];
   accompaniments: Record<string, Record<string, number>>;
-  globalHotDishNotes: string; // Propriedade adicionada
+  globalHotDishNotes: string;
   specialRequests: string;
+  
+  // --- Adições para o fluxo de Comanda/Autenticação ---
+  isAuthenticated: boolean;
+  comanda: Omit<Comanda, 'id' | 'createdAt' | 'isActive' | 'usedAt'> | null;
+  currentStep: number;
+  completedSteps: number[];
 }
 
 export interface ItemPedido {
@@ -95,14 +111,4 @@ export interface Order {
   itensPedido: ItemPedido[];
   observacoesGerais?: string;
   observacoesPratosQuentes?: string;
-}
-
-export interface Comanda {
-  id: string;
-  token: string;
-  guestName: string;
-  cabin: string;
-  numberOfGuests: number;
-  isActive: boolean;
-  createdAt: any; // Firestore Timestamp
 }

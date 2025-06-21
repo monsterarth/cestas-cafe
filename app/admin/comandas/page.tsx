@@ -1,115 +1,132 @@
-"use client";
+// Arquivo: app/admin/comandas/page.tsx
+'use client';
 
-import * as React from "react";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Comanda } from "@/types";
-import { ComandaThermalReceipt } from "@/components/comanda-thermal-receipt";
-import { Loader2, Printer } from "lucide-react";
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2, Ticket, Printer, RotateCcw } from 'lucide-react';
+import { Comanda } from '@/types';
+import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
+import { toast } from 'sonner';
 
 export default function ComandasPage() {
-  const [guestName, setGuestName] = useState("");
-  const [cabin, setCabin] = useState("");
-  const [numberOfGuests, setNumberOfGuests] = useState("1");
-  const [isLoading, setIsLoading] = useState(false);
-  const [generatedComanda, setGeneratedComanda] = useState<Comanda | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [generatedComanda, setGeneratedComanda] = useState<Comanda | null>(null);
 
-  // A função de imprimir simplesmente chama a função nativa do navegador
-  const handlePrint = () => {
-    window.print();
-  };
+    const handleGenerateComanda = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setIsLoading(true);
+        
+        const formData = new FormData(e.currentTarget);
+        const guestName = formData.get('guestName') as string;
+        const cabin = formData.get('cabin') as string;
+        const numberOfGuests = Number(formData.get('numberOfGuests'));
 
-  // Função que envia os dados do formulário para a nossa API
-  const handleGenerateComanda = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setGeneratedComanda(null); // Limpa a comanda anterior
+        if (!guestName || !cabin || !numberOfGuests) {
+            toast.error("Por favor, preencha todos os campos.");
+            setIsLoading(false);
+            return;
+        }
 
-    try {
-      const response = await fetch('/api/comandas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestName, cabin, numberOfGuests }),
-      });
+        try {
+            const response = await fetch('/api/comandas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ guestName, cabin, numberOfGuests }),
+            });
 
-      const result = await response.json();
+            const result = await response.json();
 
-      if (!response.ok) {
-        // Se a API retornar um erro, mostra o erro para o admin
-        throw new Error(result.error || 'Falha ao gerar comanda');
-      }
-      
-      // Se deu tudo certo, guarda a nova comanda no estado para mostrar na tela
-      setGeneratedComanda(result);
+            if (!response.ok) {
+                throw new Error(result.message || "Falha ao gerar comanda.");
+            }
 
-    } catch (error: any) {
-      console.error(error);
-      alert(`Erro ao gerar comanda: ${error.message}`);
-    } finally {
-      setIsLoading(false);
+            setGeneratedComanda(result);
+            toast.success(`Comanda ${result.token} gerada com sucesso!`);
+
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handlePrint = () => {
+        const printContent = document.getElementById('printable-receipt');
+        if (printContent) {
+            const printableArea = document.querySelector('.printable-area');
+            if (printableArea) {
+                printableArea.innerHTML = ''; // Limpa a área
+                printableArea.appendChild(printContent.cloneNode(true));
+                window.print();
+            }
+        }
+    };
+    
+    const resetForm = () => {
+        setGeneratedComanda(null);
     }
-  };
 
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Gerar Nova Comanda de Acesso</CardTitle>
-          <CardDescription>
-            Preencha os dados do hóspede para criar o código de acesso ao sistema de pedidos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleGenerateComanda} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="guestName">Nome do Hóspede</Label>
-              <Input id="guestName" value={guestName} onChange={(e) => setGuestName(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cabin">Cabana / Quarto</Label>
-              <Input id="cabin" value={cabin} onChange={(e) => setCabin(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="numberOfGuests">Número de Hóspedes</Label>
-              <Input id="numberOfGuests" type="number" min="1" value={numberOfGuests} onChange={(e) => setNumberOfGuests(e.target.value)} required />
-            </div>
-            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
-              {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando...</> : "Gerar Comanda"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Gerador de Comandas</CardTitle>
+                    <CardDescription>
+                        {generatedComanda 
+                            ? "Comanda gerada. Imprima ou gere uma nova." 
+                            : "Preencha os dados do hóspede para criar uma nova comanda de acesso."}
+                    </CardDescription>
+                </CardHeader>
+                {!generatedComanda ? (
+                    <form onSubmit={handleGenerateComanda}>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="guestName">Nome do Hóspede</Label>
+                                <Input id="guestName" name="guestName" placeholder="Ex: João da Silva" required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="cabin">Cabana / Quarto</Label>
+                                <Input id="cabin" name="cabin" placeholder="Ex: Cabana 04" required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="numberOfGuests">Número de Hóspedes</Label>
+                                <Input id="numberOfGuests" name="numberOfGuests" type="number" min="1" max="10" required />
+                            </div>
+                        </CardContent>
+                        <CardFooter>
+                            <Button type="submit" disabled={isLoading}>
+                                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ticket className="mr-2 h-4 w-4" />}
+                                Gerar Comanda
+                            </Button>
+                        </CardFooter>
+                    </form>
+                ) : (
+                    <>
+                        <CardContent>
+                            <p className="text-center text-green-700 font-semibold">Comanda gerada com sucesso!</p>
+                        </CardContent>
+                        <CardFooter className="flex-col sm:flex-row gap-2">
+                           <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4" />Imprimir Comanda</Button>
+                           <Button variant="outline" onClick={resetForm}><RotateCcw className="mr-2 h-4 w-4" />Gerar Nova</Button>
+                        </CardFooter>
+                    </>
+                )}
+            </Card>
 
-      {/* Esta seção só aparece DEPOIS que a comanda for gerada com sucesso */}
-      {generatedComanda && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Comanda Gerada!</CardTitle>
-            <CardDescription>
-              Abaixo está a pré-visualização. Clique em imprimir para o recibo térmico.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
-            <div className="p-4 border rounded-lg bg-stone-100">
-                <ComandaThermalReceipt comanda={generatedComanda} />
+            <div>
+                <h3 className="text-lg font-semibold mb-2 text-muted-foreground">Pré-visualização</h3>
+                <Card className="p-2 bg-gray-200">
+                    <div id="printable-receipt">
+                       {generatedComanda ? <ComandaThermalReceipt comanda={generatedComanda} /> : <div className="text-center py-20 text-gray-500">Aguardando geração da comanda...</div>}
+                    </div>
+                </Card>
             </div>
-            <Button onClick={handlePrint} size="lg">
-              <Printer className="mr-2 h-5 w-5" />
-              Imprimir Comanda
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Este é o gabarito para a impressão, que fica escondido mas usa sua classe CSS */}
-      {generatedComanda && (
-        <div className="printable-area absolute -top-full h-0 overflow-hidden">
-          <ComandaThermalReceipt comanda={generatedComanda} />
+            {/* Div oculta para impressão, gerenciada pelo layout */}
+            <div className="printable-area"></div>
         </div>
-      )}
-    </div>
-  );
+    );
 }

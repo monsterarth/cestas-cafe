@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { AppConfig } from "@/types";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { getFirebaseDb } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,6 @@ import { useEffect, useState, useCallback } from "react"; // CORREÇÃO: Adicion
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Textarea } from "@/components/ui/textarea";
-import { getFirebaseDb } from "@/lib/firebase";
 
 const initialMessages = [
     "Que seu dia seja tão incrível quanto o aroma de um café fresquinho.", "Um sorriso pode mudar o mundo. Comece pelo seu!", "A gentileza é como o açúcar, deixa tudo mais doce.", "Respire fundo. Sinta a calma. Prossiga com leveza.", "Cada novo dia é uma tela em branco. Pinte-a com as cores da alegria!", "Pequenos gestos, grandes sorrisos. Faça a diferença hoje.", "Que a energia boa te encontre e faça morada.", "A vida é feita de momentos. Aprecie cada um deles.", "Confie no seu potencial. Você é mais forte do que imagina.", "A felicidade está nas pequenas coisas, como uma xícara de chá quente.", "Seja a razão do sorriso de alguém hoje.", "Que o seu trabalho seja leve e seu coração, grato.", "Comece o dia com o pé direito e a alma em paz.", "Acredite na magia dos novos começos.", "Cultive o bem-estar: corpo são, mente sã.", "Que a sua jornada hoje seja repleta de boas surpresas.", "Lembre-se de fazer uma pausa e apreciar a vista.", "Espalhe positividade. O mundo agradece.", "O melhor tempero da vida é a gratidão.", "Você é capaz de coisas maravilhosas. Acredite!",
