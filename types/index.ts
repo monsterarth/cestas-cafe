@@ -38,6 +38,7 @@ export interface AppConfig {
   // Aparência
   logoUrl?: string;
   nomeFazenda: string;
+  subtitulo?: string;
   corFundo: string;
   corTexto: string;
   corDestaque: string;
