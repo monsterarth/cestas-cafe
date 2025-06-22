@@ -1,43 +1,62 @@
 // Arquivo: app/api/comandas/route.ts
 import { NextResponse } from 'next/server';
-import { getFirebaseDb } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
+import { Comanda } from '@/types';
+import { adminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore'; // <-- MUDANÇA: Importação correta para o Admin SDK
 
-// Função para gerar um token alfanumérico curto e legível
-const generateToken = (length = 6): string => {
-    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789'; // Caracteres legíveis, sem O, 0
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
+export async function GET() {
+    try {
+        const comandasRef = adminDb.collection('comandas');
+        const q = comandasRef.orderBy('createdAt', 'desc');
+
+        const snapshot = await q.get();
+        const comandas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
+        
+        const serializableComandas = comandas.map(comanda => ({
+            ...comanda,
+            createdAt: (comanda.createdAt as Timestamp).toDate().toISOString(),
+            horarioLimite: comanda.horarioLimite ? (comanda.horarioLimite as Timestamp).toDate().toISOString() : null,
+            usedAt: comanda.usedAt ? (comanda.usedAt as Timestamp).toDate().toISOString() : null,
+        }));
+
+        return NextResponse.json(serializableComandas, { status: 200 });
+
+    } catch (error: any) {
+        console.error('Erro ao buscar comandas:', error);
+        return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
     }
-    return result;
 }
 
 export async function POST(request: Request) {
     try {
-        const db = await getFirebaseDb();
-        if (!db) {
-            return NextResponse.json({ message: 'Conexão com banco de dados falhou.' }, { status: 500 });
-        }
-
-        const { guestName, cabin, numberOfGuests } = await request.json();
+        const { guestName, cabin, numberOfGuests, horarioLimite, mensagemAtraso } = await request.json();
 
         if (!guestName || !cabin || !numberOfGuests) {
-            return NextResponse.json({ message: 'Dados incompletos.' }, { status: 400 });
+            return NextResponse.json({ message: 'Dados do hóspede, cabana e n° de pessoas são obrigatórios.' }, { status: 400 });
         }
 
         const token = generateToken();
 
-        const comandaData = {
+        const comandaData: any = {
             token,
             guestName,
             cabin,
             numberOfGuests: Number(numberOfGuests),
             isActive: true,
-            createdAt: serverTimestamp(),
+            status: 'ativa',
+            // CORREÇÃO: Usa o método correto do Admin SDK para gerar a data no servidor
+            createdAt: FieldValue.serverTimestamp(),
         };
 
-        const docRef = await addDoc(collection(db, 'comandas'), comandaData);
+        if (horarioLimite && horarioLimite !== '') {
+            comandaData.horarioLimite = new Date(horarioLimite);
+        }
+        if (mensagemAtraso) {
+            comandaData.mensagemAtraso = mensagemAtraso;
+        }
+
+        const docRef = await adminDb.collection('comandas').add(comandaData);
 
         return NextResponse.json({ id: docRef.id, ...comandaData }, { status: 201 });
 
@@ -45,4 +64,14 @@ export async function POST(request: Request) {
         console.error('Erro ao criar comanda:', error);
         return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
     }
+}
+
+// A função generateToken permanece a mesma
+function generateToken(): string {
+    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 4; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `F-${result}`;
 }

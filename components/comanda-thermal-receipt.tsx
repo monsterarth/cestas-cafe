@@ -2,7 +2,8 @@
 'use client';
 
 import { Comanda } from "@/types";
-import { QRCodeCanvas } from 'qrcode.react';
+// MUDANÇA: Importa apenas o QRCodeSVG para garantir consistência
+import { QRCodeSVG } from 'qrcode.react';
 
 interface ComandaThermalReceiptProps {
     comanda: Comanda | null;
@@ -11,7 +12,8 @@ interface ComandaThermalReceiptProps {
 export function ComandaThermalReceipt({ comanda }: ComandaThermalReceiptProps) {
     if (!comanda) return null;
 
-    const qrCodeUrl = `${window.location.origin}/?token=${comanda.token}`;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fazendadorosa.com.br';
+    const qrCodeUrl = `${baseUrl}/?token=${comanda.token}`;
 
     return (
         <div 
@@ -37,7 +39,10 @@ export function ComandaThermalReceipt({ comanda }: ComandaThermalReceiptProps) {
             </div>
             
             <div className="flex flex-col items-center justify-center text-center my-4">
-                <QRCodeCanvas
+                {/* CORREÇÃO FINAL: Usamos apenas QRCodeSVG. Ele funciona perfeitamente
+                    tanto para a visualização na tela, quanto para a impressão direta
+                    e também para a captura da 'foto' para o PDF. */}
+                <QRCodeSVG
                     value={qrCodeUrl}
                     size={128}
                     bgColor={"#ffffff"}

@@ -1,4 +1,6 @@
 // Arquivo: hooks/use-order.tsx
+'use client';
+
 import { create } from 'zustand';
 import { toast } from 'sonner';
 import type { OrderState, Person, Comanda, AccompanimentCategory } from '@/types';
@@ -43,13 +45,14 @@ export const useOrderStore = create<OrderState & OrderActions>((set, get) => ({
     set({
       isAuthenticated: true,
       comanda: comandaData,
-      currentStep: 1,
+      currentStep: 1, // ALTERAÇÃO: Vai para a nova etapa de confirmação
       completedSteps: [1],
+      // ALTERAÇÃO: Pré-preenche guestInfo com dados da comanda
       guestInfo: {
-        ...get().guestInfo,
         name: comandaData.guestName,
         cabin: comandaData.cabin,
         people: comandaData.numberOfGuests,
+        time: '', // Horário será definido na etapa de confirmação
       },
       persons,
     });
@@ -63,12 +66,11 @@ export const useOrderStore = create<OrderState & OrderActions>((set, get) => ({
 
   setStep: (step) => {
     const { completedSteps } = get();
-    if (step <= Math.max(...completedSteps, 0) + 1) {
-       set((state) => ({
-         currentStep: step,
-         completedSteps: [...new Set([...state.completedSteps, step])]
-       }));
-    }
+    // A lógica de navegação foi simplificada para ser mais flexível
+    set((state) => ({
+      currentStep: step,
+      completedSteps: [...new Set([...state.completedSteps, step])]
+    }));
   },
 
   handleSelectDish: (personIndex, dishId) => {

@@ -1,6 +1,7 @@
 // Arquivo: types/index.ts
 import { Timestamp } from "firebase/firestore";
 
+// --- Tipos de Dados do Cardápio ---
 export interface HotDish {
   id: string;
   nomeItem: string;
@@ -18,22 +19,6 @@ export interface Flavor {
   posicao: number;
 }
 
-export interface Person {
-  id: number;
-  hotDish: {
-    typeId: string;
-    flavorId: string;
-  } | null;
-  notes?: string;
-}
-
-export interface Cabin {
-  id: string;
-  name: string;
-  capacity: number;
-  posicao?: number;
-}
-
 export interface AccompanimentCategory {
   id: string;
   name: string;
@@ -48,25 +33,40 @@ export interface AccompanimentItem {
   descricaoPorcao?: string;
 }
 
+// --- Tipos de Configuração (Refatorado) ---
 export interface AppConfig {
+  // Aparência
   logoUrl?: string;
   nomeFazenda: string;
-  textoAgradecimento: string;
+  subtitulo?: string;
   corFundo: string;
   corTexto: string;
   corDestaque: string;
   corDestaqueTexto: string;
   corCartao: string;
-  welcomeEmoji?: string;
-  welcomeTitle?: string;
-  welcomeSubtitle?: string;
-  successTitle?: string;
-  successSubtitle?: string;
-  successGratitude?: string;
-  successFooter?: string;
-  mensagemDoDia?: string;
+  // Mensagens
+  textoBoasVindas?: string;
+  textoAgradecimento: string;
   mensagemAtrasoPadrao?: string;
-  subtitulo? : string;
+  mensagemDoDia?: string;
+  mensagensMotivacionais?: string[];
+}
+
+export interface Cabin {
+  id: string;
+  name: string;
+  capacity: number;
+  posicao?: number;
+}
+
+// --- Tipos de Pedidos e Comandas ---
+export interface Person {
+  id: number;
+  hotDish: {
+    typeId: string;
+    flavorId: string;
+  } | null;
+  notes?: string;
 }
 
 export interface Comanda {
@@ -104,10 +104,9 @@ export interface ItemPedido {
   nomeItem: string;
   quantidade: number;
   observacao?: string;
-  sabor?: string;
-  // CORREÇÃO: Adicionando as propriedades que faltavam
   paraPessoa?: string;
   categoria?: string;
+  sabor?: string;
 }
 
 export interface Order {
