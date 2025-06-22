@@ -7,32 +7,48 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Ticket, Printer, RotateCcw } from 'lucide-react';
-import { Comanda, Cabin } from '@/types';
+import { Loader2, Ticket, Printer } from 'lucide-react';
+import { Comanda, Cabin, AppConfig } from '@/types'; // [MODIFICADO] Adicionado AppConfig
 import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePrint } from '@/hooks/use-print';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getFirebaseDb } from '@/lib/firebase'; // [ADICIONADO]
+import { doc, getDoc } from 'firebase/firestore'; // [ADICIONADO]
 
 export default function CriarComandaPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [generatedComanda, setGeneratedComanda] = useState<Comanda | null>(null);
     const [cabanas, setCabanas] = useState<Cabin[]>([]);
+    const [appConfig, setAppConfig] = useState<AppConfig | null>(null); // [ADICIONADO] Estado para a config
     const { printComponent, isPrinting } = usePrint();
 
     useEffect(() => {
-        const fetchCabanas = async () => {
+        const fetchData = async () => {
+            // [MODIFICADO] Busca cabanas e config em paralelo
             try {
-                const res = await fetch('/api/cabanas');
-                if (!res.ok) throw new Error("Falha ao buscar cabanas");
-                const data = await res.json();
-                setCabanas(data);
+                const db = await getFirebaseDb();
+                if (!db) throw new Error("Falha na conexão com o banco.");
+
+                const [cabanasRes, configSnap] = await Promise.all([
+                    fetch('/api/cabanas'),
+                    getDoc(doc(db, "configuracoes", "app")),
+                ]);
+                
+                if (!cabanasRes.ok) throw new Error("Falha ao buscar cabanas");
+                const cabanasData = await cabanasRes.json();
+                setCabanas(cabanasData);
+
+                if (configSnap.exists()) {
+                    setAppConfig(configSnap.data() as AppConfig);
+                }
+
             } catch (error: any) {
                 toast.error(error.message);
             }
         };
-        fetchCabanas();
+        fetchData();
     }, []);
 
     const handleGenerateComanda = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -72,7 +88,8 @@ export default function CriarComandaPage() {
 
     const handlePrint = () => {
         if (!generatedComanda) return;
-        printComponent(<ComandaThermalReceipt comanda={generatedComanda} />);
+        // [MODIFICADO] Passa a prop config para o componente de impressão
+        printComponent(<ComandaThermalReceipt comanda={generatedComanda} config={appConfig} />);
     };
 
     const resetForm = () => setGeneratedComanda(null);
@@ -145,7 +162,8 @@ export default function CriarComandaPage() {
                 <h3 className="text-lg font-semibold mb-2 text-muted-foreground">Pré-visualização</h3>
                 <Card className="p-2 bg-gray-200">
                     <div>
-                        {generatedComanda ? <ComandaThermalReceipt comanda={generatedComanda} /> : <div className="text-center py-20 text-gray-500">Aguardando geração da comanda...</div>}
+                        {/* [MODIFICADO] Passa a prop config para a pré-visualização */}
+                        {generatedComanda ? <ComandaThermalReceipt comanda={generatedComanda} config={appConfig} /> : <div className="text-center py-20 text-gray-500">Aguardando geração da comanda...</div>}
                     </div>
                 </Card>
             </div>

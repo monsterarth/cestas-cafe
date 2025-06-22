@@ -1,165 +1,216 @@
 // Arquivo: components/comanda-management-card.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Comanda } from '@/types';
+import { useState, useEffect, useMemo, ChangeEvent } from 'react'; // [NOVO] Importado 'useMemo'
+import { AppConfig, Comanda } from '@/types';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
+import { usePrint } from '@/hooks/use-print';
+import { toast } from 'sonner';
+import { Eye, Printer, Archive, RotateCcw, Loader2, Calendar, Users, Home, Ticket, Pencil } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ComandaThermalReceipt } from './comanda-thermal-receipt';
-import { toast } from 'sonner';
-import { Loader2, Archive, Save, AlertTriangle, CircleCheck, CircleX, Printer } from 'lucide-react';
 import { format } from 'date-fns';
-import { usePrint } from '@/hooks/use-print';
-import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-
-interface ComandaFromAPI extends Omit<Comanda, 'createdAt' | 'horarioLimite' | 'usedAt'> {
-    createdAt: string;
-    horarioLimite?: string | null;
-    usedAt?: string | null;
-}
 
 interface ComandaManagementCardProps {
-    comandaData: ComandaFromAPI;
+    comandaData: Comanda;
+    config: AppConfig | null;
     onUpdate: () => void;
 }
 
-export function ComandaManagementCard({ comandaData, onUpdate }: ComandaManagementCardProps) {
-    const comandaDate = useMemo(() => ({
+const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
+
+export function ComandaManagementCard({ comandaData, config, onUpdate }: ComandaManagementCardProps) {
+    const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const { printComponent, isPrinting } = usePrint();
+    
+    // [CORREÇÃO] Usa o useMemo para evitar recriar o objeto 'comanda' a cada renderização,
+    // o que causava o loop infinito.
+    const comanda = useMemo(() => ({
         ...comandaData,
-        createdAt: new Date(comandaData.createdAt),
-        horarioLimite: comandaData.horarioLimite ? new Date(comandaData.horarioLimite) : undefined,
+        createdAt: new Date(comandaData.createdAt as any),
+        horarioLimite: comandaData.horarioLimite ? new Date(comandaData.horarioLimite as any) : null
     }), [comandaData]);
 
-    const [isActive, setIsActive] = useState(comandaDate.isActive);
-    const [horarioLimite, setHorarioLimite] = useState(
-        comandaDate.horarioLimite ? format(comandaDate.horarioLimite, "yyyy-MM-dd'T'HH:mm") : ''
-    );
-    const [mensagemAtraso, setMensagemAtraso] = useState(comandaDate.mensagemAtraso || '');
-    const [isSaving, setIsSaving] = useState(false);
-    const { printComponent, isPrinting } = usePrint();
+    const [editData, setEditData] = useState({
+        horarioLimite: '',
+        mensagemAtraso: '',
+    });
 
-    const handleUpdate = async (updates: { [key: string]: any }) => {
-        setIsSaving(true);
+    // Este useEffect agora depende do objeto 'comanda' que é estável graças ao useMemo.
+    useEffect(() => {
+        if (isEditDialogOpen) {
+            const formattedHorario = comanda.horarioLimite && isValidDate(comanda.horarioLimite)
+                ? format(comanda.horarioLimite, "yyyy-MM-dd'T'HH:mm")
+                : '';
+            
+            setEditData({
+                horarioLimite: formattedHorario,
+                mensagemAtraso: comanda.mensagemAtraso || '',
+            });
+        }
+    }, [isEditDialogOpen, comanda]); // A dependência 'comanda' agora é estável
+
+    const handleAction = async (action: 'arquivar' | 'reativar') => {
+        setIsUpdating(true);
         try {
-            const response = await fetch(`/api/comandas/${comandaDate.id}`, {
+            const response = await fetch(`/api/comandas/${comanda.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updates),
+                body: JSON.stringify({ action }),
             });
-            if (!response.ok) throw new Error('Falha ao atualizar a comanda.');
-            toast.success(`Comanda ${comandaDate.token} atualizada!`);
+            if (!response.ok) throw new Error('Falha ao atualizar status.');
+            
+            toast.success(`Comanda ${action === 'arquivar' ? 'arquivada' : 'reativada'}!`);
             onUpdate();
         } catch (error: any) {
             toast.error(error.message);
         } finally {
-            setIsSaving(false);
+            setIsUpdating(false);
         }
     };
     
-    const handleArchive = () => {
-        handleUpdate({ status: 'arquivada', isActive: false });
-    };
-    
-    const handleSave = () => {
-        const updatePayload: { [key: string]: any } = {
-            mensagemAtraso: mensagemAtraso,
-            horarioLimite: horarioLimite ? new Date(horarioLimite) : null,
-        };
-        handleUpdate(updatePayload);
+    const handleSaveChanges = async () => {
+        setIsUpdating(true);
+        try {
+            const response = await fetch(`/api/comandas/${comanda.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    horarioLimite: editData.horarioLimite,
+                    mensagemAtraso: editData.mensagemAtraso,
+                }),
+            });
+             if (!response.ok) throw new Error('Falha ao salvar alterações.');
+
+            toast.success('Validade da comanda atualizada!');
+            onUpdate();
+            setIsEditDialogOpen(false);
+        } catch (error: any) {
+            toast.error(`Falha ao salvar: ${error.message}`);
+        } finally {
+            setIsUpdating(false);
+        }
     };
 
-    const handleActiveToggle = (checked: boolean) => {
-        setIsActive(checked);
-        handleUpdate({ isActive: checked });
-    }
+    const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setEditData(prev => ({ ...prev, [name]: value }));
+    };
 
     const handlePrint = () => {
-        printComponent(<ComandaThermalReceipt comanda={receiptComanda as Comanda} />);
+        printComponent(<ComandaThermalReceipt comanda={comandaData} config={config} />);
     };
 
-    const isExpired = comandaDate.horarioLimite ? comandaDate.horarioLimite < new Date() : false;
-    
-    const receiptComanda = {
-        ...comandaDate,
-        createdAt: { toDate: () => comandaDate.createdAt } as any,
-        horarioLimite: comandaDate.horarioLimite ? { toDate: () => comandaDate.horarioLimite } as any : undefined,
-    }
-
     return (
-        <Card className="flex flex-col">
-            <CardHeader className="flex-row items-start justify-between">
-                <div>
-                    <CardTitle>Comanda {receiptComanda.token}</CardTitle>
-                    <div className="flex items-center gap-2 mt-2">
-                        {isActive && !isExpired && <CircleCheck className="h-4 w-4 text-green-600" />}
-                        {isActive && isExpired && <AlertTriangle className="h-4 w-4 text-yellow-600" />}
-                        {!isActive && <CircleX className="h-4 w-4 text-red-600" />}
-                        <span className="text-sm font-medium">
-                            {isActive ? (isExpired ? 'Expirada' : 'Ativa') : 'Inativa'}
-                        </span>
+        <>
+            <Card className="flex flex-col border">
+                <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                        <span className="truncate pr-2">{comanda.guestName}</span>
+                         <Badge variant={comanda.status === 'arquivada' ? 'secondary' : 'default'}>
+                            {comanda.status === 'arquivada' ? 'Arquivada' : 'Ativa'}
+                        </Badge>
+                    </CardTitle>
+                    <CardDescription>
+                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Home className="h-3 w-3" /> 
+                            <span>{comanda.cabin}</span>
+                         </div>
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow space-y-3">
+                     <div className="flex items-center gap-2 text-sm">
+                        <Ticket className="h-4 w-4 text-muted-foreground" /> 
+                        Token: <Badge variant="outline">{comanda.token}</Badge>
+                     </div>
+                     <div className="flex items-center gap-2 text-sm">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span>{comanda.numberOfGuests} Hóspedes</span>
+                     </div>
+                     <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span>Gerada em: {isValidDate(comanda.createdAt) ? comanda.createdAt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Data inválida'}</span>
+                     </div>
+                     {comanda.horarioLimite && isValidDate(comanda.horarioLimite) && (
+                        <div className="flex items-center gap-2 text-sm text-amber-600">
+                           <Calendar className="h-4 w-4" />
+                           <span>Expira em: {comanda.horarioLimite.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                     )}
+                </CardContent>
+                <CardFooter className="flex justify-end gap-2">
+                     <Button variant="outline" size="icon" onClick={() => setIsViewDialogOpen(true)} disabled={isUpdating}>
+                        <Eye className="h-4 w-4" />
+                        <span className="sr-only">Visualizar e Imprimir</span>
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={() => setIsEditDialogOpen(true)} disabled={isUpdating}>
+                        <Pencil className="h-4 w-4" />
+                        <span className="sr-only">Editar Validade</span>
+                    </Button>
+                    {comanda.status !== 'arquivada' ? (
+                        <Button variant="destructive" size="icon" onClick={() => handleAction('arquivar')} disabled={isUpdating}>
+                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <Archive className="h-4 w-4" />}
+                             <span className="sr-only">Arquivar</span>
+                        </Button>
+                    ) : (
+                         <Button variant="secondary" size="icon" onClick={() => handleAction('reativar')} disabled={isUpdating}>
+                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <RotateCcw className="h-4 w-4" />}
+                             <span className="sr-only">Reativar</span>
+                        </Button>
+                    )}
+                </CardFooter>
+            </Card>
+            
+            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+                <DialogContent className="sm:max-w-xs p-0">
+                    <DialogHeader className="p-4 pb-0">
+                        <DialogTitle>Visualizar Comanda</DialogTitle>
+                        <DialogDescription>Imprima novamente se necessário.</DialogDescription>
+                    </DialogHeader>
+                    <div className="p-4 flex justify-center bg-gray-100 dark:bg-gray-800">
+                        <ComandaThermalReceipt comanda={comandaData} config={config} />
                     </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Label htmlFor={`active-switch-${receiptComanda.id}`}>Ativar</Label>
-                    <Switch
-                        id={`active-switch-${receiptComanda.id}`}
-                        checked={isActive}
-                        onCheckedChange={handleActiveToggle}
-                        disabled={isSaving}
-                    />
-                </div>
-            </CardHeader>
-            <CardContent className="flex-grow space-y-4">
-                <div className="bg-gray-100 p-2 rounded-md flex justify-center">
-                    <ComandaThermalReceipt comanda={receiptComanda as Comanda} />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor={`limite-${receiptComanda.id}`}>Prazo de Utilização</Label>
-                    <Input
-                        id={`limite-${receiptComanda.id}`}
-                        type="datetime-local"
-                        value={horarioLimite}
-                        onChange={(e) => setHorarioLimite(e.target.value)}
-                        disabled={isSaving}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor={`mensagem-${receiptComanda.id}`}>Mensagem de Atraso</Label>
-                    <Textarea
-                        id={`mensagem-${receiptComanda.id}`}
-                        value={mensagemAtraso}
-                        onChange={(e) => setMensagemAtraso(e.target.value)}
-                        disabled={isSaving}
-                        placeholder="Mensagem padrão será usada se vazio."
-                    />
-                </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-                <TooltipProvider delayDuration={100}>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={handlePrint} disabled={isPrinting}>
-                                {isPrinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Imprimir Comanda</p></TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
+                     <div className="p-4 pt-0 flex justify-end">
+                        <Button onClick={handlePrint} disabled={isPrinting}>
+                            {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                            Imprimir
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleArchive} disabled={isSaving}>
-                        <Archive className="mr-2 h-4 w-4" /> Arquivar
-                    </Button>
-                    <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Salvar
-                    </Button>
-                </div>
-            </CardFooter>
-        </Card>
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Editar Validade da Comanda</DialogTitle>
+                        <DialogDescription>Defina um prazo para o uso desta comanda. Deixe em branco para não ter limite.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                           <Label htmlFor="horarioLimite">Horário Limite para Pedido</Label>
+                           <Input id="horarioLimite" name="horarioLimite" type="datetime-local" value={editData.horarioLimite} onChange={handleInputChange} />
+                        </div>
+                        <div className="space-y-2">
+                           <Label htmlFor="mensagemAtraso">Mensagem para Pedidos Atrasados (Opcional)</Label>
+                           <Textarea id="mensagemAtraso" name="mensagemAtraso" placeholder="Ex: Opa! O prazo para pedidos encerrou." value={editData.mensagemAtraso} onChange={handleInputChange} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSaveChanges} disabled={isUpdating}>
+                            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Salvar Alterações
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

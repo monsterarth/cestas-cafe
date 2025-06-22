@@ -114,7 +114,8 @@ export default function DashboardPage() {
                                     {data.comandasDoDia.map((comanda) => (
                                         <CarouselItem key={comanda.id} className="pl-4 md:basis-1/2 lg:basis-1/3">
                                             <div className="p-1">
-                                                <ComandaThermalReceipt comanda={comanda} />
+                                                {/* [CORREÇÃO] Adicionada a prop 'config' que agora é obrigatória */}
+                                                <ComandaThermalReceipt comanda={comanda} config={config} />
                                             </div>
                                         </CarouselItem>
                                     ))}

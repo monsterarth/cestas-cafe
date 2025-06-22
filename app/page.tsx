@@ -189,7 +189,7 @@ export default function Home() {
               />
             )}
             
-            {orderSubmitted && <StepSuccess />}
+            {orderSubmitted && <StepSuccess config={appConfig} />}
           </div>
 
           {isAuthenticated && !orderSubmitted && (

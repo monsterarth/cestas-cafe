@@ -50,6 +50,21 @@ export interface AppConfig {
   mensagemAtrasoPadrao?: string;
   mensagemDoDia?: string;
   mensagensMotivacionais?: string[];
+
+  // NOVOS CAMPOS DE MENSAGENS PERSONALIZÁVEIS
+  welcomeEmoji?: string;
+  welcomeTitle?: string;
+  welcomeSubtitle?: string;
+  successTitle?: string;
+  successSubtitle?: string;
+  successGratitude?: string;
+  successFooter?: string;
+
+  // NOVOS CAMPOS PARA A COMANDA
+  comandaTitle?: string;
+  comandaSubtitle?: string;
+  comandaPostQr?: string;
+  comandaFooter?: string;
 }
 
 export interface Cabin {
