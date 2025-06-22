@@ -1,7 +1,7 @@
 // Arquivo: components/comanda-management-card.tsx
 'use client';
 
-import { useState, useEffect, useMemo, ChangeEvent } from 'react'; // [NOVO] Importado 'useMemo'
+import { useState, useEffect, useMemo, ChangeEvent } from 'react';
 import { AppConfig, Comanda } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
 import { usePrint } from '@/hooks/use-print';
 import { toast } from 'sonner';
-import { Eye, Printer, Archive, RotateCcw, Loader2, Calendar, Users, Home, Ticket, Pencil } from 'lucide-react';
+import { Eye, Printer, Loader2, Calendar, Users, Home, Ticket, Pencil } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
+import { Switch } from '@/components/ui/switch'; // [NOVO] Importado o Switch
 
 interface ComandaManagementCardProps {
     comandaData: Comanda;
@@ -30,8 +31,6 @@ export function ComandaManagementCard({ comandaData, config, onUpdate }: Comanda
     const [isUpdating, setIsUpdating] = useState(false);
     const { printComponent, isPrinting } = usePrint();
     
-    // [CORREÇÃO] Usa o useMemo para evitar recriar o objeto 'comanda' a cada renderização,
-    // o que causava o loop infinito.
     const comanda = useMemo(() => ({
         ...comandaData,
         createdAt: new Date(comandaData.createdAt as any),
@@ -43,7 +42,6 @@ export function ComandaManagementCard({ comandaData, config, onUpdate }: Comanda
         mensagemAtraso: '',
     });
 
-    // Este useEffect agora depende do objeto 'comanda' que é estável graças ao useMemo.
     useEffect(() => {
         if (isEditDialogOpen) {
             const formattedHorario = comanda.horarioLimite && isValidDate(comanda.horarioLimite)
@@ -55,7 +53,7 @@ export function ComandaManagementCard({ comandaData, config, onUpdate }: Comanda
                 mensagemAtraso: comanda.mensagemAtraso || '',
             });
         }
-    }, [isEditDialogOpen, comanda]); // A dependência 'comanda' agora é estável
+    }, [isEditDialogOpen, comanda]);
 
     const handleAction = async (action: 'arquivar' | 'reativar') => {
         setIsUpdating(true);
@@ -67,7 +65,7 @@ export function ComandaManagementCard({ comandaData, config, onUpdate }: Comanda
             });
             if (!response.ok) throw new Error('Falha ao atualizar status.');
             
-            toast.success(`Comanda ${action === 'arquivar' ? 'arquivada' : 'reativada'}!`);
+            toast.success(`Comanda ${action === 'arquivar' ? 'desativada' : 'ativada'}!`);
             onUpdate();
         } catch (error: any) {
             toast.error(error.message);
@@ -115,7 +113,7 @@ export function ComandaManagementCard({ comandaData, config, onUpdate }: Comanda
                     <CardTitle className="flex items-center justify-between">
                         <span className="truncate pr-2">{comanda.guestName}</span>
                          <Badge variant={comanda.status === 'arquivada' ? 'secondary' : 'default'}>
-                            {comanda.status === 'arquivada' ? 'Arquivada' : 'Ativa'}
+                            {comanda.status === 'arquivada' ? 'Desativada' : 'Ativa'}
                         </Badge>
                     </CardTitle>
                     <CardDescription>
@@ -145,26 +143,30 @@ export function ComandaManagementCard({ comandaData, config, onUpdate }: Comanda
                         </div>
                      )}
                 </CardContent>
-                <CardFooter className="flex justify-end gap-2">
-                     <Button variant="outline" size="icon" onClick={() => setIsViewDialogOpen(true)} disabled={isUpdating}>
-                        <Eye className="h-4 w-4" />
-                        <span className="sr-only">Visualizar e Imprimir</span>
-                    </Button>
-                    <Button variant="outline" size="icon" onClick={() => setIsEditDialogOpen(true)} disabled={isUpdating}>
-                        <Pencil className="h-4 w-4" />
-                        <span className="sr-only">Editar Validade</span>
-                    </Button>
-                    {comanda.status !== 'arquivada' ? (
-                        <Button variant="destructive" size="icon" onClick={() => handleAction('arquivar')} disabled={isUpdating}>
-                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <Archive className="h-4 w-4" />}
-                             <span className="sr-only">Arquivar</span>
+                <CardFooter className="flex justify-between items-center">
+                    {/* [NOVO] Switch para ativar/desativar a comanda */}
+                    <div className="flex items-center space-x-2">
+                        <Switch
+                            id={`comanda-switch-${comanda.id}`}
+                            checked={comanda.status !== 'arquivada'}
+                            onCheckedChange={(isChecked) => handleAction(isChecked ? 'reativar' : 'arquivar')}
+                            disabled={isUpdating}
+                        />
+                        <Label htmlFor={`comanda-switch-${comanda.id}`} className="text-sm">
+                           {comanda.status !== 'arquivada' ? 'Ativa' : 'Desativada'}
+                        </Label>
+                    </div>
+
+                    <div className="flex gap-2">
+                         <Button variant="outline" size="icon" onClick={() => setIsViewDialogOpen(true)} disabled={isUpdating}>
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">Visualizar e Imprimir</span>
                         </Button>
-                    ) : (
-                         <Button variant="secondary" size="icon" onClick={() => handleAction('reativar')} disabled={isUpdating}>
-                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <RotateCcw className="h-4 w-4" />}
-                             <span className="sr-only">Reativar</span>
+                        <Button variant="outline" size="icon" onClick={() => setIsEditDialogOpen(true)} disabled={isUpdating}>
+                            <Pencil className="h-4 w-4" />
+                            <span className="sr-only">Editar Validade</span>
                         </Button>
-                    )}
+                    </div>
                 </CardFooter>
             </Card>
             
