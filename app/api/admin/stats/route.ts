@@ -1,48 +1,97 @@
-// Arquivo: app/api/admin/stats/route.ts
-import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin'; // <-- MUDANÇA IMPORTANTE
-import { Order } from '@/types';
+// cestas-cafe/app/api/admin/stats/route.ts
 
-export async function GET() {
+import { NextResponse, NextRequest } from 'next/server';
+import { adminDb } from '@/lib/firebase-admin';
+import { Timestamp, Query, CollectionReference } from 'firebase-admin/firestore';
+// Importando os tipos corretos do seu projeto
+import { Order, ItemPedido } from '@/types'; 
+import { endOfDay, parseISO } from 'date-fns';
+
+export async function GET(request: NextRequest) {
     try {
-        const ordersSnapshot = await adminDb.collection("orders").get();
+        const { searchParams } = new URL(request.url);
+        const startDateParam = searchParams.get('startDate');
+        const endDateParam = searchParams.get('endDate');
+        
+        let query: Query | CollectionReference = adminDb.collection("pedidos");
+
+        if (startDateParam && endDateParam) {
+            const startDate = parseISO(startDateParam);
+            const endDate = endOfDay(parseISO(endDateParam));
+
+            query = query
+                .where("timestampPedido", ">=", Timestamp.fromDate(startDate))
+                .where("timestampPedido", "<=", Timestamp.fromDate(endDate));
+        }
+
+        const ordersSnapshot = await query.get();
+
+        if (ordersSnapshot.empty) {
+            return NextResponse.json({
+                totalPedidos: 0,
+                totalItensVendidos: 0,
+                itensMaisPedidos: [],
+                pratosQuentesMaisPedidos: [],
+                saboresMaisPedidos: [], // Alterado de acompanhamentos para sabores
+                categoriasMaisConsumidas: [],
+            });
+        }
+
         const allOrders = ordersSnapshot.docs.map(doc => doc.data() as Order);
 
-        // KPI 1: Pratos Quentes mais populares
-        const pratosQuentesCount: { [key: string]: number } = {};
+        const itemCounts: { [key: string]: number } = {};
+        const pratosQuentesCounts: { [key: string]: number } = {};
+        const saboresCounts: { [key: string]: number } = {}; // Nova agregação para sabores
+        const categoriaCounts: { [key: string]: number } = {};
+        let totalItensVendidos = 0;
+
         allOrders.forEach(order => {
-            order.itensPedido?.forEach(item => {
-                if (item.categoria === 'Prato Quente' && item.nomeItem) {
-                    pratosQuentesCount[item.nomeItem] = (pratosQuentesCount[item.nomeItem] || 0) + 1;
+            // Usando o tipo 'ItemPedido' correto
+            order.itensPedido?.forEach((item: ItemPedido) => {
+                const itemName = item.nomeItem || 'Item Desconhecido';
+                const quantity = item.quantidade || 1;
+
+                totalItensVendidos += quantity;
+                itemCounts[itemName] = (itemCounts[itemName] || 0) + quantity;
+
+                const categoria = item.categoria || 'Sem Categoria';
+                categoriaCounts[categoria] = (categoriaCounts[categoria] || 0) + quantity;
+
+                // A categoria 'Pratos Quentes' agora vem do seu tipo de dados
+                if (item.categoria === 'Prato Quente') {
+                    pratosQuentesCounts[itemName] = (pratosQuentesCounts[itemName] || 0) + quantity;
+                }
+
+                // Usando o campo 'sabor' que existe no seu 'ItemPedido'
+                if (item.sabor) {
+                    saboresCounts[item.sabor] = (saboresCounts[item.sabor] || 0) + quantity;
                 }
             });
         });
-        const pratosPopulares = Object.entries(pratosQuentesCount)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value);
 
-        // KPI 2: Horários de entrega mais comuns
-        const horariosCount: { [key: string]: number } = {};
-        allOrders.forEach(order => {
-            if (order.horarioEntrega) {
-                horariosCount[order.horarioEntrega] = (horariosCount[order.horarioEntrega] || 0) + 1;
-            }
-        });
-        const horariosPopulares = Object.entries(horariosCount)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-            
-        // KPI 3: Total de pedidos
-        const totalPedidos = allOrders.length;
+        const sortAndSlice = (data: { [key: string]: number }, limit = 10) => {
+            return Object.entries(data)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, limit);
+        };
+        
+        const itensMaisPedidos = sortAndSlice(itemCounts, 10);
+        const pratosQuentesMaisPedidos = sortAndSlice(pratosQuentesCounts, 5);
+        const saboresMaisPedidos = sortAndSlice(saboresCounts, 5);
+        const categoriasMaisConsumidas = sortAndSlice(categoriaCounts, 5);
 
         return NextResponse.json({
-            totalPedidos,
-            pratosPopulares,
-            horariosPopulares
+            totalPedidos: allOrders.length,
+            totalItensVendidos,
+            itensMaisPedidos,
+            pratosQuentesMaisPedidos,
+            saboresMaisPedidos, // Enviando os dados de sabores
+            categoriasMaisConsumidas
         });
 
     } catch (error: any) {
         console.error("Stats API error:", error);
-        return NextResponse.json({ message: "Erro ao buscar dados de estatísticas." }, { status: 500 });
+        return NextResponse.json({ message: "Erro ao buscar dados de estatísticas.", error: error.message }, { status: 500 });
     }
 }

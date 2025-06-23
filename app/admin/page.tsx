@@ -1,4 +1,4 @@
-// Arquivo: app/admin/page.tsx
+// cestas-cafe/app/admin/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,13 +8,12 @@ import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
 import { AppConfig, Comanda } from '@/types';
 import { toast } from 'sonner';
 import { AlertCircle, BarChart2, Edit3, Loader2, Megaphone, Save, ShoppingBasket, Users } from 'lucide-react';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
-// Interface para os dados recebidos da API
 interface DashboardData {
     totalCestas: number;
     totalPessoas: number;
@@ -46,13 +45,7 @@ export default function DashboardPage() {
                 
                 const dashboardData = await dashboardRes.json();
                 
-                dashboardData.comandasDoDia.forEach((comanda: any) => {
-                    comanda.createdAt = Timestamp.fromDate(new Date(comanda.createdAt));
-                    if (comanda.horarioLimite) {
-                        comanda.horarioLimite = Timestamp.fromDate(new Date(comanda.horarioLimite));
-                    }
-                });
-
+                // CORREÇÃO: Removida a tentativa de converter strings ISO de volta para objetos Timestamp.
                 setData(dashboardData);
 
                 if (configRes.exists()) {
@@ -83,7 +76,6 @@ export default function DashboardPage() {
         try {
             await setDoc(configRef, { mensagemDoDia: editedMessage }, { merge: true });
             
-            // [CORREÇÃO] Garante que o estado seja atualizado de forma segura
             setConfig(prevConfig => prevConfig ? { ...prevConfig, mensagemDoDia: editedMessage } : null);
             
             toast.success("Mensagem do dia salva com sucesso!");
