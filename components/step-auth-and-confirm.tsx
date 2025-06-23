@@ -1,76 +1,112 @@
-// cestas-cafe/components/step-auth-and-confirm.tsx
+// Arquivo: components/step-auth-and-confirm.tsx
 'use client';
 
-import React, { useState } from 'react';
-import { useOrder } from '@/hooks/use-order';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, ArrowRight } from 'lucide-react';
-import { toast } from 'sonner';
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useOrder } from "@/hooks/use-order";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, KeyRound } from "lucide-react";
+import { toast } from "sonner";
+import type { Comanda } from "@/types";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
-const StepAuthAndConfirm = () => {
-    const [token, setToken] = useState('');
+export default function StepAuthAndConfirm() {
+    const { setAuthenticated } = useOrder();
+    const [tokenPart, setTokenPart] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const setAuthenticated = useOrder((state) => state.setAuthenticated);
+    const searchParams = useSearchParams();
 
-    const handleValidateToken = async () => {
-        if (!token.trim()) {
-            toast.error("Por favor, insira o código da sua comanda.");
+    const authenticate = async (fullToken: string) => {
+        if (!fullToken || fullToken.length < 6) {
+            toast.error("Por favor, insira um código de acesso válido.");
             return;
         }
         setIsLoading(true);
+        let response: Response | undefined;
+
         try {
-            const response = await fetch(`/api/validate-token/${token.trim()}`);
+            // CORREÇÃO: Aponta para a nova rota de validação
+            response = await fetch(`/api/validate-token/${fullToken}`);
             const data = await response.json();
 
+            if (response.status === 410) {
+                toast.error("Prazo Expirado!", {
+                    description: data.message,
+                    duration: 10000,
+                });
+                throw new Error(data.message || 'Comanda expirada.');
+            }
+
             if (!response.ok) {
-                throw new Error(data.message || "Código inválido, expirado ou já utilizado.");
+                throw new Error(data.message || 'Falha na autenticação.');
             }
             
-            toast.success("Comanda validada com sucesso!");
-            setAuthenticated(data.comanda);
+            const comandaData = data as Comanda;
+            toast.success(`Bem-vindo(a), ${comandaData.guestName}!`);
+            setAuthenticated(comandaData);
 
         } catch (error: any) {
-            toast.error(error.message);
+            console.error("Authentication error:", error.message);
+            if (response?.status !== 410) {
+                 toast.error(error.message || "Código inválido. Tente novamente.");
+            }
         } finally {
             setIsLoading(false);
         }
     };
+    
+    useEffect(() => {
+        const tokenFromUrl = searchParams.get('token');
+        if (tokenFromUrl) {
+            authenticate(tokenFromUrl.toUpperCase());
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+    
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (tokenPart.length < 4) {
+            toast.error("Por favor, preencha os 4 caracteres do código.");
+            return;
+        }
+        const fullToken = `F-${tokenPart.toUpperCase()}`;
+        authenticate(fullToken);
+    };
 
-    // CORREÇÃO: Adicionado um container flex para centralizar o card.
-    // O 'min-h-[70vh]' garante que ele tenha espaço para se centralizar verticalmente na tela.
     return (
-        <div className="flex items-center justify-center min-h-[70vh] p-4">
-            <Card className="w-full max-w-md shadow-xl">
-                <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">Bem-vindo(a)!</CardTitle>
-                    <CardDescription>Para começar, insira o código da sua comanda abaixo.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex w-full items-center space-x-2">
-                        <Input
-                            type="text"
-                            placeholder="Seu código aqui"
-                            value={token}
-                            onChange={(e) => setToken(e.target.value.toUpperCase())}
-                            onKeyDown={(e) => e.key === 'Enter' && handleValidateToken()}
-                            className="text-center text-lg tracking-widest flex-1"
-                            disabled={isLoading}
-                        />
-                        <Button
-                            type="button"
-                            size="icon"
-                            onClick={handleValidateToken}
-                            disabled={isLoading}
+        <Card className="max-w-lg mx-auto">
+            <CardHeader className="items-center text-center">
+                <CardTitle>Acesse seu Pedido</CardTitle>
+                <CardDescription>
+                    Digite o código de acesso que você recebeu no check-in.
+                </CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+                <CardContent className="space-y-6">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                        <Label htmlFor="token">Código de Acesso</Label>
+                        <InputOTP 
+                            maxLength={4} 
+                            value={tokenPart}
+                            onChange={(value) => setTokenPart(value)}
                         >
-                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-                        </Button>
+                            <InputOTPGroup className="text-2xl">
+                                <span className="font-bold text-muted-foreground mr-2">F -</span>
+                                <InputOTPSlot index={0} />
+                                <InputOTPSlot index={1} />
+                                <InputOTPSlot index={2} />
+                                <InputOTPSlot index={3} />
+                            </InputOTPGroup>
+                        </InputOTP>
                     </div>
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <KeyRound className="mr-2 h-4 w-4" />}
+                        {isLoading ? 'Verificando...' : 'Entrar'}
+                    </Button>
                 </CardContent>
-            </Card>
-        </div>
+            </form>
+        </Card>
     );
-};
-
-export default StepAuthAndConfirm;
+}
