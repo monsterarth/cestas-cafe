@@ -1,48 +1,72 @@
-// Arquivo: app/api/comandas/route.ts
-import { NextResponse } from 'next/server';
-import { getFirebaseDb } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+// cestas-cafe/app/api/comandas/route.ts
+'use client';
 
-// Função para gerar um token alfanumérico curto e legível
-const generateToken = (length = 6): string => {
-    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789'; // Caracteres legíveis, sem O, 0
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
+import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebase-admin';
+// CORREÇÃO: Apenas Timestamp é necessário do 'firebase-admin/firestore'
+import { Timestamp } from 'firebase-admin/firestore';
+import type { Comanda } from '@/types';
+
+/**
+ * Converte a string de data/hora local para um Timestamp UTC correto,
+ * assumindo que a string de entrada está no fuso de Brasília (GMT-3).
+ * @param localDateTimeString A string de data/hora vinda do navegador.
+ * @returns Um objeto Timestamp do Firestore ou undefined.
+ */
+const convertLocalStringToTimestamp = (localDateTimeString: string | undefined | null): Timestamp | undefined => {
+    if (!localDateTimeString) {
+        // CORREÇÃO: Retorna undefined em vez de null para corresponder ao tipo
+        return undefined;
     }
-    return result;
-}
+    try {
+        const isoStringWithOffset = `${localDateTimeString}:00-03:00`;
+        const correctDate = new Date(isoStringWithOffset);
+        if (isNaN(correctDate.getTime())) return undefined;
+        return Timestamp.fromDate(correctDate);
+    } catch (error) {
+        console.error("Erro ao converter string de data para Timestamp:", error);
+        return undefined;
+    }
+};
 
 export async function POST(request: Request) {
     try {
-        const db = await getFirebaseDb();
-        if (!db) {
-            return NextResponse.json({ message: 'Conexão com banco de dados falhou.' }, { status: 500 });
-        }
-
-        const { guestName, cabin, numberOfGuests } = await request.json();
+        const { guestName, cabin, numberOfGuests, horarioLimite } = await request.json();
 
         if (!guestName || !cabin || !numberOfGuests) {
-            return NextResponse.json({ message: 'Dados incompletos.' }, { status: 400 });
+            return NextResponse.json({ message: "Dados incompletos para criar a comanda." }, { status: 400 });
         }
 
-        const token = generateToken();
+        const token = `F-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-        const comandaData = {
+        const newComandaData = {
             token,
             guestName,
             cabin,
             numberOfGuests: Number(numberOfGuests),
             isActive: true,
-            createdAt: serverTimestamp(),
+            status: 'ativa',
+            createdAt: Timestamp.now(),
+            horarioLimite: convertLocalStringToTimestamp(horarioLimite),
         };
+        
+        // CORREÇÃO: Usando a sintaxe correta do Admin SDK para adicionar um documento.
+        // O `add` é um método da referência da coleção.
+        const docRef = await adminDb.collection("comandas").add(newComandaData);
+        
+        // Retornamos os dados criados junto com o ID gerado.
+        const responseData = { ...newComandaData, id: docRef.id };
 
-        const docRef = await addDoc(collection(db, 'comandas'), comandaData);
-
-        return NextResponse.json({ id: docRef.id, ...comandaData }, { status: 201 });
+        // É preciso converter os Timestamps do Admin para um formato serializável (ISO string)
+        // para enviar como JSON de volta ao cliente sem erros.
+        return NextResponse.json({
+            ...responseData,
+            createdAt: (responseData.createdAt as Timestamp).toDate().toISOString(),
+            horarioLimite: responseData.horarioLimite ? (responseData.horarioLimite as Timestamp).toDate().toISOString() : undefined,
+        }, { status: 201 });
 
     } catch (error: any) {
-        console.error('Erro ao criar comanda:', error);
-        return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
+        console.error("Erro ao criar comanda:", error);
+        return NextResponse.json({ message: "Erro interno no servidor.", error: error.message }, { status: 500 });
     }
 }

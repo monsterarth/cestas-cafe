@@ -59,31 +59,53 @@
   }
 }
 
-/* --- ESTILOS DE IMPRESSÃO REVISADOS --- */
-
-/* Por padrão, o container de impressão fica totalmente oculto */
-#print-container, .printable-area {
-  display: none;
-}
+/* --- ESTILOS DE IMPRESSÃO FINAIS E OTIMIZADOS --- */
 
 @media print {
-  /* 1. Esconde tudo que não é para imprimir */
-  body > *:not(.printable-area) {
-    display: none !important;
+  /* CORREÇÃO: Define o tamanho da página como automático para economizar papel */
+  @page {
+    size: auto;  /* A página se ajustará ao conteúdo */
+    margin: 0mm; /* Remove margens de impressão do navegador */
   }
 
-  /* 2. Mostra o container de impressão e garante que ele seja o único elemento visível */
+  /* Garante que o corpo e o html não tenham altura fixa */
+  html, body {
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Oculta todos os elementos da interface */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Torna a nossa área de impressão e seus filhos visíveis */
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+
+  /* Posiciona a área de impressão no topo da página */
   .printable-area {
-    display: block !important;
     position: absolute;
-    top: 0;
     left: 0;
+    top: 0;
     width: 100%;
   }
-  
-  /* 3. Garante que todo o corpo da página não tenha preenchimento/margem extra */
-  body {
-    padding: 0 !important;
-    margin: 0 !important;
-  }
+}
+
+/* Classes para controlar visibilidade na tela vs. impressão (para o QR Code) */
+.screen-only {
+    display: block;
+}
+.print-only {
+    display: none;
+}
+@media print {
+    .screen-only {
+        display: none !important;
+    }
+    .print-only {
+        display: block !important;
+    }
 }

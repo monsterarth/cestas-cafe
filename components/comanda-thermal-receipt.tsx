@@ -1,17 +1,20 @@
 // Arquivo: components/comanda-thermal-receipt.tsx
 'use client';
 
-import { Comanda } from "@/types";
-import { QRCodeCanvas } from 'qrcode.react';
+import { AppConfig, Comanda } from "@/types"; // [MODIFICADO] Adicionado AppConfig
+// MUDANÇA: Importa apenas o QRCodeSVG para garantir consistência
+import { QRCodeSVG } from 'qrcode.react';
 
 interface ComandaThermalReceiptProps {
     comanda: Comanda | null;
+    config: AppConfig | null; // [ADICIONADO] Nova prop de configuração
 }
 
-export function ComandaThermalReceipt({ comanda }: ComandaThermalReceiptProps) {
+export function ComandaThermalReceipt({ comanda, config }: ComandaThermalReceiptProps) {
     if (!comanda) return null;
 
-    const qrCodeUrl = `${window.location.origin}/?token=${comanda.token}`;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fazendadorosa.com.br';
+    const qrCodeUrl = `${baseUrl}/?token=${comanda.token}`;
 
     return (
         <div 
@@ -19,8 +22,9 @@ export function ComandaThermalReceipt({ comanda }: ComandaThermalReceiptProps) {
             style={{ width: '80mm', boxSizing: 'border-box' }}
         >
             <div className="text-center mb-4">
-                <h1 className="text-lg font-bold">Fazenda do Rosa</h1>
-                <p className="text-xs">Sua Comanda de Café da Manhã</p>
+                {/* [MODIFICADO] Usa texto do config com fallback */}
+                <h1 className="text-lg font-bold">{config?.comandaTitle || 'Fazenda do Rosa'}</h1>
+                <p className="text-xs">{config?.comandaSubtitle || 'Sua Comanda de Café da Manhã'}</p>
             </div>
 
             <div className="text-sm space-y-1 mb-4">
@@ -37,7 +41,7 @@ export function ComandaThermalReceipt({ comanda }: ComandaThermalReceiptProps) {
             </div>
             
             <div className="flex flex-col items-center justify-center text-center my-4">
-                <QRCodeCanvas
+                <QRCodeSVG
                     value={qrCodeUrl}
                     size={128}
                     bgColor={"#ffffff"}
@@ -45,12 +49,13 @@ export function ComandaThermalReceipt({ comanda }: ComandaThermalReceiptProps) {
                     level={"L"}
                     includeMargin={false}
                 />
-                <p className="text-xs mt-2">Escaneie para iniciar o pedido</p>
+                 {/* [MODIFICADO] Usa texto do config com fallback */}
+                <p className="text-xs mt-2">{config?.comandaPostQr || 'Escaneie para iniciar o pedido'}</p>
             </div>
 
-            <div className="border-t border-dashed border-black pt-2 text-center text-xs">
-                <p>Apresente este ticket se necessário.</p>
-                <p>Bom apetite!</p>
+            <div className="border-t border-dashed border-black pt-2 text-center text-xs whitespace-pre-line">
+                {/* [MODIFICADO] Usa texto do config com fallback e suporte para quebra de linha */}
+                <p>{config?.comandaFooter || 'Apresente este ticket se necessário.\nBom apetite!'}</p>
             </div>
         </div>
     );

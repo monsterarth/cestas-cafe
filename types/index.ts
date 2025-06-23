@@ -1,6 +1,7 @@
 // Arquivo: types/index.ts
 import { Timestamp } from "firebase/firestore";
 
+// --- Tipos de Dados do Cardápio ---
 export interface HotDish {
   id: string;
   nomeItem: string;
@@ -18,22 +19,6 @@ export interface Flavor {
   posicao: number;
 }
 
-export interface Person {
-  id: number;
-  hotDish: {
-    typeId: string;
-    flavorId: string;
-  } | null;
-  notes?: string;
-}
-
-export interface Cabin {
-  id: string;
-  name: string;
-  capacity: number;
-  posicao?: number;
-}
-
 export interface AccompanimentCategory {
   id: string;
   name: string;
@@ -48,15 +33,25 @@ export interface AccompanimentItem {
   descricaoPorcao?: string;
 }
 
+// --- Tipos de Configuração (Refatorado) ---
 export interface AppConfig {
+  // Aparência
   logoUrl?: string;
   nomeFazenda: string;
-  textoAgradecimento: string;
+  subtitulo?: string;
   corFundo: string;
   corTexto: string;
   corDestaque: string;
   corDestaqueTexto: string;
   corCartao: string;
+  // Mensagens
+  textoBoasVindas?: string;
+  textoAgradecimento: string;
+  mensagemAtrasoPadrao?: string;
+  mensagemDoDia?: string;
+  mensagensMotivacionais?: string[];
+
+  // NOVOS CAMPOS DE MENSAGENS PERSONALIZÁVEIS
   welcomeEmoji?: string;
   welcomeTitle?: string;
   welcomeSubtitle?: string;
@@ -64,9 +59,29 @@ export interface AppConfig {
   successSubtitle?: string;
   successGratitude?: string;
   successFooter?: string;
-  mensagemDoDia?: string;
-  mensagemAtrasoPadrao?: string;
-  subtitulo? : string;
+
+  // NOVOS CAMPOS PARA A COMANDA
+  comandaTitle?: string;
+  comandaSubtitle?: string;
+  comandaPostQr?: string;
+  comandaFooter?: string;
+}
+
+export interface Cabin {
+  id: string;
+  name: string;
+  capacity: number;
+  posicao?: number;
+}
+
+// --- Tipos de Pedidos e Comandas ---
+export interface Person {
+  id: number;
+  hotDish: {
+    typeId: string;
+    flavorId: string;
+  } | null;
+  notes?: string;
 }
 
 export interface Comanda {
@@ -104,10 +119,9 @@ export interface ItemPedido {
   nomeItem: string;
   quantidade: number;
   observacao?: string;
-  sabor?: string;
-  // CORREÇÃO: Adicionando as propriedades que faltavam
   paraPessoa?: string;
   categoria?: string;
+  sabor?: string;
 }
 
 export interface Order {
