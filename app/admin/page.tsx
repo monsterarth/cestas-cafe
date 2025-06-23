@@ -7,16 +7,18 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { ComandaThermalReceipt } from '@/components/comanda-thermal-receipt';
 import { AppConfig, Comanda } from '@/types';
 import { toast } from 'sonner';
-import { AlertCircle, BarChart2, Loader2, Megaphone, ShoppingBasket, Users } from 'lucide-react';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { AlertCircle, BarChart2, Edit3, Loader2, Megaphone, Save, ShoppingBasket, Users } from 'lucide-react';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 
 // Interface para os dados recebidos da API
 interface DashboardData {
     totalCestas: number;
     totalPessoas: number;
-    comandasDoDia: Comanda[]; // Usamos o tipo Comanda, mas os Timestamps virão como strings
+    comandasDoDia: Comanda[]; 
     alertas: string[];
 }
 
@@ -24,6 +26,10 @@ export default function DashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
     const [config, setConfig] = useState<AppConfig | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    const [isEditingMessage, setIsEditingMessage] = useState(false);
+    const [editedMessage, setEditedMessage] = useState('');
+    const [isSavingMessage, setIsSavingMessage] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -40,7 +46,6 @@ export default function DashboardPage() {
                 
                 const dashboardData = await dashboardRes.json();
                 
-                // Converte as datas de string de volta para objetos Timestamp para o componente de recibo
                 dashboardData.comandasDoDia.forEach((comanda: any) => {
                     comanda.createdAt = Timestamp.fromDate(new Date(comanda.createdAt));
                     if (comanda.horarioLimite) {
@@ -51,7 +56,9 @@ export default function DashboardPage() {
                 setData(dashboardData);
 
                 if (configRes.exists()) {
-                    setConfig(configRes.data() as AppConfig);
+                    const configData = configRes.data() as AppConfig;
+                    setConfig(configData);
+                    setEditedMessage(configData.mensagemDoDia || ''); 
                 }
 
             } catch (error: any) {
@@ -63,6 +70,35 @@ export default function DashboardPage() {
 
         fetchData();
     }, []);
+    
+    const handleSaveMessage = async () => {
+        setIsSavingMessage(true);
+        const db = await getFirebaseDb();
+        if (!db) {
+            toast.error("Falha ao conectar com o banco de dados.");
+            setIsSavingMessage(false);
+            return;
+        }
+        const configRef = doc(db, 'configuracoes', 'app');
+        try {
+            await setDoc(configRef, { mensagemDoDia: editedMessage }, { merge: true });
+            
+            // [CORREÇÃO] Garante que o estado seja atualizado de forma segura
+            setConfig(prevConfig => prevConfig ? { ...prevConfig, mensagemDoDia: editedMessage } : null);
+            
+            toast.success("Mensagem do dia salva com sucesso!");
+            setIsEditingMessage(false);
+        } catch (error) {
+            toast.error("Ocorreu um erro ao salvar a mensagem.");
+        } finally {
+            setIsSavingMessage(false);
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditedMessage(config?.mensagemDoDia || '');
+        setIsEditingMessage(false);
+    };
 
     if (isLoading) {
         return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-gray-500" /></div>;
@@ -94,10 +130,33 @@ export default function DashboardPage() {
                  <Card className="col-span-1 md:col-span-2 bg-blue-50 border-blue-200">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-blue-800">Mensagem do Dia</CardTitle>
-                        <Megaphone className="h-4 w-4 text-blue-600" />
+                        {!isEditingMessage ? (
+                            <Button variant="ghost" size="sm" className="p-1 h-auto" onClick={() => setIsEditingMessage(true)}>
+                                <Edit3 className="h-4 w-4 text-blue-600" />
+                            </Button>
+                        ) : (
+                            <Megaphone className="h-4 w-4 text-blue-600" />
+                        )}
                     </CardHeader>
                     <CardContent>
-                        <p className="text-blue-700">{config?.mensagemDoDia || 'Tenham um ótimo dia de trabalho!'}</p>
+                        {isEditingMessage ? (
+                            <div className="space-y-2">
+                                <Textarea 
+                                    value={editedMessage}
+                                    onChange={(e) => setEditedMessage(e.target.value)}
+                                    className="bg-white/50"
+                                    rows={3}
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="ghost" size="sm" onClick={handleCancelEdit} disabled={isSavingMessage}>Cancelar</Button>
+                                    <Button size="sm" onClick={handleSaveMessage} disabled={isSavingMessage} className="bg-blue-600 hover:bg-blue-700">
+                                        {isSavingMessage ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-blue-700 italic">"{config?.mensagemDoDia || 'Nenhuma mensagem definida.'}"</p>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -114,7 +173,6 @@ export default function DashboardPage() {
                                     {data.comandasDoDia.map((comanda) => (
                                         <CarouselItem key={comanda.id} className="pl-4 md:basis-1/2 lg:basis-1/3">
                                             <div className="p-1">
-                                                {/* [CORREÇÃO] Adicionada a prop 'config' que agora é obrigatória */}
                                                 <ComandaThermalReceipt comanda={comanda} config={config} />
                                             </div>
                                         </CarouselItem>

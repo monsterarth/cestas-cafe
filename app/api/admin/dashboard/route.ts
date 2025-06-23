@@ -1,7 +1,8 @@
 // Arquivo: app/api/admin/dashboard/route.ts
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-import { Timestamp } from 'firebase/firestore';
+// CORREÇÃO: Importando o Timestamp do SDK de Admin, que é o correto para o back-end.
+import { Timestamp } from 'firebase-admin/firestore'; 
 import { startOfToday, endOfToday } from 'date-fns';
 import { Comanda } from '@/types';
 
@@ -33,7 +34,8 @@ export async function GET() {
 
         const alertas: string[] = [];
         const agora = new Date();
-        const umaHoraDepois = new Date(agora.getTime() + 60 * 60 * 1000);
+        // Adiciona um buffer de 5 minutos para a notificação
+        const umaHoraDepois = new Date(agora.getTime() + 55 * 60 * 1000);
 
         const comandasPertoExpirarQuery = adminDb.collection("comandas")
             .where("isActive", "==", true)
@@ -46,6 +48,7 @@ export async function GET() {
             alertas.push(`A comanda ${comanda.token} para ${comanda.guestName} expira em breve!`);
         });
 
+        // Esta serialização agora funcionará corretamente com o tipo de Timestamp correto.
         const comandasDoDiaSerializaveis = comandasDoDia.map(comanda => ({
             ...comanda,
             createdAt: (comanda.createdAt as Timestamp).toDate().toISOString(),
@@ -60,7 +63,7 @@ export async function GET() {
         });
 
     } catch (error: any) {
-        console.error("Dashboard API error:", error);
-        return NextResponse.json({ message: "Erro ao buscar dados do dashboard." }, { status: 500 });
+        console.error("Erro na API do Dashboard:", error);
+        return NextResponse.json({ message: "Erro ao buscar dados do dashboard.", error: error.message }, { status: 500 });
     }
 }
