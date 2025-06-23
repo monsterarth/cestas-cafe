@@ -8,8 +8,7 @@ import { getFirebaseDb } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
 interface OrderActions {
-    // CORREÇÃO: A função agora espera o objeto 'Comanda' completo.
-    setAuthenticated: (comandaData: Comanda) => void;
+    setAuthenticated: (comandaData: Omit<Comanda, 'id' | 'createdAt' | 'isActive' | 'usedAt'>) => void;
     updateGuestInfo: (updates: Partial<OrderState['guestInfo']>) => void;
     setStep: (step: number) => void;
     handleSelectDish: (personIndex: number, dishId: string) => void;
