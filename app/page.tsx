@@ -1,78 +1,77 @@
-// Arquivo: app/page.tsx
+// cestas-cafe/app/page.tsx
 "use client"
 
-import React from "react";
-import { useFirebaseData } from "@/hooks/use-firebase-data";
-import { useOrder, deactivateComanda } from "@/hooks/use-order";
-import { LoadingScreen } from "@/components/loading-screen";
-import { StepNavigation } from "@/components/step-navigation";
-import { GuestAccordion } from "@/components/guest-accordion";
-import { OrderSidebar } from "@/components/order-sidebar";
-import { StepDetails } from "@/components/step-details";
-import { StepAccompaniments } from "@/components/step-accompaniments";
-import { AppHeader } from "@/components/app-header";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle } from "lucide-react";
-import { StepReview } from "@/components/step-review";
-import { StepSuccess } from "@/components/step-success";
-import { Toaster } from "sonner";
-import StepAuthAndConfirm from "@/components/step-auth-and-confirm";
-import { StepConfirm } from "@/components/step-confirm";
-import { StepWelcomeMessage } from "@/components/step-welcome-message";
-import { Label } from "@/components/ui/label";
+import React from "react" // CORREÇÃO: Removido 'import type'
+import { useFirebaseData } from "@/hooks/use-firebase-data"
+import { useOrder, deactivateComanda } from "@/hooks/use-order"
+import { LoadingScreen } from "@/components/loading-screen"
+import { StepNavigation } from "@/components/step-navigation"
+import { GuestAccordion } from "@/components/guest-accordion"
+import { OrderSidebar } from "@/components/order-sidebar"
+import { StepDetails } from "@/components/step-details"
+import { StepAccompaniments } from "@/components/step-accompaniments"
+import { StepWelcome } from "@/components/step-welcome"
+import { AppHeader } from "@/components/app-header"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { MessageCircle } from "lucide-react"
+import { StepReview } from "@/components/step-review"
+import { StepSuccess } from "@/components/step-success"
+import { Toaster } from "sonner"
+import { StepAuthAndConfirm } from "@/components/step-auth-and-confirm"
 
 export default function Home() {
-  const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData();
-  
-  const {
-    isAuthenticated,
-    comanda,
-    currentStep,
-    completedSteps,
-    guestInfo,
-    persons,
-    accompaniments: orderAccompaniments,
-    globalHotDishNotes,
-    specialRequests,
-    setStep,
-    updateGuestInfo,
-    handleSelectDish,
-    handleSelectFlavor,
-    handleSelectNoHotDish,
-    handleNotesChange,
-    handleUpdateAccompaniment,
-    handleSpecialRequestsChange,
-  } = useOrder();
-  
-  const [orderSubmitted, setOrderSubmitted] = React.useState(false);
+    const { hotDishes, cabins, deliveryTimes, accompaniments, appConfig, loading, error } = useFirebaseData();
+    
+    const {
+        isAuthenticated,
+        comanda,
+        currentStep,
+        completedSteps,
+        guestInfo,
+        persons,
+        accompaniments: orderAccompaniments,
+        globalHotDishNotes,
+        specialRequests,
+        setStep,
+        updateGuestInfo,
+        handleSelectDish,
+        handleSelectFlavor,
+        handleSelectNoHotDish,
+        handleNotesChange,
+        handleUpdateAccompaniment,
+        handleSpecialRequestsChange,
+    } = useOrder();
+    
+    const [orderSubmitted, setOrderSubmitted] = React.useState(false);
 
-  const handleOrderSuccess = () => {
-    if (comanda?.token) {
-      deactivateComanda(comanda.token);
+    const handleOrderSuccess = () => {
+        if (comanda?.token) {
+            deactivateComanda(comanda.token);
+        }
+        setOrderSubmitted(true);
+    };
+    
+    if (loading) {
+        return <LoadingScreen />;
     }
-    setOrderSubmitted(true);
-  };
-  
-  if (loading) {
-    return <LoadingScreen />;
-  }
 
-  if (error) {
-    return (
-      <div className="fixed inset-0 flex flex-col justify-center items-center z-50 bg-[#F7FDF2]">
-        <p className="text-red-600 p-4 text-center">{error}</p>
-        <Button onClick={() => window.location.reload()} className="mt-4">
-          Tentar Novamente
-        </Button>
-      </div>
-    );
-  }
+    if (error) {
+        return (
+            <div className="fixed inset-0 flex flex-col justify-center items-center z-50 bg-[#F7FDF2]">
+                <p className="text-red-600 p-4 text-center">{error}</p>
+                <Button onClick={() => window.location.reload()} className="mt-4">
+                    Tentar Novamente
+                </Button>
+            </div>
+        );
+    }
 
-  if (!appConfig) {
-    return <LoadingScreen message="Aguardando configurações..." />;
-  }
+    if (!appConfig) {
+        return <LoadingScreen message="Aguardando configurações..." />;
+    }
 
+  // CORREÇÃO: O objeto orderState agora inclui todas as propriedades do estado global
   const orderState = {
     isAuthenticated,
     comanda,
@@ -85,32 +84,28 @@ export default function Home() {
     specialRequests,
   };
 
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <Toaster position="top-center" richColors />
-      <AppHeader config={appConfig} />
+    return (
+        <div className="min-h-screen bg-background text-foreground">
+            <Toaster position="top-center" richColors />
+            <AppHeader config={appConfig} />
 
-      {!isAuthenticated && <div className="h-4" />} 
-      
-      {isAuthenticated && !orderSubmitted && (
-        <StepNavigation currentStep={currentStep} completedSteps={completedSteps} onStepClick={setStep} />
-      )}
+            {!isAuthenticated && <div className="h-4" />} 
+            
+            {isAuthenticated && !orderSubmitted && (
+                <StepNavigation currentStep={currentStep} completedSteps={completedSteps} onStepClick={setStep} />
+            )}
 
-      <main className="container mx-auto p-2 md:p-4 lg:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
-          <div className="lg:col-span-2">
+            <main className="container mx-auto p-2 md:p-4 lg:p-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
+                    <div className="lg:col-span-2">
 
-            {currentStep === 0 && !isAuthenticated && <StepAuthAndConfirm />}
+            {!isAuthenticated && <StepAuthAndConfirm />}
             
             {isAuthenticated && currentStep === 1 && !orderSubmitted && (
-              <StepConfirm deliveryTimes={deliveryTimes} />
+              <StepWelcome config={appConfig} onNext={() => setStep(2)} />
             )}
 
             {isAuthenticated && currentStep === 2 && !orderSubmitted && (
-                <StepWelcomeMessage config={appConfig} />
-            )}
-
-            {isAuthenticated && currentStep === 99 && !orderSubmitted && (
               <StepDetails
                 orderState={orderState}
                 cabins={cabins}
@@ -129,7 +124,7 @@ export default function Home() {
                     <div>
                       <h1 className="text-xl md:text-2xl font-bold">Escolha dos Pratos Quentes</h1>
                       <p className="opacity-90 mt-1 text-sm md:text-base">
-                        Cada hóspede deve escolher <strong>1 prato quente</strong>.
+                        Cada hóspede deve escolher <strong>1 prato quente</strong>. Toque no nome para ver as opções.
                       </p>
                     </div>
                   </div>
@@ -146,12 +141,12 @@ export default function Home() {
 
                   <div className="pt-6 md:pt-8 border-t">
                     <div className="space-y-3 mb-6">
-                      <Label className="text-base md:text-lg font-bold flex items-center gap-2">
+                      <label className="text-base md:text-lg font-bold flex items-center gap-2">
                         <MessageCircle className="w-4 h-4 md:w-5 md:h-5" style={{ color: appConfig.corDestaque }} />
                         Observações Gerais para Pratos Quentes
-                      </Label>
+                      </label>
                       <Textarea
-                        placeholder="Ex: sem cebola, alergias, preferências..."
+                        placeholder="Observações que se aplicam a todos os pratos quentes (ex: sem cebola, alergias, preferências...)"
                         value={globalHotDishNotes}
                         onChange={(e) => handleNotesChange(e.target.value)}
                         className="resize-none"
@@ -189,21 +184,21 @@ export default function Home() {
               />
             )}
             
-            {orderSubmitted && <StepSuccess config={appConfig} />}
+            {orderSubmitted && <StepSuccess />}
           </div>
 
-          {isAuthenticated && !orderSubmitted && (
-            <div className="hidden lg:block lg:col-span-1">
-              <OrderSidebar
-                orderState={orderState}
-                hotDishes={hotDishes}
-                accompaniments={accompaniments}
-                appConfig={appConfig}
-              />
-            </div>
-          )}
+                    {isAuthenticated && !orderSubmitted && (
+                        <div className="hidden lg:block lg:col-span-1">
+                            <OrderSidebar
+                                orderState={orderState}
+                                hotDishes={hotDishes}
+                                accompaniments={accompaniments}
+                                appConfig={appConfig}
+                            />
+                        </div>
+                    )}
+                </div>
+            </main>
         </div>
-      </main>
-    </div>
-  )
+    )
 }
