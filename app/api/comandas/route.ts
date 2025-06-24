@@ -1,69 +1,82 @@
-// cestas-cafe/app/api/comandas/route.ts
-'use client';
-
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-// CORREÇÃO: Apenas Timestamp é necessário do 'firebase-admin/firestore'
-import { Timestamp } from 'firebase-admin/firestore';
-import type { Comanda } from '@/types';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { Comanda } from '@/types';
 
-/**
- * Converte a string de data/hora local para um Timestamp UTC correto,
- * assumindo que a string de entrada está no fuso de Brasília (GMT-3).
- * @param localDateTimeString A string de data/hora vinda do navegador.
- * @returns Um objeto Timestamp do Firestore ou undefined.
- */
-const convertLocalStringToTimestamp = (localDateTimeString: string | undefined | null): Timestamp | undefined => {
-    if (!localDateTimeString) {
-        // CORREÇÃO: Retorna undefined em vez de null para corresponder ao tipo
-        return undefined;
-    }
+// Readicionando o handler GET funcional
+export async function GET() {
     try {
-        const isoStringWithOffset = `${localDateTimeString}:00-03:00`;
-        const correctDate = new Date(isoStringWithOffset);
-        if (isNaN(correctDate.getTime())) return undefined;
-        return Timestamp.fromDate(correctDate);
-    } catch (error) {
-        console.error("Erro ao converter string de data para Timestamp:", error);
-        return undefined;
-    }
-};
+        const comandasRef = adminDb.collection('comandas');
+        const q = comandasRef.orderBy('createdAt', 'desc');
 
+        const snapshot = await q.get();
+        const comandas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comanda[];
+        
+        // Garante que todos os timestamps sejam strings antes de enviar
+        const serializableComandas = comandas.map(comanda => ({
+            ...comanda,
+            createdAt: (comanda.createdAt as unknown as Timestamp).toDate().toISOString(),
+            horarioLimite: comanda.horarioLimite ? (comanda.horarioLimite as unknown as Timestamp).toDate().toISOString() : null,
+            usedAt: comanda.usedAt ? (comanda.usedAt as unknown as Timestamp).toDate().toISOString() : null,
+        }));
+
+        return NextResponse.json(serializableComandas, { status: 200 });
+
+    } catch (error: any) {
+        console.error('Erro ao buscar comandas:', error);
+        return NextResponse.json({ message: 'Erro interno do servidor.', error: error.message }, { status: 500 });
+    }
+}
+
+
+// Versão final e funcional do handler POST
 export async function POST(request: Request) {
     try {
-        const { guestName, cabin, numberOfGuests, horarioLimite } = await request.json();
+        const { guestName, cabin, numberOfGuests, horarioLimite, mensagemAtraso } = await request.json();
 
         if (!guestName || !cabin || !numberOfGuests) {
-            return NextResponse.json({ message: "Dados incompletos para criar a comanda." }, { status: 400 });
+            return NextResponse.json({ message: 'Dados do hóspede, cabana e n° de pessoas são obrigatórios.' }, { status: 400 });
         }
 
         const token = `F-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-        const newComandaData = {
+        // 1. Prepara o objeto para o Firestore (com tipos complexos)
+        const dataForFirestore: any = {
             token,
             guestName,
             cabin,
             numberOfGuests: Number(numberOfGuests),
             isActive: true,
             status: 'ativa',
-            createdAt: Timestamp.now(),
-            horarioLimite: convertLocalStringToTimestamp(horarioLimite),
+            createdAt: FieldValue.serverTimestamp(),
         };
-        
-        // CORREÇÃO: Usando a sintaxe correta do Admin SDK para adicionar um documento.
-        // O `add` é um método da referência da coleção.
-        const docRef = await adminDb.collection("comandas").add(newComandaData);
-        
-        // Retornamos os dados criados junto com o ID gerado.
-        const responseData = { ...newComandaData, id: docRef.id };
 
-        // É preciso converter os Timestamps do Admin para um formato serializável (ISO string)
-        // para enviar como JSON de volta ao cliente sem erros.
-        return NextResponse.json({
-            ...responseData,
-            createdAt: (responseData.createdAt as Timestamp).toDate().toISOString(),
-            horarioLimite: responseData.horarioLimite ? (responseData.horarioLimite as Timestamp).toDate().toISOString() : undefined,
-        }, { status: 201 });
+        if (horarioLimite && horarioLimite !== '') {
+            dataForFirestore.horarioLimite = new Date(horarioLimite);
+        }
+        if (mensagemAtraso) {
+            dataForFirestore.mensagemAtraso = mensagemAtraso;
+        }
+
+        // 2. Salva no banco de dados
+        const docRef = await adminDb.collection('comandas').add(dataForFirestore);
+
+        // 3. Monta a resposta do zero, usando apenas dados seguros (primitivos)
+        const responseData = {
+            id: docRef.id,
+            token: token,
+            guestName: guestName,
+            cabin: cabin,
+            numberOfGuests: Number(numberOfGuests),
+            isActive: true,
+            status: 'ativa',
+            createdAt: new Date().toISOString(),
+            horarioLimite: horarioLimite || null,
+            mensagemAtraso: mensagemAtraso || null
+        };
+
+        // 4. Retorna a resposta segura
+        return NextResponse.json(responseData, { status: 201 });
 
     } catch (error: any) {
         console.error("Erro ao criar comanda:", error);
