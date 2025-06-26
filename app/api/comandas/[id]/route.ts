@@ -1,5 +1,4 @@
 // cestas-cafe/app/api/comandas/[id]/route.ts
-'use client';
 
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
