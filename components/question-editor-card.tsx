@@ -13,27 +13,32 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+// ATUALIZAÇÃO: Importar o tipo de listener do dnd-kit
+import type { DraggableSyntheticListeners } from '@dnd-kit/core';
 
-// Tipos de categoria para as perguntas
+
 const QUESTION_CATEGORIES = ["Limpeza", "Atendimento", "Infraestrutura", "Comida", "Geral"];
 
 interface QuestionEditorCardProps {
     question: Question;
     updateQuestion: (id: string, updates: Partial<Question>) => void;
     removeQuestion: (id: string) => void;
+    // ATUALIZAÇÃO: Adicionar a prop para receber os listeners
+    dragListeners?: DraggableSyntheticListeners;
 }
 
-export const QuestionEditorCard = ({ question, updateQuestion, removeQuestion }: QuestionEditorCardProps) => {
+export const QuestionEditorCard = ({ question, updateQuestion, removeQuestion, dragListeners }: QuestionEditorCardProps) => {
 
     const handleInputChange = (field: keyof Question, value: any) => {
         updateQuestion(question.id, { [field]: value });
     };
 
     return (
-        <Card className="bg-white/80">
+        <Card className="bg-white/80 overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between p-4 bg-slate-50 border-b">
-                <div className="flex items-center gap-2">
-                    <GripVertical className="h-5 w-5 text-gray-400 cursor-grab" />
+                {/* ATUALIZAÇÃO: Os listeners são aplicados a este container, que agora é a alça de arrasto */}
+                <div className="flex items-center gap-2 cursor-grab" {...dragListeners}>
+                    <GripVertical className="h-5 w-5 text-gray-400" />
                     <h4 className="font-semibold">Pergunta</h4>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => removeQuestion(question.id)}>
@@ -85,7 +90,6 @@ export const QuestionEditorCard = ({ question, updateQuestion, removeQuestion }:
                         </Select>
                     </div>
                 </div>
-                {/* Futuramente, aqui entrará o editor de opções para SINGLE_CHOICE e MULTIPLE_CHOICE */}
             </CardContent>
         </Card>
     );

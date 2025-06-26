@@ -1,14 +1,27 @@
 // components/survey-builder-form.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy
+} from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-import { Question } from '@/types/survey';
+import { Question, Survey } from '@/types/survey';
 import { QuestionEditorCard } from './question-editor-card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -17,26 +30,51 @@ import { Label } from './ui/label';
 import { PlusCircle, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Componente wrapper para tornar o QuestionEditorCard arrastável
-function SortableQuestionCard({ id, question, updateQuestion, removeQuestion }: any) {
+function SortableQuestionCard({ id, question, updateQuestion, removeQuestion }: { id: string, question: Question, updateQuestion: (id: string, updates: Partial<Question>) => void, removeQuestion: (id: string) => void }) {
+    // ATUALIZAÇÃO: separamos os `listeners` dos outros atributos
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
     };
+
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-            <QuestionEditorCard question={question} updateQuestion={updateQuestion} removeQuestion={removeQuestion} />
+        // ATUALIZAÇÃO: O container principal agora só tem os atributos de acessibilidade (`attributes`)
+        // Os `listeners` de arrasto são passados como prop para o componente filho.
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <QuestionEditorCard
+                question={question}
+                updateQuestion={updateQuestion}
+                removeQuestion={removeQuestion}
+                dragListeners={listeners}
+            />
         </div>
     );
 }
 
-export function SurveyBuilderForm() {
+interface SurveyBuilderFormProps {
+    initialData?: Survey;
+}
+
+export function SurveyBuilderForm({ initialData }: SurveyBuilderFormProps) {
     const router = useRouter();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [questions, setQuestions] = useState<Question[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+
+    const isEditMode = !!initialData;
+
+    useEffect(() => {
+        if (initialData) {
+            setTitle(initialData.title);
+            setDescription(initialData.description);
+            // Ordenar as perguntas pela posição ao carregar
+            const sortedQuestions = initialData.questions.sort((a, b) => a.position - b.position);
+            setQuestions(sortedQuestions.map(q => ({ ...q, id: q.id || `q_${Math.random()}` })));
+        }
+    }, [initialData]);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -45,7 +83,7 @@ export function SurveyBuilderForm() {
 
     const addNewQuestion = () => {
         const newQuestion: Question = {
-            id: `q_${Date.now()}`, // ID temporário
+            id: `q_${Date.now()}`,
             text: '',
             type: 'RATING',
             category: 'Geral',
@@ -62,53 +100,67 @@ export function SurveyBuilderForm() {
         setQuestions(prev => prev.filter(q => q.id !== id));
     };
 
-    const handleDragEnd = (event: any) => {
+    const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
-        if (active.id !== over.id) {
-            const oldIndex = questions.findIndex(q => q.id === active.id);
-            const newIndex = questions.findIndex(q => q.id === over.id);
-            const newQuestions = [...questions];
-            const [movedQuestion] = newQuestions.splice(oldIndex, 1);
-            newQuestions.splice(newIndex, 0, movedQuestion);
-            setQuestions(newQuestions.map((q, index) => ({ ...q, position: index })));
+        if (over && active.id !== over.id) {
+            setQuestions((items) => {
+                const oldIndex = items.findIndex((item) => item.id === active.id);
+                const newIndex = items.findIndex((item) => item.id === over.id);
+                const reorderedItems = arrayMove(items, oldIndex, newIndex);
+                return reorderedItems.map((item, index) => ({ ...item, position: index }));
+            });
         }
     };
-
+    
     const handleSave = async () => {
         if (!title) {
             toast.error('O título da pesquisa é obrigatório.');
             return;
         }
         setIsSaving(true);
-        toast.loading('Salvando pesquisa...');
-        
+        toast.loading('Salvando alterações...');
+
         try {
-            // 1. Criar o documento da pesquisa
-            const surveyResponse = await fetch('/api/surveys', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, description }),
-            });
-
-            if (!surveyResponse.ok) throw new Error('Falha ao criar a pesquisa.');
-
-            const surveyData = await surveyResponse.json();
-            const surveyId = surveyData.id;
-
-            // 2. Salvar cada pergunta na subcoleção
-            for (const question of questions) {
-                const { id, ...questionData } = question; // Remove o ID temporário
-                await fetch(`/api/surveys/${surveyId}/questions`, {
+            if (isEditMode) {
+                const surveyId = initialData.id;
+                await fetch(`/api/surveys/${surveyId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description }),
+                });
+                for (const oldQuestion of initialData.questions) {
+                    await fetch(`/api/surveys/${surveyId}/questions/${oldQuestion.id}`, { method: 'DELETE' });
+                }
+                for (const question of questions) {
+                    const { id, ...questionData } = question;
+                    await fetch(`/api/surveys/${surveyId}/questions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(questionData),
+                    });
+                }
+            } else {
+                const surveyResponse = await fetch('/api/surveys', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(questionData),
+                    body: JSON.stringify({ title, description }),
                 });
+                if (!surveyResponse.ok) throw new Error('Falha ao criar a pesquisa.');
+                const surveyData = await surveyResponse.json();
+                const surveyId = surveyData.id;
+                for (const question of questions) {
+                    const { id, ...questionData } = question;
+                    await fetch(`/api/surveys/${surveyId}/questions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(questionData),
+                    });
+                }
             }
-
             toast.dismiss();
             toast.success('Pesquisa salva com sucesso!');
             router.push('/admin/surveys');
-
+            router.refresh();
         } catch (error: any) {
             toast.dismiss();
             toast.error('Erro ao salvar a pesquisa.', { description: error.message });
@@ -147,7 +199,7 @@ export function SurveyBuilderForm() {
                 </Button>
                 <Button onClick={handleSave} disabled={isSaving}>
                     <Save className="mr-2 h-4 w-4" />
-                    {isSaving ? 'Salvando...' : 'Salvar Pesquisa'}
+                    {isSaving ? 'Salvando...' : (isEditMode ? 'Salvar Alterações' : 'Salvar Pesquisa')}
                 </Button>
             </div>
         </div>
