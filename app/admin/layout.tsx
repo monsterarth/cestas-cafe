@@ -14,8 +14,8 @@ import { ThemeInjector } from "@/components/theme-injector";
 import { Toaster } from "@/components/ui/sonner";
 import type { AppConfig } from "@/types";
 import { onAuthStateChanged, User } from "firebase/auth";
-// CORREÇÃO: Importado o ícone ExternalLink
-import { LayoutDashboard, ShoppingBasket, BarChart2, Ticket, Settings, Paintbrush, MessageSquare, Home, UtensilsCrossed, LogOut, ExternalLink } from "lucide-react";
+// ATUALIZAÇÃO: Importado o ícone ClipboardList
+import { LayoutDashboard, ShoppingBasket, BarChart2, Ticket, Settings, Paintbrush, MessageSquare, Home, UtensilsCrossed, LogOut, ExternalLink, ClipboardList } from "lucide-react";
 
 const NavLink = ({ href, pathname, children }: { href: string; pathname: string; children: React.ReactNode }) => {
   const isActive = pathname === href || (href !== '/admin' && pathname.startsWith(href));
@@ -80,13 +80,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
     checkAuth();
   }, [pathname, router]);
-  
+
   const handleLogout = async () => {
     const auth = await getFirebaseAuth();
     if (auth) {
-        const { signOut } = await import("firebase/auth");
-        await signOut(auth);
-        router.push("/admin/login");
+      const { signOut } = await import("firebase/auth");
+      await signOut(auth);
+      router.push("/admin/login");
     }
   };
 
@@ -94,8 +94,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!user && pathname !== "/admin/login") return <LoadingScreen message="Redirecionando para o login..." />;
   if (!user && pathname === "/admin/login") return <>{children}</>;
 
+  // ATUALIZAÇÃO: Adicionada lógica para o header das páginas de pesquisa
   const getHeaderText = () => {
     if (pathname === '/admin') return "Dashboard";
+    if (pathname.startsWith('/admin/surveys')) return "Pesquisas de Satisfação";
     if (pathname === '/admin/pedidos') return "Lista de Pedidos";
     if (pathname === '/admin/pedidos/estatisticas') return "Estatísticas de Pedidos";
     if (pathname === '/admin/comandas/criar') return "Criar Nova Comanda";
@@ -126,6 +128,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <NavLink href="/admin/pedidos" pathname={pathname}><ShoppingBasket size={18} /> Pedidos</NavLink>
                 <NavLink href="/admin/pedidos/estatisticas" pathname={pathname}><BarChart2 size={18} /> Estatísticas</NavLink>
               </div>
+              
+              {/* ATUALIZAÇÃO: Nova seção e link para Pesquisas */}
+              <div>
+                <h3 className="px-3 text-xs font-semibold uppercase text-gray-400 mb-2">Análises</h3>
+                <NavLink href="/admin/surveys" pathname={pathname}><ClipboardList size={18} /> Pesquisas</NavLink>
+              </div>
+
               <div>
                 <h3 className="px-3 text-xs font-semibold uppercase text-gray-400 mb-2">Comandas</h3>
                 <NavLink href="/admin/comandas/criar" pathname={pathname}><Ticket size={18} /> Criar Comanda</NavLink>
@@ -141,21 +150,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </nav>
 
             <div className="mt-auto p-4 space-y-2 border-t border-gray-700">
-                {/* CORREÇÃO: Adicionado o botão para voltar ao formulário */}
-                <Link 
-                    href="/" 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors text-left"
-                >
-                    <ExternalLink size={18} /> Voltar ao Formulário
-                </Link>
-                <button 
-                    onClick={handleLogout} 
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500 transition-colors text-left"
-                >
-                    <LogOut size={18} /> Sair
-                </button>
+              <Link
+                href="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors text-left"
+              >
+                <ExternalLink size={18} /> Voltar ao Formulário
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500 transition-colors text-left"
+              >
+                <LogOut size={18} /> Sair
+              </button>
             </div>
           </aside>
 
