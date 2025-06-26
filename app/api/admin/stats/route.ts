@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
                 categoriaCounts[categoria] = (categoriaCounts[categoria] || 0) + quantity;
 
                 // A categoria 'Pratos Quentes' agora vem do seu tipo de dados
-                if (item.categoria === 'Prato Quente') {
+                if (item.categoria === 'Pratos Quentes') {
                     pratosQuentesCounts[itemName] = (pratosQuentesCounts[itemName] || 0) + quantity;
                 }
 
