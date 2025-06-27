@@ -1,6 +1,8 @@
-// app/s/[id]/page.tsx
+// app/s/[surveyId]/page.tsx
 import React from 'react';
 import { adminDb } from '@/lib/firebase-admin';
+// CORREÇÃO: Separando as importações. AppConfig vem de types/index, o resto de types/survey.
+import { AppConfig } from '@/types'; 
 import { Survey, Question } from '@/types/survey';
 import { SurveyPublicView } from '@/components/survey-public-view';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -9,25 +11,13 @@ async function getSurveyData(id: string): Promise<Survey | null> {
     try {
         const surveyRef = adminDb.collection('surveys').doc(id);
         const surveyDoc = await surveyRef.get();
-
-        if (!surveyDoc.exists) {
-            return null;
-        }
-
+        if (!surveyDoc.exists) return null;
         const rawData = surveyDoc.data();
-        if (!rawData) {
-            return null;
-        }
-
+        if (!rawData) return null;
         const questionsRef = surveyRef.collection('questions').orderBy('position', 'asc');
         const questionsSnapshot = await questionsRef.get();
-        
-        const questions = questionsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-        })) as Question[];
-
-        const surveyData: Survey = {
+        const questions = questionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Question[];
+        return {
             id: surveyDoc.id,
             title: rawData.title,
             description: rawData.description,
@@ -35,17 +25,28 @@ async function getSurveyData(id: string): Promise<Survey | null> {
             createdAt: (rawData.createdAt as Timestamp).toDate().toISOString(),
             questions,
         };
-        
-        return surveyData;
-
     } catch (error) {
         console.error("Erro ao buscar dados da pesquisa:", error);
         return null;
     }
 }
 
-export default async function PublicSurveyPage({ params }: { params: { id: string } }) {
-    const surveyData = await getSurveyData(params.id);
+async function getAppConfig(): Promise<AppConfig | null> {
+    try {
+        const configRef = adminDb.collection('configuracoes').doc('app');
+        const configDoc = await configRef.get();
+        return configDoc.exists ? configDoc.data() as AppConfig : null;
+    } catch (error) {
+        console.error("Erro ao buscar configurações do app:", error);
+        return null;
+    }
+}
+
+export default async function PublicSurveyPage({ params }: { params: { surveyId: string } }) {
+    const [surveyData, appConfig] = await Promise.all([
+        getSurveyData(params.surveyId),
+        getAppConfig()
+    ]);
 
     if (!surveyData || !surveyData.isActive) {
         return (
@@ -59,8 +60,8 @@ export default async function PublicSurveyPage({ params }: { params: { id: strin
     }
 
     return (
-        <main className="bg-slate-50 min-h-screen">
-            <SurveyPublicView survey={surveyData} />
+        <main className="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+            <SurveyPublicView survey={surveyData} config={appConfig} />
         </main>
     );
 }

@@ -136,3 +136,16 @@ export interface Order {
   observacoesGerais?: string;
   observacoesPratosQuentes?: string;
 }
+
+export interface AppConfig {
+  // ... outras configurações ...
+  successTitle?: string;
+  successSubtitle?: string;
+  successGratitude?: string;
+  successFooter?: string;
+
+  // ATUALIZAÇÃO: Adicionando campos para a mensagem de sucesso da pesquisa
+  surveySuccessTitle?: string;
+  surveySuccessSubtitle?: string;
+  surveySuccessFooter?: string;
+}
