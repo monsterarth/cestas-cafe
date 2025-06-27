@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { useFetchData } from '@/hooks/use-fetch-data'; // ATUALIZADO: Usando o novo hook
+import { useFetchData } from '@/hooks/use-fetch-data';
 import { Survey } from '@/types/survey';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,42 +18,40 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator, // Importar o separador
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
+// ATUALIZAÇÃO: Importar os ícones de Copy e Link
+import { MoreHorizontal, PlusCircle, Copy, Link as LinkIcon } from 'lucide-react';
 import { LoadingScreen } from '@/components/loading-screen';
+import { toast } from 'sonner'; // Importar o toast para feedback
 
-// Tipo auxiliar para os itens da lista, refletindo o que a API retorna
-// O timestamp do Firestore é serializado como um objeto com `seconds` e `nanoseconds`
+// Tipo auxiliar para os itens da lista
 interface SurveyListItem extends Omit<Survey, 'questions' | 'createdAt'> {
     createdAt: { seconds: number; nanoseconds: number };
 }
 
 export default function SurveysPage() {
     const router = useRouter();
-    // ATUALIZADO: Chamada correta para o novo hook genérico
     const { data: surveys, isLoading, error } = useFetchData<SurveyListItem[]>(
         '/api/surveys'
     );
+
+    // ATUALIZAÇÃO: Função para copiar o link da pesquisa
+    const handleCopyLink = (id: string) => {
+        const publicUrl = `${window.location.origin}/s/${id}`;
+        navigator.clipboard.writeText(publicUrl);
+        toast.success("Link da pesquisa copiado para a área de transferência!");
+    };
 
     if (isLoading) {
         return <LoadingScreen message="Carregando pesquisas..." />;
     }
 
-    // CORRIGIDO: Tratamento de erro, acessando a propriedade `message` do objeto Error
     if (error) {
         return <div className="text-red-500">Erro ao carregar as pesquisas: {error.message}</div>;
     }
-
-    const handleAction = (action: 'results' | 'edit' | 'delete', id: string) => {
-        if (action === 'edit') {
-            router.push(`/admin/surveys/${id}/edit`);
-        } else if (action === 'results') {
-            router.push(`/admin/surveys/${id}/results`);
-        }
-        // TODO: Implementar a lógica de deleção com um modal de confirmação.
-    };
 
     return (
         <div className="space-y-6">
@@ -77,7 +75,6 @@ export default function SurveysPage() {
                     </TableHeader>
                     <TableBody>
                         {surveys && surveys.length > 0 ? (
-                            // CORRIGIDO: Adicionado tipo explícito para o parâmetro `survey`
                             surveys.map((survey: SurveyListItem) => (
                                 <TableRow key={survey.id}>
                                     <TableCell className="font-medium">{survey.title}</TableCell>
@@ -87,7 +84,6 @@ export default function SurveysPage() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
-                                        {/* CORRIGIDO: Conversão correta do timestamp serializado */}
                                         {new Date(survey.createdAt.seconds * 1000).toLocaleDateString('pt-BR')}
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -99,15 +95,22 @@ export default function SurveysPage() {
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleAction('results', survey.id)}>
+                                                {/* ATUALIZAÇÃO: Nova opção para copiar o link */}
+                                                <DropdownMenuItem onClick={() => handleCopyLink(survey.id)}>
+                                                    <LinkIcon className="mr-2 h-4 w-4" />
+                                                    Copiar Link Público
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => router.push(`/admin/surveys/${survey.id}/results`)}>
                                                     Resultados
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleAction('edit', survey.id)}>
+                                                <DropdownMenuItem onClick={() => router.push(`/admin/surveys/${survey.id}/edit`)}>
                                                     Editar
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="text-red-600 focus:text-red-500"
-                                                    onClick={() => handleAction('delete', survey.id)}
+                                                    // TODO: Implementar lógica de deleção com modal
+                                                    onClick={() => toast.info('Função de deletar a ser implementada.')}
                                                 >
                                                     Deletar
                                                 </DropdownMenuItem>

@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-// Interface para definir a estrutura do retorno do hook
 interface FetchResult<T> {
     data: T | null;
     isLoading: boolean;
@@ -11,23 +10,26 @@ interface FetchResult<T> {
     refetch: () => void;
 }
 
-/**
- * Hook genérico para buscar dados de uma URL de API.
- * @param url O endpoint da API para buscar os dados.
- * @returns Um objeto contendo os dados, o estado de carregamento e possíveis erros.
- */
-export function useFetchData<T>(url: string): FetchResult<T> {
+// CORREÇÃO: A URL agora pode ser uma string ou null.
+export function useFetchData<T>(url: string | null): FetchResult<T> {
     const [data, setData] = useState<T | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<Error | null>(null);
 
     const fetchData = useCallback(async () => {
+        // CORREÇÃO: Se a URL for nula, não fazemos a chamada e resetamos o estado.
+        // Isso é útil para buscas que dependem de outras variáveis.
+        if (url === null) {
+            setData(null);
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         try {
             const response = await fetch(url);
             if (!response.ok) {
-                // Captura erros de HTTP (ex: 404, 500)
                 const errorBody = await response.text();
                 throw new Error(`Erro na requisição: ${response.status} ${response.statusText}. Detalhes: ${errorBody}`);
             }
@@ -45,10 +47,8 @@ export function useFetchData<T>(url: string): FetchResult<T> {
     }, [url]);
 
     useEffect(() => {
-        // Busca os dados quando o componente é montado ou a URL muda
         fetchData();
     }, [fetchData]);
 
-    // A função refetch permite que o componente re-execute a busca de dados manualmente
     return { data, isLoading, error, refetch: fetchData };
 }
