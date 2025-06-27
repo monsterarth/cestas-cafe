@@ -1,10 +1,10 @@
 // app/s/[id]/page.tsx
 import React from 'react';
 import { adminDb } from '@/lib/firebase-admin';
-import { Survey } from '@/types/survey';
+import { Survey, Question } from '@/types/survey';
 import { SurveyPublicView } from '@/components/survey-public-view';
+import { Timestamp } from 'firebase-admin/firestore';
 
-// Função para buscar os dados da pesquisa no servidor
 async function getSurveyData(id: string): Promise<Survey | null> {
     try {
         const surveyRef = adminDb.collection('surveys').doc(id);
@@ -14,19 +14,27 @@ async function getSurveyData(id: string): Promise<Survey | null> {
             return null;
         }
 
+        const rawData = surveyDoc.data();
+        if (!rawData) {
+            return null;
+        }
+
         const questionsRef = surveyRef.collection('questions').orderBy('position', 'asc');
         const questionsSnapshot = await questionsRef.get();
         
         const questions = questionsSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
-        })) as Survey['questions'];
+        })) as Question[];
 
-        const surveyData = {
+        const surveyData: Survey = {
             id: surveyDoc.id,
-            ...surveyDoc.data(),
+            title: rawData.title,
+            description: rawData.description,
+            isActive: rawData.isActive,
+            createdAt: (rawData.createdAt as Timestamp).toDate().toISOString(),
             questions,
-        } as Survey;
+        };
         
         return surveyData;
 
@@ -36,16 +44,15 @@ async function getSurveyData(id: string): Promise<Survey | null> {
     }
 }
 
-// O componente da página
 export default async function PublicSurveyPage({ params }: { params: { id: string } }) {
     const surveyData = await getSurveyData(params.id);
 
-    if (!surveyData) {
+    if (!surveyData || !surveyData.isActive) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="text-center">
-                    <h1 className="text-2xl font-bold">Pesquisa não encontrada</h1>
-                    <p className="text-muted-foreground">O link que você acessou pode estar incorreto ou a pesquisa não está mais disponível.</p>
+            <div className="flex items-center justify-center h-screen bg-slate-50">
+                <div className="text-center p-4">
+                    <h1 className="text-2xl font-bold">Pesquisa não disponível</h1>
+                    <p className="text-muted-foreground">O link que você acessou pode estar incorreto ou a pesquisa foi desativada.</p>
                 </div>
             </div>
         );
