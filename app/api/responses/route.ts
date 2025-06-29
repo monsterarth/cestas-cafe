@@ -4,10 +4,11 @@ import { adminDb } from '@/lib/firebase-admin';
 import { SurveyResponse, Answer } from '@/types/survey';
 import { Timestamp } from 'firebase-admin/firestore';
 
-// POST: Recebe e salva as respostas de um hóspede
 export async function POST(request: Request) {
     try {
-        const { surveyId, comandaId, answers }: Omit<SurveyResponse, 'id' | 'respondedAt'> = await request.json();
+        // ATUALIZAÇÃO: Extraindo o 'context' do corpo da requisição
+        const { surveyId, comandaId, answers, context }: Omit<SurveyResponse, 'id' | 'respondedAt'> = await request.json();
+
         if (!surveyId || !answers || answers.length === 0) {
             return NextResponse.json({ message: 'Dados de resposta inválidos.' }, { status: 400 });
         }
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
             surveyId,
             comandaId: comandaId || null,
             respondedAt: Timestamp.now(),
+            context: context || {} // Salva o contexto no documento
         };
         batch.set(responseRef, responseData);
 
