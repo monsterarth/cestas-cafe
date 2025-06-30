@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppConfig } from '@/types';
-// ATUALIZAÇÃO: Importando o novo tipo de contexto
 import { Survey, Question, Answer, SurveyResponseContext } from '@/types/survey';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -11,9 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel';
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Star, Info } from 'lucide-react';
+// ATUALIZAÇÃO: Importando os ícones necessários
+import { Star, Info, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { SurveySuccessCard } from './survey-success-card';
@@ -24,35 +24,36 @@ const NpsInput = ({ value, onChange }: { value: number | undefined; onChange: (v
 interface SurveyPublicViewProps {
     survey: Survey;
     config: AppConfig | null;
-    // ATUALIZAÇÃO: Adicionando a prop 'context' para receber os dados da URL
     context: SurveyResponseContext;
 }
 
 export function SurveyPublicView({ survey, config, context }: SurveyPublicViewProps) {
     const [api, setApi] = useState<CarouselApi>();
-    const [current, setCurrent] = useState(0);
+    const [currentSlide, setCurrentSlide] = useState(0);
     const [answers, setAnswers] = useState<Record<string, any>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isComplete, setIsComplete] = useState(false);
     
     const answerableQuestions = survey.questions.filter(q => q.type !== 'SECTION_BREAK');
-    const totalQuestions = answerableQuestions.length;
+    const totalAnswerableQuestions = answerableQuestions.length;
 
     useEffect(() => {
         if (!api) return;
         const updateCurrent = () => {
-            const currentQuestionIndex = api.selectedScrollSnap();
-            const currentQuestion = survey.questions[currentQuestionIndex];
-            if (currentQuestion?.type === 'SECTION_BREAK') {
-                setTimeout(() => api.scrollNext(), 800);
+            if (api) {
+                const currentQuestionIndex = api.selectedScrollSnap();
+                const currentQuestion = survey.questions[currentQuestionIndex];
+                if (currentQuestion?.type === 'SECTION_BREAK') {
+                    // Pula automaticamente para o próximo se for um divisor
+                    setTimeout(() => api.scrollNext(), 800);
+                }
+                setCurrentSlide(currentQuestionIndex);
             }
-            const answeredCount = answerableQuestions.slice(0, api.selectedScrollSnap() + 1).filter(q => q.type !== 'SECTION_BREAK').length;
-            setCurrent(answeredCount);
         };
         api.on("select", updateCurrent);
-        // Pequeno timeout para garantir que a UI inicialize antes de checar a primeira pergunta
         setTimeout(updateCurrent, 100);
-    }, [api, survey.questions, answerableQuestions]);
+        return () => { api.off("select", updateCurrent); };
+    }, [api, survey.questions]);
 
     const handleAnswerChange = (questionId: string, value: any, questionType: Question['type']) => {
         if (questionType === 'MULTIPLE_CHOICE') {
@@ -62,24 +63,16 @@ export function SurveyPublicView({ survey, config, context }: SurveyPublicViewPr
         } else {
             setAnswers(prev => ({ ...prev, [questionId]: value }));
         }
-        if (questionType !== 'TEXT' && questionType !== 'MULTIPLE_CHOICE') {
-           setTimeout(() => api?.scrollNext(), 300);
-        }
     };
     
     const handleSubmit = async () => {
         setIsSubmitting(true); toast.loading("Enviando suas respostas...");
-        const finalAnswers: Omit<Answer, 'id'>[] = survey.questions
-            .filter(q => q.type !== 'SECTION_BREAK')
-            .map((q: Question) => ({
-                question_snapshot: q.text,
-                question_category_snapshot: q.category,
-                question_type_snapshot: q.type,
-                value: answers[q.id] || ''
-            }));
+        const finalAnswers: Omit<Answer, 'id'>[] = answerableQuestions.map((q: Question) => ({
+            question_snapshot: q.text, question_category_snapshot: q.category,
+            question_type_snapshot: q.type, value: answers[q.id] || ''
+        }));
         
         try {
-            // ATUALIZAÇÃO: Incluindo o 'context' no corpo da requisição para a API
             const payload = { surveyId: survey.id, answers: finalAnswers, context };
             const response = await fetch('/api/responses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             if (!response.ok) {
@@ -97,13 +90,15 @@ export function SurveyPublicView({ survey, config, context }: SurveyPublicViewPr
     if (isComplete) {
         return <SurveySuccessCard config={config} />;
     }
-
+    
+    const progressPercentage = totalAnswerableQuestions > 0 ? ((currentSlide + 1) / survey.questions.length) * 100 : 0;
+    
     return (
         <div className="w-full max-w-2xl overflow-x-hidden">
             <Card>
                 <CardHeader className="text-center"><CardTitle className="text-2xl">{survey.title}</CardTitle><CardDescription>{survey.description}</CardDescription></CardHeader>
                 <CardContent>
-                    <Carousel setApi={setApi} className="w-full">
+                    <Carousel setApi={setApi} opts={{ align: "start", loop: false }}>
                         <CarouselContent>
                             {survey.questions.map((question: Question) => (
                                 <CarouselItem key={question.id}>
@@ -128,9 +123,32 @@ export function SurveyPublicView({ survey, config, context }: SurveyPublicViewPr
                                 </CarouselItem>
                             ))}
                         </CarouselContent>
-                        <div className="flex items-center justify-center space-x-4 mt-6">
-                            <CarouselPrevious /><div className="flex-grow flex flex-col items-center gap-2"><Progress value={(current / totalQuestions) * 100} className="w-full max-w-xs" /><span className="text-sm text-muted-foreground">Pergunta {current || 1} de {totalQuestions}</span></div>
-                            {api?.selectedScrollSnap() !== survey.questions.length - 1 ? (<CarouselNext />) : (<Button onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? "Enviando..." : "Finalizar"}</Button>)}
+                        
+                        <div className="mt-8 space-y-4">
+                           <Progress value={progressPercentage} className="w-full max-w-xs mx-auto" />
+                           <div className="flex items-center justify-center space-x-4">
+                               <Button variant="outline" size="icon" onClick={() => api?.scrollPrev()} disabled={!api?.canScrollPrev()}>
+                                   <ArrowLeft className="h-4 w-4" />
+                                   <span className="sr-only">Anterior</span>
+                               </Button>
+
+                               <span className="text-sm font-medium text-muted-foreground">
+                                   {currentSlide + 1} de {survey.questions.length}
+                               </span>
+                               
+                               {/* CORREÇÃO: Lógica para o botão de próximo / finalizar */}
+                               {api?.selectedScrollSnap() !== survey.questions.length - 1 ? (
+                                    <Button variant="outline" size="icon" onClick={() => api?.scrollNext()} disabled={!api?.canScrollNext()}>
+                                        <ArrowRight className="h-4 w-4" />
+                                        <span className="sr-only">Próximo</span>
+                                    </Button>
+                               ) : (
+                                    <Button onClick={handleSubmit} disabled={isSubmitting} size="icon" className="bg-green-600 hover:bg-green-700 text-white">
+                                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                        <span className="sr-only">Finalizar</span>
+                                    </Button>
+                               )}
+                           </div>
                         </div>
                     </Carousel>
                 </CardContent>
@@ -138,5 +156,3 @@ export function SurveyPublicView({ survey, config, context }: SurveyPublicViewPr
         </div>
     );
 }
-
-export default SurveyPublicView;
