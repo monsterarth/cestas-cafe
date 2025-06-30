@@ -1,7 +1,6 @@
 // app/admin/surveys/page.tsx
 'use client';
 
-// ATUALIZAÇÃO: Adicionar 'useState' para controlar o dialog
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFetchData } from '@/hooks/use-fetch-data';
@@ -23,38 +22,41 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle, Link as LinkIcon, Share2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Link as LinkIcon, Share2, History } from 'lucide-react';
 import { LoadingScreen } from '@/components/loading-screen';
 import { toast } from 'sonner';
 import { GenerateSurveyLinkDialog } from '@/components/generate-survey-link-dialog';
+import { SurveyLinkHistory } from '@/components/survey-link-history';
 
+// CORREÇÃO: O tipo agora espera 'createdAt' como uma string, que é o formato padronizado da API.
 interface SurveyListItem extends Omit<Survey, 'questions' | 'createdAt'> {
-    createdAt: { seconds: number; nanoseconds: number };
+    createdAt: string;
 }
 
 export default function SurveysPage() {
     const router = useRouter();
-    const { data: surveys, isLoading, error } = useFetchData<SurveyListItem[]>('/api/surveys');
-
-    // ATUALIZAÇÃO: Estado para controlar qual pesquisa está selecionada para o dialog
+    const { data: surveys, isLoading, error, refetch } = useFetchData<SurveyListItem[]>('/api/surveys');
+    
     const [dialogSurvey, setDialogSurvey] = useState<SurveyListItem | null>(null);
+    const [historySurveyId, setHistorySurveyId] = useState<string | null>(null);
 
     const handleCopyGenericLink = (id: string) => {
         const publicUrl = `${window.location.origin}/s/${id}`;
         navigator.clipboard.writeText(publicUrl);
         toast.success("Link genérico copiado para a área de transferência!");
     };
-
-    if (isLoading) {
-        return <LoadingScreen message="Carregando pesquisas..." />;
-    }
-
-    if (error) {
-        return <div className="text-red-500">Erro ao carregar as pesquisas: {error.message}</div>;
-    }
+    
+    const handleOpenLinkDialog = (survey: SurveyListItem) => {
+        setDialogSurvey(survey);
+        if(historySurveyId !== survey.id) {
+            setHistorySurveyId(survey.id);
+        }
+    };
+    
+    if (isLoading) { return <LoadingScreen message="Carregando pesquisas..." />; }
+    if (error) { return <div className="text-red-500">Erro ao carregar as pesquisas: {error.message}</div>; }
 
     return (
-        // ATUALIZAÇÃO: Usa um Fragment <> para poder colocar o Dialog fora do layout principal
         <>
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -72,13 +74,18 @@ export default function SurveysPage() {
                                 <TableHead>Título</TableHead>
                                 <TableHead className="w-[150px]">Status</TableHead>
                                 <TableHead className="w-[150px]">Data Criação</TableHead>
-                                <TableHead className="text-right w-[80px]">Ações</TableHead>
+                                <TableHead className="text-right w-[120px]">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {surveys && surveys.length > 0 ? (
                                 surveys.map((survey) => (
-                                    <TableRow key={survey.id}>
+                                    <TableRow 
+                                        key={survey.id} 
+                                        onClick={() => setHistorySurveyId(survey.id)} 
+                                        className="cursor-pointer" 
+                                        data-state={historySurveyId === survey.id ? 'selected' : ''}
+                                    >
                                         <TableCell className="font-medium">{survey.title}</TableCell>
                                         <TableCell>
                                             <Badge variant={survey.isActive ? 'default' : 'outline'}>
@@ -86,30 +93,32 @@ export default function SurveysPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            {new Date(survey.createdAt.seconds * 1000).toLocaleDateString('pt-BR')}
+                                            {/* CORREÇÃO: Lendo a data como uma string e formatando */}
+                                            {new Date(survey.createdAt).toLocaleDateString('pt-BR')}
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right flex items-center justify-end gap-2">
+                                            <Button variant="outline" size="icon" onClick={(e) => { e.stopPropagation(); handleOpenLinkDialog(survey); }}>
+                                                <Share2 className="h-4 w-4" />
+                                                <span className="sr-only">Gerar Link Personalizado</span>
+                                            </Button>
+
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
                                                         <span className="sr-only">Abrir menu</span>
                                                         <MoreHorizontal className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    {/* ATUALIZAÇÃO: Este item agora apenas define o estado, não abre o dialog diretamente */}
-                                                    <DropdownMenuItem onSelect={() => setDialogSurvey(survey)}>
-                                                        <Share2 className="mr-2 h-4 w-4" />
-                                                        Gerar Link Personalizado
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuItem onClick={() => handleCopyGenericLink(survey.id)}>
+                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCopyGenericLink(survey.id); }}>
                                                         <LinkIcon className="mr-2 h-4 w-4" />
                                                         Copiar Link Genérico
                                                     </DropdownMenuItem>
-
+                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setHistorySurveyId(survey.id); }}>
+                                                        <History className="mr-2 h-4 w-4" />
+                                                        Ver Histórico
+                                                    </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
-
                                                     <DropdownMenuItem onClick={() => router.push(`/admin/surveys/${survey.id}/results`)}>
                                                         Resultados
                                                     </DropdownMenuItem>
@@ -118,7 +127,7 @@ export default function SurveysPage() {
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
                                                         className="text-red-600 focus:text-red-500"
-                                                        onClick={() => toast.info('Função de deletar a ser implementada.')}
+                                                        onClick={(e) => { e.stopPropagation(); toast.info('Função de deletar a ser implementada.'); }}
                                                     >
                                                         Deletar
                                                     </DropdownMenuItem>
@@ -128,25 +137,25 @@ export default function SurveysPage() {
                                     </TableRow>
                                 ))
                             ) : (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="text-center h-24">
-                                        Nenhuma pesquisa encontrada.
-                                    </TableCell>
-                                </TableRow>
+                                <TableRow><TableCell colSpan={5} className="text-center h-24">Nenhuma pesquisa encontrada.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
                 </div>
+                
+                {historySurveyId && (
+                    <div className="mt-6">
+                        <SurveyLinkHistory surveyId={historySurveyId} />
+                    </div>
+                )}
             </div>
-
-            {/* ATUALIZAÇÃO: O Dialog agora vive aqui, fora do loop da tabela.
-              Ele é controlado pelo estado 'dialogSurvey'.
-            */}
+            
             <GenerateSurveyLinkDialog
                 isOpen={!!dialogSurvey}
                 onOpenChange={(open) => {
                     if (!open) {
                         setDialogSurvey(null);
+                        refetch();
                     }
                 }}
                 survey={dialogSurvey}

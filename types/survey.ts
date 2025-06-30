@@ -49,3 +49,10 @@ export interface SurveyResponse {
   answers: Answer[];
   context?: SurveyResponseContext;
 }
+export interface GeneratedSurveyLink {
+    id: string;
+    surveyId: string;
+    fullUrl: string;
+    context: SurveyResponseContext;
+    createdAt: Timestamp | string;
+}
