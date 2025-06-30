@@ -24,7 +24,6 @@ interface GenerateSurveyLinkDialogProps {
 }
 
 export const GenerateSurveyLinkDialog = ({ survey, isOpen, onOpenChange }: GenerateSurveyLinkDialogProps) => {
-    // Estados internos para os campos do formulário
     const [cabinName, setCabinName] = useState('');
     const [guestCount, setGuestCount] = useState<number | ''>('');
     const [checkIn, setCheckIn] = useState('');
@@ -33,53 +32,37 @@ export const GenerateSurveyLinkDialog = ({ survey, isOpen, onOpenChange }: Gener
     const [selectedState, setSelectedState] = useState('');
     const [selectedCity, setSelectedCity] = useState('');
 
-    // CORREÇÃO: Buscando cabanas da API correta e apenas quando o dialog está aberto
     const { data: cabins, isLoading: loadingCabins } = useFetchData<Cabin[]>(isOpen ? '/api/cabanas' : null);
     const { data: countries, isLoading: loadingCountries, refetch: refetchCountries } = useFetchData<LocationItem[]>(isOpen ? '/api/locations/countries' : null);
     const { data: states, isLoading: loadingStates, refetch: refetchStates } = useFetchData<LocationItem[]>(isOpen && selectedCountry ? `/api/locations/states?countryId=${selectedCountry}` : null);
     const { data: cities, isLoading: loadingCities, refetch: refetchCities } = useFetchData<LocationItem[]>(isOpen && selectedState ? `/api/locations/cities?stateId=${selectedState}` : null);
     
-    // Efeito para preparar e limpar o formulário
     useEffect(() => {
         if (isOpen) {
-            setCheckOut(format(new Date(), 'yyyy-MM-dd')); // Seta a data de hoje
+            setCheckOut(format(new Date(), 'yyyy-MM-dd'));
+            if (countries && countries.length > 0 && !selectedCountry) {
+                const brazil = countries.find(c => c.name.toLowerCase() === 'brasil');
+                if (brazil) setSelectedCountry(brazil.id);
+            }
         } else {
-            // Limpa tudo ao fechar para não manter dados antigos na próxima abertura
             setCabinName(''); setGuestCount(''); setCheckIn(''); setCheckOut('');
             setSelectedCountry(''); setSelectedState(''); setSelectedCity('');
         }
-    }, [isOpen]);
-
-    // Efeito para pré-selecionar o país, executado apenas uma vez quando os países carregam
-    useEffect(() => {
-        if (isOpen && countries && countries.length > 0 && !selectedCountry) {
-            const brazil = countries.find(c => c.name.toLowerCase() === 'brasil');
-            if (brazil) setSelectedCountry(brazil.id);
-        }
     }, [isOpen, countries]);
 
-
-    // Efeitos para limpar seleções em cascata
     useEffect(() => { if (isOpen) { setSelectedState(''); setSelectedCity(''); } }, [selectedCountry, isOpen]);
     useEffect(() => { if (isOpen) { setSelectedCity(''); } }, [selectedState, isOpen]);
 
     const handleAddLocation = async (type: 'country' | 'state' | 'city', name: string) => {
-        let url = '';
-        let body: any = { name };
-        let refetch: () => void = () => {};
-
-        if (type === 'country') { url = '/api/locations/countries'; refetch = refetchCountries; }
-        else if (type === 'state') { if (!selectedCountry) { toast.error("Selecione um país primeiro."); return; } url = '/api/locations/states'; body.countryId = selectedCountry; refetch = refetchStates; }
-        else if (type === 'city') { if (!selectedState) { toast.error("Selecione um estado primeiro."); return; } url = '/api/locations/cities'; body.stateId = selectedState; refetch = refetchCities; }
+        let url = '', body: any = { name }, refetch: () => void = () => {}, label = '';
+        if (type === 'country') { url = '/api/locations/countries'; refetch = refetchCountries; label = 'País'; }
+        else if (type === 'state') { if (!selectedCountry) { toast.error("Selecione um país primeiro."); return; } url = '/api/locations/states'; body.countryId = selectedCountry; refetch = refetchStates; label = 'Estado'; }
+        else if (type === 'city') { if (!selectedState) { toast.error("Selecione um estado primeiro."); return; } url = '/api/locations/cities'; body.stateId = selectedState; refetch = refetchCities; label = 'Cidade'; }
         else return;
         
         const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        if(response.ok) {
-          toast.success(`${Label} adicionado(a) com sucesso!`);
-          refetch();
-        } else {
-          toast.error("Falha ao adicionar local.");
-        }
+        if(response.ok) { toast.success(`${label} adicionado(a) com sucesso!`); refetch(); } 
+        else { toast.error("Falha ao adicionar local."); }
     };
 
     const generateAndCopyLink = () => {
@@ -87,40 +70,25 @@ export const GenerateSurveyLinkDialog = ({ survey, isOpen, onOpenChange }: Gener
         const baseUrl = `${window.location.origin}/s/${survey.id}`;
         const params = new URLSearchParams();
 
-        const context: SurveyResponseContext = {};
-        if (cabinName) context.cabinName = cabinName;
-        if (guestCount) context.guestCount = Number(guestCount);
-        if (checkIn) context.checkInDate = checkIn;
-        if (checkOut) context.checkOutDate = checkOut;
+        if (cabinName) params.append('cabana', cabinName);
+        if (guestCount) params.append('hospedes', guestCount.toString());
+        if (checkIn) params.append('checkin', checkIn);
+        if (checkOut) params.append('checkout', checkOut);
+        
+        // CORREÇÃO: Busca o NOME do local para adicionar à URL
         const countryName = countries?.find(c => c.id === selectedCountry)?.name;
         const stateName = states?.find(s => s.id === selectedState)?.name;
         const cityName = cities?.find(c => c.id === selectedCity)?.name;
-        if (countryName) context.country = countryName;
-        if (stateName) context.state = stateName;
-        if (cityName) context.city = cityName;
-        
-        Object.entries(context).forEach(([key, value]) => {
-            if (value) params.append(key, String(value));
-        });
+
+        if (countryName) params.append('pais', countryName);
+        if (stateName) params.append('estado', stateName);
+        if (cityName) params.append('cidade', cityName);
         
         const finalUrl = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
         navigator.clipboard.writeText(finalUrl);
         toast.success("Link personalizado copiado!");
         onOpenChange(false);
     };
-
-    const renderSelectWithAdd = (label: string, value: string, onValueChange: (val: string) => void, items: LocationItem[] | null, placeholder: string, loading: boolean, addHandler: (name: string) => Promise<void>, isDisabled: boolean = false) => (
-        <div>
-            <Label>{label}</Label>
-            <div className="flex gap-2">
-                <Select value={value} onValueChange={onValueChange} disabled={isDisabled || loading || !items}>
-                    <SelectTrigger><SelectValue placeholder={loading ? "Carregando..." : placeholder} /></SelectTrigger>
-                    <SelectContent>{items?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent>
-                </Select>
-                <AddLocationDialog title={`Adicionar ${label}`} label={`Nome do ${label}`} onSave={addHandler} />
-            </div>
-        </div>
-    );
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -137,9 +105,9 @@ export const GenerateSurveyLinkDialog = ({ survey, isOpen, onOpenChange }: Gener
                         <div><Label htmlFor="checkOut">Check-out</Label><Input id="checkOut" type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} /></div>
                     </div>
                     <div className="space-y-4"><h4 className="font-semibold text-sm border-b pb-2">Localização do Hóspede</h4>
-                        {renderSelectWithAdd("País", selectedCountry, setSelectedCountry, countries, "Selecione o país", loadingCountries, (name) => handleAddLocation('country', name))}
-                        {renderSelectWithAdd("Estado", selectedState, setSelectedState, states, "Selecione um país primeiro", loadingStates, (name) => handleAddLocation('state', name), !selectedCountry)}
-                        {renderSelectWithAdd("Cidade", selectedCity, setSelectedCity, cities, "Selecione um estado primeiro", loadingCities, (name) => handleAddLocation('city', name), !selectedState)}
+                        <div><Label>País</Label><div className="flex gap-2"><Select value={selectedCountry} onValueChange={setSelectedCountry} disabled={loadingCountries}><SelectTrigger><SelectValue placeholder={loadingCountries ? "Carregando..." : "Selecione o país"} /></SelectTrigger><SelectContent>{countries?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select><AddLocationDialog title="Adicionar País" label="Nome do País" onSave={(name) => handleAddLocation('country', name)} /></div></div>
+                        <div><Label>Estado</Label><div className="flex gap-2"><Select value={selectedState} onValueChange={setSelectedState} disabled={!selectedCountry || loadingStates}><SelectTrigger><SelectValue placeholder={!selectedCountry ? "Selecione um país" : (loadingStates ? "Carregando..." : "Selecione o estado")} /></SelectTrigger><SelectContent>{states?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select><AddLocationDialog title="Adicionar Estado" label="Nome do Estado" onSave={(name) => handleAddLocation('state', name)} /></div></div>
+                        <div><Label>Cidade</Label><div className="flex gap-2"><Select value={selectedCity} onValueChange={setSelectedCity} disabled={!selectedState || loadingCities}><SelectTrigger><SelectValue placeholder={!selectedState ? "Selecione um estado" : (loadingCities ? "Carregando..." : "Selecione a cidade")} /></SelectTrigger><SelectContent>{cities?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select><AddLocationDialog title="Adicionar Cidade" label="Nome da Cidade" onSave={(name) => handleAddLocation('city', name)} /></div></div>
                     </div>
                 </div>
                 <DialogFooter><Button onClick={generateAndCopyLink}><Copy className="mr-2 h-4 w-4"/> Gerar e Copiar Link</Button></DialogFooter>
