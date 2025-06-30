@@ -28,7 +28,7 @@ import { toast } from 'sonner';
 import { GenerateSurveyLinkDialog } from '@/components/generate-survey-link-dialog';
 import { SurveyLinkHistory } from '@/components/survey-link-history';
 
-// CORREÇÃO: O tipo agora espera 'createdAt' como uma string, que é o formato padronizado da API.
+// CORREÇÃO: O tipo agora espera 'createdAt' como uma string.
 interface SurveyListItem extends Omit<Survey, 'questions' | 'createdAt'> {
     createdAt: string;
 }
@@ -43,7 +43,7 @@ export default function SurveysPage() {
     const handleCopyGenericLink = (id: string) => {
         const publicUrl = `${window.location.origin}/s/${id}`;
         navigator.clipboard.writeText(publicUrl);
-        toast.success("Link genérico copiado para a área de transferência!");
+        toast.success("Link genérico copiado!");
     };
     
     const handleOpenLinkDialog = (survey: SurveyListItem) => {
@@ -80,20 +80,11 @@ export default function SurveysPage() {
                         <TableBody>
                             {surveys && surveys.length > 0 ? (
                                 surveys.map((survey) => (
-                                    <TableRow 
-                                        key={survey.id} 
-                                        onClick={() => setHistorySurveyId(survey.id)} 
-                                        className="cursor-pointer" 
-                                        data-state={historySurveyId === survey.id ? 'selected' : ''}
-                                    >
+                                    <TableRow key={survey.id} onClick={() => setHistorySurveyId(survey.id)} className="cursor-pointer" data-state={historySurveyId === survey.id ? 'selected' : ''}>
                                         <TableCell className="font-medium">{survey.title}</TableCell>
+                                        <TableCell><Badge variant={survey.isActive ? 'default' : 'outline'}>{survey.isActive ? 'Ativo' : 'Inativo'}</Badge></TableCell>
                                         <TableCell>
-                                            <Badge variant={survey.isActive ? 'default' : 'outline'}>
-                                                {survey.isActive ? 'Ativo' : 'Inativo'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            {/* CORREÇÃO: Lendo a data como uma string e formatando */}
+                                            {/* CORREÇÃO: Criando a data a partir da string recebida da API */}
                                             {new Date(survey.createdAt).toLocaleDateString('pt-BR')}
                                         </TableCell>
                                         <TableCell className="text-right flex items-center justify-end gap-2">
@@ -101,44 +92,21 @@ export default function SurveysPage() {
                                                 <Share2 className="h-4 w-4" />
                                                 <span className="sr-only">Gerar Link Personalizado</span>
                                             </Button>
-
                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                                                        <span className="sr-only">Abrir menu</span>
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCopyGenericLink(survey.id); }}>
-                                                        <LinkIcon className="mr-2 h-4 w-4" />
-                                                        Copiar Link Genérico
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setHistorySurveyId(survey.id); }}>
-                                                        <History className="mr-2 h-4 w-4" />
-                                                        Ver Histórico
-                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCopyGenericLink(survey.id); }}><LinkIcon className="mr-2 h-4 w-4" />Copiar Link Genérico</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setHistorySurveyId(survey.id); }}><History className="mr-2 h-4 w-4" />Ver Histórico</DropdownMenuItem>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => router.push(`/admin/surveys/${survey.id}/results`)}>
-                                                        Resultados
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => router.push(`/admin/surveys/${survey.id}/edit`)}>
-                                                        Editar
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        className="text-red-600 focus:text-red-500"
-                                                        onClick={(e) => { e.stopPropagation(); toast.info('Função de deletar a ser implementada.'); }}
-                                                    >
-                                                        Deletar
-                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => router.push(`/admin/surveys/${survey.id}/results`)}>Resultados</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => router.push(`/admin/surveys/${survey.id}/edit`)}>Editar</DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-red-600 focus:text-red-500" onClick={(e) => { e.stopPropagation(); toast.info('Função de deletar a ser implementada.'); }}>Deletar</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))
-                            ) : (
-                                <TableRow><TableCell colSpan={5} className="text-center h-24">Nenhuma pesquisa encontrada.</TableCell></TableRow>
-                            )}
+                            ) : (<TableRow><TableCell colSpan={5} className="text-center h-24">Nenhuma pesquisa encontrada.</TableCell></TableRow>)}
                         </TableBody>
                     </Table>
                 </div>

@@ -13,7 +13,7 @@ export async function GET() {
             return NextResponse.json([]);
         }
 
-        // CORREÇÃO: Mapeia os dados e converte o Timestamp para string
+        // Mapeia os dados e converte o Timestamp para string
         const surveys = snapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -36,7 +36,7 @@ export async function GET() {
 // POST: Cria uma nova pesquisa
 export async function POST(request: Request) {
     try {
-        const { title, description, isActive } = await request.json(); // isActive pode ser recebido
+        const { title, description, isActive } = await request.json();
         if (!title) {
             return NextResponse.json({ message: 'O título é obrigatório.' }, { status: 400 });
         }
