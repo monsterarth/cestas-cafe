@@ -1,10 +1,12 @@
 // components/question-editor-card.tsx
+'use client';
+
 import React from 'react';
 import { Question, QuestionType } from '@/types/survey';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea'; // Importar Textarea
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { GripVertical, Trash2, PlusCircle, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,10 +15,10 @@ import type { DraggableSyntheticListeners } from '@dnd-kit/core';
 const QUESTION_CATEGORIES = ["Limpeza", "Atendimento", "Infraestrutura", "Comida", "Geral"];
 
 interface QuestionEditorCardProps {
-    question: Question;
-    updateQuestion: (id: string, updates: Partial<Question>) => void;
-    removeQuestion: (id: string) => void;
-    dragListeners?: DraggableSyntheticListeners;
+  question: Question;
+  updateQuestion: (id: string, updates: Partial<Question>) => void;
+  removeQuestion: (id: string) => void;
+  dragListeners?: DraggableSyntheticListeners;
 }
 
 export const QuestionEditorCard = ({ question, updateQuestion, removeQuestion, dragListeners }: QuestionEditorCardProps) => {
@@ -40,9 +42,11 @@ export const QuestionEditorCard = ({ question, updateQuestion, removeQuestion, d
         updateQuestion(question.id, { options: newOptions });
     };
     
-    const showOptionsEditor = question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE';
-    const isSectionBreak = question.type === 'SECTION_BREAK';
-    const isNPS = question.type === 'NPS';
+    // CORREÇÃO: Garante que o código não quebre se o 'type' for de uma versão antiga e não existir na lista nova.
+    const questionType = question.type || 'TEXT'; // Define um padrão seguro
+    const showOptionsEditor = questionType === 'SINGLE_CHOICE' || questionType === 'MULTIPLE_CHOICE';
+    const isSectionBreak = questionType === 'SECTION_BREAK';
+    const isNPS = questionType === 'NPS';
 
     return (
         <Card className="bg-white/80 overflow-hidden">
@@ -54,12 +58,13 @@ export const QuestionEditorCard = ({ question, updateQuestion, removeQuestion, d
                 <div><Label htmlFor={`question-text-${question.id}`}>{isSectionBreak ? 'Título da Seção' : 'Texto da Pergunta'}</Label><Input id={`question-text-${question.id}`} value={question.text} onChange={(e) => handleInputChange('text', e.target.value)} placeholder={isSectionBreak ? 'Ex: Sobre sua Cabana' : 'Ex: Como você avalia a limpeza?'} /></div>
 
                 {isSectionBreak && (
+                    // CORREÇÃO: Usa 'question.description || ''' para evitar erro se a propriedade não existir em dados antigos.
                     <div><Label htmlFor={`question-description-${question.id}`}>Texto de Apoio (Opcional)</Label><Textarea id={`question-description-${question.id}`} value={question.description || ''} onChange={(e) => handleInputChange('description', e.target.value)} placeholder="Uma breve descrição para esta seção." rows={2} /></div>
                 )}
                 
                 {!isSectionBreak && (
                     <div className="grid grid-cols-2 gap-4">
-                        <div><Label htmlFor={`question-type-${question.id}`}>Tipo</Label><Select value={question.type} onValueChange={(value: QuestionType) => handleInputChange('type', value)}><SelectTrigger id={`question-type-${question.id}`}><SelectValue placeholder="Selecione o tipo" /></SelectTrigger><SelectContent><SelectItem value="RATING">Avaliação (Estrelas)</SelectItem><SelectItem value="TEXT">Texto Aberto</SelectItem><SelectItem value="SINGLE_CHOICE">Escolha Única</SelectItem><SelectItem value="MULTIPLE_CHOICE">Múltipla Escolha</SelectItem><SelectItem value="NPS">Escala Numérica (NPS)</SelectItem><SelectItem value="SECTION_BREAK">Divisor de Seção</SelectItem></SelectContent></Select></div>
+                        <div><Label htmlFor={`question-type-${question.id}`}>Tipo</Label><Select value={questionType} onValueChange={(value: QuestionType) => handleInputChange('type', value)}><SelectTrigger id={`question-type-${question.id}`}><SelectValue placeholder="Selecione o tipo" /></SelectTrigger><SelectContent><SelectItem value="RATING">Avaliação (Estrelas)</SelectItem><SelectItem value="TEXT">Texto Aberto</SelectItem><SelectItem value="SINGLE_CHOICE">Escolha Única</SelectItem><SelectItem value="MULTIPLE_CHOICE">Múltipla Escolha</SelectItem><SelectItem value="NPS">Escala Numérica (NPS)</SelectItem><SelectItem value="SECTION_BREAK">Divisor de Seção</SelectItem></SelectContent></Select></div>
                         {!isNPS && (
                              <div><Label htmlFor={`question-category-${question.id}`}>Categoria</Label><Select value={question.category} onValueChange={(value: string) => handleInputChange('category', value)}><SelectTrigger id={`question-category-${question.id}`}><SelectValue placeholder="Selecione a categoria" /></SelectTrigger><SelectContent>{QUESTION_CATEGORIES.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent></Select></div>
                         )}
