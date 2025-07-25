@@ -1,181 +1,195 @@
-// cestas-cafe/app/admin/pedidos/estatisticas/page.tsx
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { DateRange } from 'react-day-picker';
-import { subDays, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { useFetchData } from '@/hooks/use-fetch-data';
+import { Order, ItemPedido } from '@/types';
+import { useMemo } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LoadingScreen } from '@/components/loading-screen';
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Calendar as CalendarIcon, Loader2, ListOrdered, Utensils, Grape, PieChart as PieChartIcon } from 'lucide-react';
-import { toast } from 'sonner';
-
-interface StatItem {
-    name: string;
-    value: number;
+// --- Tipagens para os dados das estatísticas ---
+interface PedidosStats {
+  totalPedidos: number;
+  totalItens: number;
+  horariosPico: { time: string; count: number }[];
+  categoriasMaisConsumidas: { name: string; value: number }[];
+  itensMaisPedidos: { name: string; value: number }[];
 }
 
-// Interface de dados atualizada para corresponder à nova API
-interface StatsData {
-    totalPedidos: number;
-    totalItensVendidos: number;
-    itensMaisPedidos: StatItem[];
-    pratosQuentesMaisPedidos: StatItem[];
-    saboresMaisPedidos: StatItem[]; // Alterado
-    categoriasMaisConsumidas: StatItem[];
-}
+// --- Lógica de processamento dos dados ---
+const processarEstatisticas = (orders: Order[]): PedidosStats => {
+  const totalPedidos = orders.length;
+  let totalItens = 0;
+  const horariosPicoMap: Record<string, number> = {};
+  const categoriasMap: Record<string, number> = {};
+  const itensMap: Record<string, number> = {};
 
-interface PieLabelProps {
-    cx: number;
-    cy: number;
-    midAngle: number;
-    innerRadius: number;
-    outerRadius: number;
-    percent: number;
-}
+  orders.forEach(order => {
+    // Horários de pico
+    const hora = order.horarioEntrega;
+    horariosPicoMap[hora] = (horariosPicoMap[hora] || 0) + 1;
 
-const initialDateRange = {
-    from: subDays(new Date(), 29),
-    to: new Date(),
+    // Itens e Categorias
+    order.itensPedido.forEach((item: ItemPedido) => {
+      totalItens += item.quantidade;
+      
+      // Contagem de itens
+      const nomeItem = item.sabor ? `${item.nomeItem} (${item.sabor})` : item.nomeItem;
+      itensMap[nomeItem] = (itensMap[nomeItem] || 0) + item.quantidade;
+
+      // Contagem de categorias
+      if (item.categoria) {
+        categoriasMap[item.categoria] = (categoriasMap[item.categoria] || 0) + item.quantidade;
+      }
+    });
+  });
+
+  // Formatação para o gráfico
+  const horariosPico = Object.entries(horariosPicoMap)
+    .map(([time, count]) => ({ time, count }))
+    .sort((a, b) => a.time.localeCompare(b.time));
+    
+  const categoriasMaisConsumidas = Object.entries(categoriasMap)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
+  const itensMaisPedidos = Object.entries(itensMap)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
+  return { totalPedidos, totalItens, horariosPico, categoriasMaisConsumidas, itensMaisPedidos };
 };
 
-const CHART_COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F", "#FFBB28"];
+
+// Tipagem para as props do label do gráfico
+interface PieLabelProps {
+    cx?: number;
+    cy?: number;
+    midAngle?: number;
+    innerRadius?: number;
+    outerRadius?: number;
+    percent?: number;
+    index?: number;
+}
+  
+const CHART_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088fe', '#00c49f'];
+
+const RADIAN = Math.PI / 180;
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: PieLabelProps) => {
+    // CORREÇÃO: Adicionamos verificações para garantir que os valores não sejam undefined
+    if (cx === undefined || cy === undefined || midAngle === undefined || innerRadius === undefined || outerRadius === undefined || percent === undefined) {
+        return null;
+    }
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  
+    return (
+      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central">
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+};
+
 
 export default function EstatisticasPage() {
-    const [stats, setStats] = useState<StatsData | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [date, setDate] = useState<DateRange | undefined>(initialDateRange);
+  const { data: orders, isLoading, error } = useFetchData<Order[]>('/api/pedidos/all');
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            if (!date?.from || !date?.to) return;
-            setIsLoading(true);
-            try {
-                const params = new URLSearchParams({
-                    startDate: date.from.toISOString(),
-                    endDate: date.to.toISOString(),
-                });
-                const response = await fetch(`/api/admin/stats?${params.toString()}`);
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Falha ao buscar estatísticas.');
-                }
-                const data: StatsData = await response.json();
-                setStats(data);
-            } catch (error: any) {
-                toast.error(error.message);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+  const stats = useMemo(() => {
+    if (!orders) return null;
+    return processarEstatisticas(orders);
+  }, [orders]);
 
-        fetchStats();
-    }, [date]);
+  if (isLoading) return <LoadingScreen message="Processando estatísticas..." />;
+  if (error || !stats) return <div>Erro ao carregar estatísticas. Tente novamente mais tarde.</div>;
 
-    const setPresetDateRange = (preset: 'semanal' | 'mensal' | 'anual') => {
-        const today = new Date();
-        let fromDate: Date;
-        if (preset === 'semanal') fromDate = startOfWeek(today, { locale: ptBR });
-        else if (preset === 'mensal') fromDate = startOfMonth(today);
-        else fromDate = startOfYear(today);
-        setDate({ from: fromDate, to: today });
-    };
-
-    const renderBarChart = (data: StatItem[], title: string, icon: React.ReactNode) => (
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Visão Geral</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div className="p-4 bg-slate-50 rounded-lg">
+            <p className="text-2xl font-bold">{stats.totalPedidos}</p>
+            <p className="text-sm text-muted-foreground">Total de Pedidos</p>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-lg">
+            <p className="text-2xl font-bold">{stats.totalItens}</p>
+            <p className="text-sm text-muted-foreground">Total de Itens Servidos</p>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2 text-lg font-semibold">{icon} {title}</CardTitle></CardHeader>
+            <CardHeader>
+                <CardTitle>Categorias Mais Consumidas</CardTitle>
+            </CardHeader>
             <CardContent>
-                {data && data.length > 0 ? (
-                    <ChartContainer config={{}} className="h-[300px] w-full">
-                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data} layout="vertical" margin={{ left: 30, right: 30, top: 5, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" allowDecimals={false} />
-                                <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 12 }} interval={0} />
-                                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                <Bar dataKey="value" fill="hsl(var(--primary))" radius={4} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </ChartContainer>
-                ) : ( <div className="flex items-center justify-center h-[300px]"><p className="text-muted-foreground">Nenhum dado para este período.</p></div> )}
+                <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                        <Tooltip />
+                        <Pie
+                            data={stats.categoriasMaisConsumidas}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            labelLine={false}
+                            label={renderCustomizedLabel}
+                        >
+                            {stats.categoriasMaisConsumidas.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                        </Pie>
+                        <Legend />
+                    </PieChart>
+                </ResponsiveContainer>
             </CardContent>
         </Card>
-    );
-    
-    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: PieLabelProps) => {
-        const radius = innerRadius + (outerRadius - innerRadius) * 1.2;
-        const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
-        const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
-        return <text x={x} y={y} fill="currentColor" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">{`${(percent * 100).toFixed(0)}%`}</text>;
-    };
 
-    return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 bg-card rounded-lg border">
-                <div>
-                    <h1 className="text-2xl font-bold">Análise de Consumo</h1>
-                    <p className="text-muted-foreground">Selecione um período para analisar os dados de pedidos.</p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <Button variant="outline" size="sm" onClick={() => setPresetDateRange('semanal')}>Esta Semana</Button>
-                    <Button variant="outline" size="sm" onClick={() => setPresetDateRange('mensal')}>Este Mês</Button>
-                    <Button variant="outline" size="sm" onClick={() => setPresetDateRange('anual')}>Este Ano</Button>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button id="date" variant="outline" size="sm" className="w-[280px] justify-start text-left font-normal">
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {date?.from ? (date.to ? `${format(date.from, "d 'de' LLL, y", {locale: ptBR})} - ${format(date.to, "d 'de' LLL, y", {locale: ptBR})}` : format(date.from, "d 'de' LLL, y")) : <span>Escolha um período</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                            <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} locale={ptBR} />
-                        </PopoverContent>
-                    </Popover>
-                </div>
-            </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Horários de Pico de Entrega</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={stats.horariosPico}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="time" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" fill="#82ca9d" name="Nº de Pedidos" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
 
-            {isLoading ? (
-                <div className="flex justify-center items-center h-96"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
-            ) : !stats ? (
-                <div className="flex justify-center items-center h-96"><p className="text-muted-foreground">Não foi possível carregar as estatísticas.</p></div>
-            ) : (
-                <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <Card><CardHeader><CardTitle>Total de Pedidos</CardTitle></CardHeader><CardContent><p className="text-4xl font-extrabold">{stats.totalPedidos}</p></CardContent></Card>
-                        <Card><CardHeader><CardTitle>Itens Vendidos</CardTitle></CardHeader><CardContent><p className="text-4xl font-extrabold">{stats.totalItensVendidos}</p></CardContent></Card>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-6">{renderBarChart(stats.itensMaisPedidos, "Top 10 Itens Mais Pedidos", <ListOrdered />)}</div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {renderBarChart(stats.pratosQuentesMaisPedidos, "Top 5 Pratos Quentes", <Utensils />)}
-                        {/* Gráfico de sabores agora usa os dados corretos */}
-                        {renderBarChart(stats.saboresMaisPedidos, "Top 5 Sabores", <Grape />)}
-                        <Card>
-                            <CardHeader><CardTitle className="flex items-center gap-2 text-lg font-semibold"><PieChartIcon /> Categorias Populares</CardTitle></CardHeader>
-                            <CardContent>
-                                {stats.categoriasMaisConsumidas && stats.categoriasMaisConsumidas.length > 0 ? (
-                                    <ChartContainer config={{}} className="h-[300px] w-full">
-                                         <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                                                <Pie data={stats.categoriasMaisConsumidas} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={2} labelLine={false} label={renderCustomizedLabel}>
-                                                    {stats.categoriasMaisConsumidas.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
-                                                </Pie>
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </ChartContainer>
-                                ) : ( <div className="flex items-center justify-center h-[300px]"><p className="text-muted-foreground">Nenhum dado para este período.</p></div> )}
-                            </CardContent>
-                        </Card>
-                    </div>
-                </>
-            )}
-        </div>
-    );
+      <Card>
+          <CardHeader>
+            <CardTitle>Top 10 Itens Mais Pedidos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={400}>
+                <BarChart layout="vertical" data={stats.itensMaisPedidos} margin={{ top: 20, right: 30, left: 100, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="name" type="category" width={150} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="value" fill="#8884d8" name="Quantidade" />
+                </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+      </Card>
+    </div>
+  );
 }
