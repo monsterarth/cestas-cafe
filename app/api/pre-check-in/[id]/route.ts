@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { z } from 'zod';
 
+// Força a rota a ser dinâmica e não usar cache
+export const dynamic = 'force-dynamic';
+
 const updateSchema = z.object({
   status: z.enum(['recebido', 'concluido', 'arquivado']),
 });

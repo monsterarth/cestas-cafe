@@ -176,6 +176,6 @@ export interface PreCheckIn {
   foodRestrictions?: string;
   isBringingPet: boolean;
   guests: Guest[];
-  createdAt: Timestamp;
+  createdAt: string; // ✨ CORRIGIDO: O tipo agora é string.
   status: 'recebido' | 'concluido' | 'arquivado';
 }

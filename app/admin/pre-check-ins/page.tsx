@@ -35,7 +35,7 @@ const PreCheckInDetails = ({ checkInData }: { checkInData: PreCheckIn }) => {
                     <p><strong>Celular:</strong> {checkInData.leadGuestPhone}
                         <Button variant="ghost" size="sm" asChild className="ml-2">
                            <a href={`https://wa.me/55${checkInData.leadGuestPhone}`} target="_blank" rel="noopener noreferrer">
-                                <Phone className="h-4 w-4" />
+                                <Phone className="h-4 w-4 text-green-600" />
                            </a>
                         </Button>
                     </p>
@@ -88,7 +88,7 @@ const PreCheckInsPage: React.FC = () => {
             
             toast.dismiss();
             toast.success(`Pré-check-in ${newStatus === 'arquivado' ? 'arquivado' : 'restaurado'} com sucesso!`);
-            refetch(); // Re-fetch data to update the list
+            refetch();
         } catch (err: any) {
             toast.dismiss();
             toast.error(err.message);
@@ -97,7 +97,7 @@ const PreCheckInsPage: React.FC = () => {
 
     const filteredCheckIns = useMemo(() => {
         if (!allCheckIns) return [];
-        return allCheckIns.filter((checkin: PreCheckIn) => 
+        return allCheckIns.filter((checkin) => 
             showArchived ? checkin.status === 'arquivado' : checkin.status !== 'arquivado'
         );
     }, [allCheckIns, showArchived]);
@@ -150,7 +150,8 @@ const PreCheckInsPage: React.FC = () => {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        {new Date(checkIn.createdAt.seconds * 1000).toLocaleString('pt-BR')}
+                                        {/* A CORREÇÃO ESTÁ AQUI */}
+                                        {new Date(checkIn.createdAt).toLocaleString('pt-BR')}
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant={checkIn.status === 'recebido' ? 'default' : checkIn.status === 'arquivado' ? 'outline' : 'secondary'}>
