@@ -1,168 +1,149 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import React, { useState } from 'react';
+import { useFetchData } from '@/hooks/use-fetch-data';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Eye } from 'lucide-react';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-    DialogClose,
-} from "@/components/ui/dialog";
+import { LoadingScreen } from '@/components/loading-screen';
+import { AlertTriangle, Dog, Eye, UserCheck, Users, Clock } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from '@/components/ui/button';
 
-// Define uma interface para o tipo de dado do check-in
-interface CheckIn {
-    id: string;
-    responsibleName: string;
-    responsibleCPF: string;
-    createdAt: string; // A data agora é uma string no formato ISO
-    status: string;
-    guests: any[];
-    vehiclePlate: string;
-    vehicleModel: string;
-    checkInDate: string;
-    checkOutDate: string;
+// Interface correta que corresponde aos dados do Firestore
+interface Guest {
+  fullName: string;
+  isLead: boolean;
 }
 
-export default function PreCheckInsPage() {
-    const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+interface PreCheckIn {
+  id: string;
+  leadGuestCpf: string;
+  leadGuestEmail: string;
+  address: string;
+  estimatedArrivalTime: string;
+  foodRestrictions?: string;
+  isBringingPet: boolean;
+  guests: Guest[];
+  createdAt: string; // A API já envia como string ISO
+  status: 'recebido' | 'concluido';
+}
 
-    useEffect(() => {
-        async function fetchCheckIns() {
-            try {
-                setLoading(true);
-                // A API agora retorna dados frescos e com a data formatada
-                const response = await fetch('/api/pre-check-in/list');
-                if (!response.ok) {
-                    throw new Error('Falha ao buscar dados');
-                }
-                const data = await response.json();
-                setCheckIns(data);
-            } catch (error) {
-                console.error("Erro:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        fetchCheckIns();
-    }, []);
-
-    const handleViewDetails = (checkIn: CheckIn) => {
-        setSelectedCheckIn(checkIn);
-        setIsDialogOpen(true);
-    };
-
-    const formatDate = (dateString: string) => {
-        if (!dateString) return 'N/A';
-        // Converte a string ISO para um objeto Date e formata para o padrão brasileiro.
-        return new Date(dateString).toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
+// Componente de detalhes que agora usa os campos corretos
+const PreCheckInDetails = ({ checkInData }: { checkInData: PreCheckIn }) => {
+    const leadGuest = checkInData.guests.find(g => g.isLead);
 
     return (
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-            <div className="flex items-center">
-                <h1 className="font-semibold text-lg md:text-2xl">Pré-Check-ins</h1>
+        <DialogContent className="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Detalhes do Pré-Check-in</DialogTitle>
+                <DialogDescription>
+                    Informações enviadas por {leadGuest?.fullName || 'Hóspede'}.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
+                <div className="p-4 rounded-lg bg-slate-50 border">
+                    <h4 className="font-semibold flex items-center gap-2 mb-2"><UserCheck /> Titular da Reserva</h4>
+                    <p><strong>Nome:</strong> {leadGuest?.fullName}</p>
+                    <p><strong>CPF:</strong> {checkInData.leadGuestCpf}</p>
+                    <p><strong>Email:</strong> {checkInData.leadGuestEmail}</p>
+                    <p><strong>Endereço:</strong> {checkInData.address}</p>
+                </div>
+                {checkInData.guests.filter(g => !g.isLead).length > 0 && (
+                     <div className="p-4 rounded-lg bg-slate-50 border">
+                        <h4 className="font-semibold flex items-center gap-2 mb-2"><Users /> Outros Hóspedes</h4>
+                        <ul className="list-disc pl-5">
+                            {checkInData.guests.filter(g => !g.isLead).map((g, index) => <li key={index}>{g.fullName}</li>)}
+                        </ul>
+                    </div>
+                )}
+                <div className="p-4 rounded-lg bg-slate-50 border">
+                    <h4 className="font-semibold flex items-center gap-2 mb-2"><Clock /> Detalhes da Chegada</h4>
+                    <p><strong>Previsão de Chegada:</strong> {checkInData.estimatedArrivalTime}</p>
+                    <p className="flex items-center gap-2"><strong>Traz Pet?</strong> {checkInData.isBringingPet ? <Dog className="h-4 w-4 text-green-600"/> : 'Não'}</p>
+                </div>
+
+                {checkInData.foodRestrictions && (
+                     <div className="p-4 rounded-lg bg-amber-50 border-amber-200 border">
+                        <h4 className="font-semibold flex items-center gap-2 mb-2 text-amber-800"><AlertTriangle /> Alergias / Restrições</h4>
+                        <p className="whitespace-pre-wrap">{checkInData.foodRestrictions}</p>
+                    </div>
+                )}
             </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Pré-Check-ins Recebidos</CardTitle>
-                    <CardDescription>Lista de formulários de pré-check-in enviados pelos hóspedes.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {loading ? (
-                        <p>Carregando...</p>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Titular da Reserva</TableHead>
-                                    <TableHead>CPF</TableHead>
-                                    <TableHead>Data de Envio</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Ações</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {checkIns.map((checkIn) => (
-                                    <TableRow key={checkIn.id}>
-                                        <TableCell>{checkIn.responsibleName}</TableCell>
-                                        <TableCell>{checkIn.responsibleCPF}</TableCell>
-                                        {/* Usa a função para formatar a data */}
-                                        <TableCell>{formatDate(checkIn.createdAt)}</TableCell>
-                                        <TableCell>
-                                            <Badge variant="outline">{checkIn.status || 'recebido'}</Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(checkIn)}>
-                                                <Eye className="h-4 w-4 mr-2" />
-                                                Ver Detalhes
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Modal de Detalhes */}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="sm:max-w-[600px]">
-                    <DialogHeader>
-                        <DialogTitle>Detalhes do Pré-Check-in</DialogTitle>
-                        <DialogDescription>
-                            Informações completas do pré-check-in de {selectedCheckIn?.responsibleName}.
-                        </DialogDescription>
-                    </DialogHeader>
-                    {selectedCheckIn && (
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-2 gap-2">
-                                <p><strong>Titular:</strong></p><p>{selectedCheckIn.responsibleName}</p>
-                                <p><strong>CPF:</strong></p><p>{selectedCheckIn.responsibleCPF}</p>
-                                <p><strong>Check-in:</strong></p><p>{formatDate(selectedCheckIn.checkInDate)}</p>
-                                <p><strong>Check-out:</strong></p><p>{formatDate(selectedCheckIn.checkOutDate)}</p>
-                                <p><strong>Placa do Veículo:</strong></p><p>{selectedCheckIn.vehiclePlate || 'N/A'}</p>
-                                <p><strong>Modelo do Veículo:</strong></p><p>{selectedCheckIn.vehicleModel || 'N/A'}</p>
-                            </div>
-                            <h4 className="font-semibold mt-4">Acompanhantes</h4>
-                            {selectedCheckIn.guests && selectedCheckIn.guests.length > 0 ? (
-                                <ul className="list-disc pl-5">
-                                    {selectedCheckIn.guests.map((guest, index) => (
-                                        <li key={index}>{guest.name} ({guest.cpf})</li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p>Nenhum acompanhante informado.</p>
-                            )}
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <DialogClose asChild>
-                            <Button type="button" variant="secondary">
-                                Fechar
-                            </Button>
-                        </DialogClose>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </main>
-    );
+        </DialogContent>
+    )
 }
+
+const PreCheckInsPage: React.FC = () => {
+    const { data: checkIns, isLoading, error } = useFetchData<PreCheckIn[]>('/api/pre-check-in/list');
+
+    if (isLoading) {
+        return <LoadingScreen message="Carregando dados de pré-check-in..." />;
+    }
+
+    if (error) {
+        return <div className="text-red-500">Erro ao carregar: {error.message}</div>;
+    }
+    
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Pré-Check-ins Recebidos</CardTitle>
+                <CardDescription>Lista de formulários de pré-check-in enviados pelos hóspedes.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Titular da Reserva</TableHead>
+                            <TableHead>CPF</TableHead>
+                            <TableHead>Data de Envio</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {checkIns && checkIns.length > 0 ? (
+                            checkIns.map((checkIn) => {
+                                // Encontra o hóspede titular para exibir na tabela
+                                const leadGuest = checkIn.guests.find(g => g.isLead);
+                                return (
+                                <TableRow key={checkIn.id}>
+                                    <TableCell className="font-medium">{leadGuest?.fullName || 'Não informado'}</TableCell>
+                                    <TableCell>{checkIn.leadGuestCpf}</TableCell>
+                                    <TableCell>
+                                        {/* A formatação da data agora funciona com a string ISO da API */}
+                                        {checkIn.createdAt ? new Date(checkIn.createdAt).toLocaleString('pt-BR') : 'N/A'}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={checkIn.status === 'recebido' ? 'default' : 'secondary'}>
+                                            {checkIn.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" size="sm">
+                                                    <Eye className="mr-2 h-4 w-4" />
+                                                    Ver Detalhes
+                                                </Button>
+                                            </DialogTrigger>
+                                            {/* Passa o objeto de check-in completo para o modal */}
+                                            <PreCheckInDetails checkInData={checkIn} />
+                                        </Dialog>
+                                    </TableCell>
+                                </TableRow>
+                            )})
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center h-24">Nenhum pré-check-in encontrado.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+};
+
+export default PreCheckInsPage;
