@@ -30,15 +30,6 @@ interface StatsData {
     categoriasMaisConsumidas: StatItem[];
 }
 
-interface PieLabelProps {
-    cx: number;
-    cy: number;
-    midAngle: number;
-    innerRadius: number;
-    outerRadius: number;
-    percent: number;
-}
-
 const initialDateRange = {
     from: subDays(new Date(), 29),
     to: new Date(),
@@ -107,12 +98,32 @@ export default function EstatisticasPage() {
         </Card>
     );
     
-    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: PieLabelProps) => {
+    // ================== INÍCIO DA CORREÇÃO ==================
+    // A interface PieLabelProps foi removida e a função foi ajustada.
+    const renderCustomizedLabel = (props: any) => {
+        const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;
+
+        // Adiciona uma verificação para garantir que as propriedades existam
+        if ([cx, cy, midAngle, innerRadius, outerRadius, percent].some(p => p === undefined)) {
+            return null;
+        }
+
+        // Não renderiza o label se a fatia for muito pequena (opcional, mas bom)
+        if (percent === 0) {
+            return null;
+        }
+
         const radius = innerRadius + (outerRadius - innerRadius) * 1.2;
-        const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
-        const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
-        return <text x={x} y={y} fill="currentColor" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">{`${(percent * 100).toFixed(0)}%`}</text>;
+        const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+        const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+
+        return (
+            <text x={x} y={y} fill="currentColor" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">
+                {`${(percent * 100).toFixed(0)}%`}
+            </text>
+        );
     };
+    // =================== FIM DA CORREÇÃO ====================
 
     return (
         <div className="space-y-6">
@@ -154,7 +165,6 @@ export default function EstatisticasPage() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {renderBarChart(stats.pratosQuentesMaisPedidos, "Top 5 Pratos Quentes", <Utensils />)}
-                        {/* Gráfico de sabores agora usa os dados corretos */}
                         {renderBarChart(stats.saboresMaisPedidos, "Top 5 Sabores", <Grape />)}
                         <Card>
                             <CardHeader><CardTitle className="flex items-center gap-2 text-lg font-semibold"><PieChartIcon /> Categorias Populares</CardTitle></CardHeader>
