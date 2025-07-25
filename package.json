@@ -56,6 +56,10 @@
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^18",
+<<<<<<< HEAD
+=======
+    "react-csv": "^2.2.2",
+>>>>>>> codigo-novo/main
     "react-day-picker": "8.10.1",
     "react-dom": "^18",
     "react-hook-form": "^7.54.1",
@@ -76,6 +80,10 @@
     "@types/qrcode": "^1.5.5",
     "@types/qrcode.react": "^3.0.0",
     "@types/react": "^18",
+<<<<<<< HEAD
+=======
+    "@types/react-csv": "^1.1.10",
+>>>>>>> codigo-novo/main
     "@types/react-dom": "^18",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
