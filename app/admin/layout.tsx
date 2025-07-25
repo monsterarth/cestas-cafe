@@ -14,7 +14,7 @@ import { ThemeInjector } from "@/components/theme-injector";
 import { Toaster } from "@/components/ui/sonner";
 import type { AppConfig } from "@/types";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { LayoutDashboard, ShoppingBasket, BarChart2, Ticket, Settings, Paintbrush, MessageSquare, Home, UtensilsCrossed, LogOut, ExternalLink, ClipboardList, FileText } from "lucide-react";
+import { LayoutDashboard, ShoppingBasket, BarChart2, Ticket, Settings, Paintbrush, MessageSquare, Home, UtensilsCrossed, LogOut, ExternalLink, ClipboardList, FileText, ChefHat, Truck } from "lucide-react";
 
 const NavLink = ({ href, pathname, children }: { href: string; pathname: string; children: React.ReactNode }) => {
   const isActive = pathname === href;
@@ -126,6 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
               <div>
                 <h3 className="px-3 text-xs font-semibold uppercase text-gray-400 mb-2">Operação</h3>
+                <NavLink href="/admin/estoque" pathname={pathname}><ChefHat size={18} /> Pedir Estoque</NavLink>
                 <NavLink href="/admin/pre-check-ins" pathname={pathname}><FileText size={18} /> Pré-Check-ins</NavLink>
                 <NavLink href="/admin/pedidos" pathname={pathname}><ShoppingBasket size={18} /> Pedidos</NavLink>
                 <NavLink href="/admin/pedidos/estatisticas" pathname={pathname}><BarChart2 size={18} /> Estatísticas</NavLink>
@@ -143,6 +144,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
               <div>
                 <h3 className="px-3 text-xs font-semibold uppercase text-gray-400 mb-2">Sistema</h3>
+                <NavLink href="/admin/settings/fornecedores" pathname={pathname}><Truck size={18} /> Fornecedores</NavLink>
                 <NavLink href="/admin/menu" pathname={pathname}><UtensilsCrossed size={18} /> Cardápio</NavLink>
                 <NavLink href="/admin/settings/aparencia" pathname={pathname}><Paintbrush size={18} /> Aparência</NavLink>
                 <NavLink href="/admin/settings/mensagens" pathname={pathname}><MessageSquare size={18} /> Mensagens</NavLink>

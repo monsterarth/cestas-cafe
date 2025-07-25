@@ -1,4 +1,4 @@
-// Arquivo: types/index.ts
+// types/index.ts
 import { Timestamp } from "firebase/firestore";
 
 // --- Tipos de Dados do Cardápio ---
@@ -145,4 +145,17 @@ export interface Order {
   itensPedido: ItemPedido[];
   observacoesGerais?: string;
   observacoesPratosQuentes?: string;
+}
+
+// --- ✨ NOVOS TIPOS PARA GESTÃO DE ESTOQUE ✨ ---
+export interface Supplier {
+  id: string;
+  name: string;
+}
+
+export interface StockItem {
+  id: string;
+  name: string;
+  supplierId: string;
+  posicao?: number;
 }
