@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-// Arquivo: types/index.ts
-=======
 // types/index.ts
->>>>>>> codigo-novo/main
 import { Timestamp } from "firebase/firestore";
 
 // --- Tipos de Dados do Cardápio ---
@@ -37,11 +33,7 @@ export interface AccompanimentItem {
   descricaoPorcao?: string;
 }
 
-<<<<<<< HEAD
-// --- Tipos de Configuração (Refatorado) ---
-=======
 // --- Tipos de Configuração (Unificado e Corrigido) ---
->>>>>>> codigo-novo/main
 export interface AppConfig {
   // Aparência
   logoUrl?: string;
@@ -52,23 +44,15 @@ export interface AppConfig {
   corDestaque: string;
   corDestaqueTexto: string;
   corCartao: string;
-<<<<<<< HEAD
-  // Mensagens
-=======
   
   // Mensagens Gerais
->>>>>>> codigo-novo/main
   textoBoasVindas?: string;
   textoAgradecimento: string;
   mensagemAtrasoPadrao?: string;
   mensagemDoDia?: string;
   mensagensMotivacionais?: string[];
 
-<<<<<<< HEAD
-  // NOVOS CAMPOS DE MENSAGENS PERSONALIZÁVEIS
-=======
   // Mensagens Personalizáveis do Formulário de Cestas
->>>>>>> codigo-novo/main
   welcomeEmoji?: string;
   welcomeTitle?: string;
   welcomeSubtitle?: string;
@@ -77,17 +61,11 @@ export interface AppConfig {
   successGratitude?: string;
   successFooter?: string;
 
-<<<<<<< HEAD
-  // NOVOS CAMPOS PARA A COMANDA
-=======
   // Mensagens da Comanda
->>>>>>> codigo-novo/main
   comandaTitle?: string;
   comandaSubtitle?: string;
   comandaPostQr?: string;
   comandaFooter?: string;
-<<<<<<< HEAD
-=======
 
   // Mensagens da Pesquisa de Satisfação
   surveySuccessTitle?: string;
@@ -97,7 +75,6 @@ export interface AppConfig {
   // ✨ NOVAS MENSAGENS DO PRÉ-CHECK-IN ✨
   preCheckInWelcomeMessage?: string;
   preCheckInSuccessMessage?: string;
->>>>>>> codigo-novo/main
 }
 
 export interface Cabin {
@@ -170,19 +147,6 @@ export interface Order {
   observacoesPratosQuentes?: string;
 }
 
-<<<<<<< HEAD
-export interface AppConfig {
-  // ... outras configurações ...
-  successTitle?: string;
-  successSubtitle?: string;
-  successGratitude?: string;
-  successFooter?: string;
-
-  // ATUALIZAÇÃO: Adicionando campos para a mensagem de sucesso da pesquisa
-  surveySuccessTitle?: string;
-  surveySuccessSubtitle?: string;
-  surveySuccessFooter?: string;
-=======
 // --- ✨ NOVOS TIPOS PARA GESTÃO DE ESTOQUE ✨ ---
 export interface Supplier {
   id: string;
@@ -194,5 +158,4 @@ export interface StockItem {
   name: string;
   supplierId: string;
   posicao?: number;
->>>>>>> codigo-novo/main
 }
