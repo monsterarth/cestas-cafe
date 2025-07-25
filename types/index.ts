@@ -1,4 +1,4 @@
-// types/index.ts
+// cestas-cafe/types/index.ts
 import { Timestamp } from "firebase/firestore";
 
 // --- Tipos de Dados do Cardápio ---
@@ -158,4 +158,24 @@ export interface StockItem {
   name: string;
   supplierId: string;
   posicao?: number;
+}
+
+// --- ✨ NOVOS TIPOS PARA O PRÉ-CHECK-IN ✨ ---
+export interface Guest {
+  fullName: string;
+  isLead: boolean;
+}
+
+export interface PreCheckIn {
+  id: string;
+  leadGuestCpf: string;
+  leadGuestEmail: string;
+  leadGuestPhone: string;
+  address: string;
+  estimatedArrivalTime: string;
+  foodRestrictions?: string;
+  isBringingPet: boolean;
+  guests: Guest[];
+  createdAt: Timestamp;
+  status: 'recebido' | 'concluido' | 'arquivado';
 }

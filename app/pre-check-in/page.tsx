@@ -1,8 +1,8 @@
 // cestas-cafe/app/pre-check-in/page.tsx
 "use client";
 
-import React, { useState } from 'react';
-import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
+import React, { useState, useEffect } from 'react';
+import { useForm, useFieldArray, SubmitHandler, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
@@ -13,10 +13,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Toaster, toast } from 'sonner';
-import { Loader2, Send, PartyPopper, CheckCircle } from 'lucide-react';
+import { Loader2, Send, PartyPopper, CheckCircle, AlertTriangle, Phone, ExternalLink } from 'lucide-react';
 import { AppHeader } from '@/components/app-header';
 import { useFirebaseData } from '@/hooks/use-firebase-data';
 import { LoadingScreen } from '@/components/loading-screen';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const guestSchema = z.object({
   fullName: z.string().min(3, "Nome completo é obrigatório."),
@@ -26,6 +27,7 @@ const guestSchema = z.object({
 const preCheckInSchema = z.object({
   leadGuestCpf: z.string().min(11, "CPF é obrigatório.").max(14, "CPF inválido."),
   leadGuestEmail: z.string().email("E-mail inválido."),
+  leadGuestPhone: z.string().min(10, "Telefone é obrigatório."),
   address: z.string().min(5, "Endereço é obrigatório."),
   estimatedArrivalTime: z.string().nonempty("Previsão de chegada é obrigatória."),
   foodRestrictions: z.string().optional(),
@@ -42,14 +44,30 @@ const PreCheckInPage: React.FC = () => {
     const { appConfig, loading: loadingConfig, error: configError } = useFirebaseData();
     const [step, setStep] = useState(0); // 0: Welcome, 1: Form, 2: Success
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showArrivalWarning, setShowArrivalWarning] = useState(false);
 
     const { register, control, handleSubmit, formState: { errors } } = useForm<PreCheckInFormValues>({
         resolver: zodResolver(preCheckInSchema),
         defaultValues: {
             guests: [{ fullName: '', isLead: true }],
             isBringingPet: false,
+            estimatedArrivalTime: '16:00',
         },
     });
+    
+    const estimatedArrivalTime = useWatch({
+      control,
+      name: "estimatedArrivalTime"
+    });
+
+    useEffect(() => {
+        if (estimatedArrivalTime && estimatedArrivalTime < "16:00") {
+            setShowArrivalWarning(true);
+        } else {
+            setShowArrivalWarning(false);
+        }
+    }, [estimatedArrivalTime]);
+
 
     const { fields, append, remove, update } = useFieldArray({
         control,
@@ -145,11 +163,29 @@ const PreCheckInPage: React.FC = () => {
                                     <div><Label htmlFor="leadGuestCpf">CPF *</Label><Input id="leadGuestCpf" {...register("leadGuestCpf")} />{errors.leadGuestCpf && <p className="text-sm text-red-600">{errors.leadGuestCpf.message}</p>}</div>
                                     <div><Label htmlFor="leadGuestEmail">E-mail *</Label><Input id="leadGuestEmail" type="email" {...register("leadGuestEmail")} />{errors.leadGuestEmail && <p className="text-sm text-red-600">{errors.leadGuestEmail.message}</p>}</div>
                                 </div>
+                                <div>
+                                    <Label htmlFor="leadGuestPhone">Celular (com DDD) *</Label>
+                                    <Input id="leadGuestPhone" type="tel" {...register("leadGuestPhone")} placeholder="48999998888" />
+                                    {errors.leadGuestPhone && <p className="text-sm text-red-600">{errors.leadGuestPhone.message}</p>}
+                                </div>
                                 <div><Label htmlFor="address">Endereço Completo *</Label><Input id="address" {...register("address")} />{errors.address && <p className="text-sm text-red-600">{errors.address.message}</p>}</div>
                             </div>
                             <div className="space-y-4 rounded-lg border p-4">
                                  <h3 className="font-semibold">Detalhes da Viagem</h3>
-                                <div><Label htmlFor="estimatedArrivalTime">Previsão de Chegada *</Label><Input id="estimatedArrivalTime" type="time" {...register("estimatedArrivalTime")} />{errors.estimatedArrivalTime && <p className="text-sm text-red-600">{errors.estimatedArrivalTime.message}</p>}</div>
+                                <div>
+                                    <Label htmlFor="estimatedArrivalTime">Previsão de Chegada *</Label>
+                                    <Input id="estimatedArrivalTime" type="time" {...register("estimatedArrivalTime")} />
+                                    {errors.estimatedArrivalTime && <p className="text-sm text-red-600">{errors.estimatedArrivalTime.message}</p>}
+                                </div>
+                                {showArrivalWarning && (
+                                    <Alert variant="default" className="bg-amber-50 border-amber-200">
+                                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                        <AlertTitle className="text-amber-800">Atenção!</AlertTitle>
+                                        <AlertDescription className="text-amber-700">
+                                            O horário do check in é a partir das 16h, porém caso sua cabana fique disponível antes deste horário informaremos no whatsapp do titular da reserva sobre a possibilidade de uma entrada antecipada!
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
                                 <div><Label htmlFor="foodRestrictions">Intolerâncias ou Alergias Alimentares?</Label><Textarea id="foodRestrictions" {...register("foodRestrictions")} placeholder="Ex: intolerância a lactose, alergia a amendoim..." /></div>
                                 <div className="flex items-center gap-2"><Checkbox id="isBringingPet" {...register("isBringingPet")} /><Label htmlFor="isBringingPet">Está trazendo um pet?</Label></div>
                             </div>
@@ -169,11 +205,16 @@ const PreCheckInPage: React.FC = () => {
                         <CheckCircle className="w-16 h-16 text-green-600 mx-auto" />
                         <CardTitle className="text-3xl text-green-700">Obrigado!</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-6">
                         <p className="text-lg text-stone-700">
-                           {appConfig.preCheckInSuccessMessage || 'Seu pré-check-in foi enviado com sucesso. Aguardamos sua chegada!'}
+                           Recebemos o seu pré-check-in! Caso haja alguma pendência ou queira tirar dúvidas, entre em contato conosco.
                         </p>
-                        <Button onClick={() => window.location.href = '/'}>Voltar ao Início</Button>
+                        <Button 
+                            size="lg"
+                            className="bg-green-500 hover:bg-green-600 text-white"
+                            onClick={() => window.open('https://wa.me/554899632985', '_blank')}>
+                            <Phone className="mr-2 h-5 w-5" /> Chamar no WhatsApp <ExternalLink className="ml-2 h-4 w-4" />
+                        </Button>
                     </CardContent>
                 </Card>
              )}
