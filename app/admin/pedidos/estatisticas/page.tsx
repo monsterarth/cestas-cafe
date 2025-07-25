@@ -1,4 +1,5 @@
-'use client'
+// cestas-cafe/app/admin/pedidos/estatisticas/page.tsx
+'use client';
 
 import { useState, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
@@ -37,62 +38,62 @@ const initialDateRange = {
 const CHART_COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F", "#FFBB28"];
 
 export default function EstatisticasPage() {
-  const { data: orders, isLoading, error } = useFetchData<Order[]>('/api/pedidos/all');
+    const [stats, setStats] = useState<StatsData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [date, setDate] = useState<DateRange | undefined>(initialDateRange);
 
-  const stats = useMemo(() => {
-    if (!orders) return null;
-    return processarEstatisticas(orders);
-  }, [orders]);
+    useEffect(() => {
+        const fetchStats = async () => {
+            if (!date?.from || !date?.to) return;
+            setIsLoading(true);
+            try {
+                const params = new URLSearchParams({
+                    startDate: date.from.toISOString(),
+                    endDate: date.to.toISOString(),
+                });
+                const response = await fetch(`/api/admin/stats?${params.toString()}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Falha ao buscar estatísticas.');
+                }
+                const data: StatsData = await response.json();
+                setStats(data);
+            } catch (error: any) {
+                toast.error(error.message);
+            } finally {
+                setIsLoading(false);
+            }
+        };
 
-  if (isLoading) return <LoadingScreen message="Processando estatísticas..." />;
-  if (error || !stats) return <div>Erro ao carregar estatísticas. Tente novamente mais tarde.</div>;
+        fetchStats();
+    }, [date]);
 
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Visão Geral</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <p className="text-2xl font-bold">{stats.totalPedidos}</p>
-            <p className="text-sm text-muted-foreground">Total de Pedidos</p>
-          </div>
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <p className="text-2xl font-bold">{stats.totalItens}</p>
-            <p className="text-sm text-muted-foreground">Total de Itens Servidos</p>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    const setPresetDateRange = (preset: 'semanal' | 'mensal' | 'anual') => {
+        const today = new Date();
+        let fromDate: Date;
+        if (preset === 'semanal') fromDate = startOfWeek(today, { locale: ptBR });
+        else if (preset === 'mensal') fromDate = startOfMonth(today);
+        else fromDate = startOfYear(today);
+        setDate({ from: fromDate, to: today });
+    };
+
+    const renderBarChart = (data: StatItem[], title: string, icon: React.ReactNode) => (
         <Card>
-            <CardHeader>
-                <CardTitle>Categorias Mais Consumidas</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-lg font-semibold">{icon} {title}</CardTitle></CardHeader>
             <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                        <Tooltip />
-                        <Pie
-                            data={stats.categoriasMaisConsumidas}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            labelLine={false}
-                            label={renderCustomizedLabel}
-                        >
-                            {stats.categoriasMaisConsumidas.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                            ))}
-                        </Pie>
-                        <Legend />
-                    </PieChart>
-                </ResponsiveContainer>
+                {data && data.length > 0 ? (
+                    <ChartContainer config={{}} className="h-[300px] w-full">
+                         <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data} layout="vertical" margin={{ left: 30, right: 30, top: 5, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis type="number" allowDecimals={false} />
+                                <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 12 }} interval={0} />
+                                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                <Bar dataKey="value" fill="hsl(var(--primary))" radius={4} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartContainer>
+                ) : ( <div className="flex items-center justify-center h-[300px]"><p className="text-muted-foreground">Nenhum dado para este período.</p></div> )}
             </CardContent>
         </Card>
     );
