@@ -33,7 +33,7 @@ export interface AccompanimentItem {
   descricaoPorcao?: string;
 }
 
-// --- Tipos de Configuração (Refatorado) ---
+// --- Tipos de Configuração (Unificado e Corrigido) ---
 export interface AppConfig {
   // Aparência
   logoUrl?: string;
@@ -44,14 +44,15 @@ export interface AppConfig {
   corDestaque: string;
   corDestaqueTexto: string;
   corCartao: string;
-  // Mensagens
+  
+  // Mensagens Gerais
   textoBoasVindas?: string;
   textoAgradecimento: string;
   mensagemAtrasoPadrao?: string;
   mensagemDoDia?: string;
   mensagensMotivacionais?: string[];
 
-  // NOVOS CAMPOS DE MENSAGENS PERSONALIZÁVEIS
+  // Mensagens Personalizáveis do Formulário de Cestas
   welcomeEmoji?: string;
   welcomeTitle?: string;
   welcomeSubtitle?: string;
@@ -60,11 +61,20 @@ export interface AppConfig {
   successGratitude?: string;
   successFooter?: string;
 
-  // NOVOS CAMPOS PARA A COMANDA
+  // Mensagens da Comanda
   comandaTitle?: string;
   comandaSubtitle?: string;
   comandaPostQr?: string;
   comandaFooter?: string;
+
+  // Mensagens da Pesquisa de Satisfação
+  surveySuccessTitle?: string;
+  surveySuccessSubtitle?: string;
+  surveySuccessFooter?: string;
+
+  // ✨ NOVAS MENSAGENS DO PRÉ-CHECK-IN ✨
+  preCheckInWelcomeMessage?: string;
+  preCheckInSuccessMessage?: string;
 }
 
 export interface Cabin {
@@ -135,17 +145,4 @@ export interface Order {
   itensPedido: ItemPedido[];
   observacoesGerais?: string;
   observacoesPratosQuentes?: string;
-}
-
-export interface AppConfig {
-  // ... outras configurações ...
-  successTitle?: string;
-  successSubtitle?: string;
-  successGratitude?: string;
-  successFooter?: string;
-
-  // ATUALIZAÇÃO: Adicionando campos para a mensagem de sucesso da pesquisa
-  surveySuccessTitle?: string;
-  surveySuccessSubtitle?: string;
-  surveySuccessFooter?: string;
 }

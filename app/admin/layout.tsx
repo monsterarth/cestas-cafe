@@ -14,11 +14,9 @@ import { ThemeInjector } from "@/components/theme-injector";
 import { Toaster } from "@/components/ui/sonner";
 import type { AppConfig } from "@/types";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { LayoutDashboard, ShoppingBasket, BarChart2, Ticket, Settings, Paintbrush, MessageSquare, Home, UtensilsCrossed, LogOut, ExternalLink, ClipboardList } from "lucide-react";
+import { LayoutDashboard, ShoppingBasket, BarChart2, Ticket, Settings, Paintbrush, MessageSquare, Home, UtensilsCrossed, LogOut, ExternalLink, ClipboardList, FileText } from "lucide-react";
 
 const NavLink = ({ href, pathname, children }: { href: string; pathname: string; children: React.ReactNode }) => {
-  // CORREÇÃO: A lógica agora verifica uma correspondência exata do caminho (pathname).
-  // Isso impede que múltiplos links fiquem ativos ao mesmo tempo em rotas aninhadas.
   const isActive = pathname === href;
   
   return (
@@ -64,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {
           if (currentUser) {
             setUser(currentUser);
           } else {
@@ -99,6 +97,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const getHeaderText = () => {
     if (pathname === '/admin') return "Dashboard";
+    if (pathname.startsWith('/admin/pre-check-ins')) return "Pré-Check-ins";
     if (pathname.startsWith('/admin/surveys')) return "Pesquisas de Satisfação";
     if (pathname === '/admin/pedidos') return "Lista de Pedidos";
     if (pathname === '/admin/pedidos/estatisticas') return "Estatísticas de Pedidos";
@@ -127,6 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
               <div>
                 <h3 className="px-3 text-xs font-semibold uppercase text-gray-400 mb-2">Operação</h3>
+                <NavLink href="/admin/pre-check-ins" pathname={pathname}><FileText size={18} /> Pré-Check-ins</NavLink>
                 <NavLink href="/admin/pedidos" pathname={pathname}><ShoppingBasket size={18} /> Pedidos</NavLink>
                 <NavLink href="/admin/pedidos/estatisticas" pathname={pathname}><BarChart2 size={18} /> Estatísticas</NavLink>
               </div>
