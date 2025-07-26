@@ -6,6 +6,7 @@ import { getFirebaseDb, isFirebaseAvailable } from "@/lib/firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { ThemeInjector } from "@/components/theme-injector"
 import type { AppConfig } from "@/types"
+import { AppFooter } from "@/components/app-footer"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -39,12 +40,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const appConfig = await getAppConfig()
 
   return (
-    <html lang="pt-BR" className={inter.variable}>
+    <html lang="pt-BR" className={`${inter.variable} h-full`}>
       <head>
         <ThemeInjector config={appConfig} />
       </head>
-      <body className="font-sans">
-        {children}
+      <body className="font-sans flex flex-col h-full">
+        <main className="flex-grow">
+          {children}
+        </main>
+        <AppFooter />
+        <div id="print-container-portal" className="printable-area"></div>
       </body>
     </html>
   )
