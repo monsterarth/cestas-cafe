@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin'; // CORREÇÃO
+import { adminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { PurchaseOrder, PurchaseOrderItem } from '@/types';
+import { QueryDocumentSnapshot, DocumentData } from 'firebase-admin/firestore';
 
 export async function GET(request: Request) {
     try {
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
         const endDate = new Date(endDateParam);
         endDate.setHours(23, 59, 59, 999);
 
-        const db = adminDb; // CORREÇÃO
+        const db = adminDb;
         const ordersRef = db.collection('purchaseOrders');
         const q = ordersRef
             .where('createdAt', '>=', Timestamp.fromDate(startDate))
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
             });
         }
         
-        const orders = snapshot.docs.map(doc => doc.data() as PurchaseOrder);
+        const orders = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as PurchaseOrder);
 
         const totalPedidosCompra = orders.length;
 

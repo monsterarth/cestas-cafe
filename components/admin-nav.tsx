@@ -26,7 +26,8 @@ import {
   Warehouse,
   BarChart3,
   CalendarDays,
-  Archive
+  Archive,
+  ConciergeBell // Novo ícone
 } from 'lucide-react';
 
 const NavLink = ({ href, children, onClick }: { href: string; children: React.ReactNode; onClick?: () => void }) => {
@@ -82,6 +83,7 @@ export const navSections = [
         { href: '/admin/settings/mensagens', label: 'Mensagens', icon: MessageSquare },
         { href: '/admin/settings/cabanas', label: 'Cabanas', icon: Home },
         { href: '/admin/settings/fornecedores', label: 'Fornecedores', icon: Truck },
+        { href: '/admin/settings/servicos', label: 'Serviços', icon: ConciergeBell },
       ],
     },
 ];

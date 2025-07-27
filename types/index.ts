@@ -135,7 +135,7 @@ export interface Order {
   observacoesPratosQuentes?: string;
 }
 
-// --- ✨ TIPOS PARA GESTÃO DE ESTOQUE ATUALIZADOS ✨ ---
+// --- TIPOS PARA GESTÃO DE ESTOQUE ---
 export interface Supplier {
   id: string;
   name: string;
@@ -153,13 +153,12 @@ export interface StockItem {
   unit: string;
 }
 
-// --- ✨ NOVOS TIPOS PARA O PEDIDO DE COMPRA ATUALIZADOS ✨ ---
 export interface PurchaseOrderItem {
     itemId: string;
     itemName: string;
     unit: string;
     quantity: number;
-    inStock: number; // Estoque acusado no momento do pedido
+    inStock: number;
 }
   
 export interface PurchaseOrder {
@@ -167,12 +166,12 @@ export interface PurchaseOrder {
     createdAt: Timestamp;
     supplierId: string;
     supplierName: string;
-    requestedBy: string; // Email do solicitante
+    requestedBy: string;
     items: PurchaseOrderItem[];
     status: 'aberto' | 'concluido' | 'arquivado';
 }
 
-// --- ✨ NOVOS TIPOS PARA O PRÉ-CHECK-IN ✨ ---
+// --- TIPOS PARA PRÉ-CHECK-IN ---
 export interface Guest {
   fullName: string;
   isLead: boolean;
@@ -192,10 +191,33 @@ export interface PreCheckIn {
   status: 'recebido' | 'concluido' | 'arquivado';
 }
 
-// --- ✨ NOVOS TIPOS PARA ESTATÍSTICAS DE COMPRA ✨ ---
-export interface PurchaseStatsData {
-    totalPedidosCompra: number;
-    totalItensComprados: number;
-    itensMaisComprados: { name: string; value: number }[];
-    fornecedoresMaisAcionados: { name: string; value: number }[];
+// --- ✨ NOVOS TIPOS PARA AGENDAMENTO DE SERVIÇOS ✨ ---
+export interface TimeSlot {
+  id: string; // ex: '11:00-12:00'
+  startTime: string; // ex: "11:00"
+  endTime: string; // ex: "12:00"
+  label: string; // ex: "11:00 às 12:00"
+}
+
+export interface Service {
+  id: string;
+  name: string; // "Jacuzzi", "Churrasqueira"
+  type: 'slots' | 'preference'; // 'slots' para Jacuzzi/Churrasqueira, 'preference' para Limpeza
+  defaultStatus: 'closed' | 'open'; // Padrão de abertura diária. 'closed' para Jacuzzi.
+  units: string[]; // ex: ["Azul clara", "Azul escura"] ou ["Única"]
+  timeSlots: TimeSlot[];
+}
+
+export interface Booking {
+    id: string;
+    serviceId: string;
+    serviceName: string;
+    unit: string; // Qual das jacuzzis? ex: "Azul clara"
+    date: string; // "YYYY-MM-DD"
+    timeSlotId: string;
+    timeSlotLabel: string;
+    guestName: string;
+    cabinName: string;
+    createdAt: Timestamp;
+    status: 'confirmado' | 'cancelado_pelo_admin' | 'bloqueado';
 }
