@@ -191,20 +191,20 @@ export interface PreCheckIn {
   status: 'recebido' | 'concluido' | 'arquivado';
 }
 
-// --- ✨ NOVOS TIPOS PARA AGENDAMENTO DE SERVIÇOS ✨ ---
+// --- TIPOS PARA AGENDAMENTO DE SERVIÇOS ---
 export interface TimeSlot {
-  id: string; // ex: '11:00-12:00'
-  startTime: string; // ex: "11:00"
-  endTime: string; // ex: "12:00"
-  label: string; // ex: "11:00 às 12:00"
+  id: string;
+  startTime: string;
+  endTime: string;
+  label: string;
 }
 
 export interface Service {
   id: string;
-  name: string; // "Jacuzzi", "Churrasqueira"
-  type: 'slots' | 'preference'; // 'slots' para Jacuzzi/Churrasqueira, 'preference' para Limpeza
-  defaultStatus: 'closed' | 'open'; // Padrão de abertura diária. 'closed' para Jacuzzi.
-  units: string[]; // ex: ["Azul clara", "Azul escura"] ou ["Única"]
+  name: string;
+  type: 'slots' | 'preference';
+  defaultStatus: 'closed' | 'open';
+  units: string[];
   timeSlots: TimeSlot[];
 }
 
@@ -212,12 +212,20 @@ export interface Booking {
     id: string;
     serviceId: string;
     serviceName: string;
-    unit: string; // Qual das jacuzzis? ex: "Azul clara"
-    date: string; // "YYYY-MM-DD"
+    unit: string;
+    date: string;
     timeSlotId: string;
     timeSlotLabel: string;
     guestName: string;
     cabinName: string;
     createdAt: Timestamp;
     status: 'confirmado' | 'cancelado_pelo_admin' | 'bloqueado';
+}
+
+// --- ✨ TIPO PARA ESTATÍSTICAS DE COMPRA (ADICIONADO) ✨ ---
+export interface PurchaseStatsData {
+    totalPedidosCompra: number;
+    totalItensComprados: number;
+    itensMaisComprados: { name: string; value: number }[];
+    fornecedoresMaisAcionados: { name: string; value: number }[];
 }
