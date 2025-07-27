@@ -21,11 +21,11 @@ type SlotStatus = {
     booking?: Booking;
 };
 
-// --- Componente de Horário ---
+// --- Componente de Horário (ATUALIZADO) ---
 function TimeSlot({ service, unit, timeSlot, status, onSlotClick }: { service: Service, unit: string, timeSlot: any, status: SlotStatus, onSlotClick: () => void }) {
     const getStatusInfo = () => {
         switch (status.status) {
-            case 'agendado': return { bg: 'bg-blue-100', text: 'text-blue-800', icon: <User className="h-4 w-4 mr-1" />, label: status.booking?.guestName };
+            case 'agendado': return { bg: 'bg-blue-100', text: 'text-blue-800', icon: <User className="h-4 w-4 mr-1" />, label: `${status.booking?.guestName} (${status.booking?.cabinName})` };
             case 'bloqueado': return { bg: 'bg-red-100', text: 'text-red-800', icon: <Lock className="h-4 w-4 mr-1" />, label: 'Bloqueado' };
             case 'fechado': return { bg: 'bg-gray-200', text: 'text-gray-600', icon: <Lock className="h-4 w-4 mr-1" />, label: 'Fechado' };
             default: return { bg: 'bg-green-100', text: 'text-green-800', icon: <Unlock className="h-4 w-4 mr-1" />, label: 'Livre' };
@@ -128,11 +128,11 @@ export default function BookingsCalendarPage() {
                     break;
 
                 case 'livre': // Ação: Bloquear
-                    if (existingBooking) { // Se existe um doc 'disponivel', atualiza ele para 'bloqueado'
+                    if (existingBooking) { 
                          await firestore.updateDoc(firestore.doc(db, 'bookings', existingBooking.id), {
                             status: 'bloqueado', guestName: 'Admin', cabinName: 'Bloqueado'
                          });
-                    } else { // Senão, cria um novo doc 'bloqueado'
+                    } else {
                         await firestore.addDoc(firestore.collection(db, 'bookings'), {
                             serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
                             timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
@@ -143,13 +143,13 @@ export default function BookingsCalendarPage() {
                     toast.success("Horário bloqueado!");
                     break;
                 
-                case 'bloqueado': // Ação: Desbloquear
+                case 'bloqueado': 
                     if (existingBooking) await firestore.deleteDoc(firestore.doc(db, 'bookings', existingBooking.id));
                     toast.success("Horário desbloqueado!");
                     break;
                 
-                case 'agendado': // Ação: Cancelar
-                    if (!confirm(`Deseja cancelar a reserva de ${existingBooking?.guestName}?`)) return;
+                case 'agendado': 
+                    if (!confirm(`Deseja cancelar a reserva de ${existingBooking?.guestName} (${existingBooking?.cabinName})?`)) return;
                     if (existingBooking) await firestore.deleteDoc(firestore.doc(db, 'bookings', existingBooking.id));
                     toast.success("Reserva cancelada!");
                     break;
