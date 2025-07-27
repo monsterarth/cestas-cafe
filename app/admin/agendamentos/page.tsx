@@ -13,10 +13,11 @@ import { Calendar as CalendarIcon, Loader2, X, Lock, Unlock, User, Info } from '
 import { format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import Link from 'next/link'; // CORREÇÃO AQUI
+import Link from 'next/link';
 
+type SlotStatusType = 'livre' | 'agendado' | 'bloqueado' | 'fechado';
 type SlotStatus = {
-    status: 'livre' | 'agendado' | 'bloqueado' | 'fechado';
+    status: SlotStatusType;
     booking?: Booking;
 };
 
@@ -68,14 +69,12 @@ export default function BookingsCalendarPage() {
         if (!db) return;
         setLoading(true);
 
-        // Listener para Serviços (carrega uma vez)
         const servicesQuery = firestore.query(firestore.collection(db, 'services'));
         firestore.getDocs(servicesQuery).then(snapshot => {
             const servicesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
             setServices(servicesData);
         });
 
-        // Listener para Agendamentos da data selecionada
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
         const bookingsQuery = firestore.query(firestore.collection(db, 'bookings'), firestore.where('date', '==', dateStr));
         const unsubscribe = firestore.onSnapshot(bookingsQuery, (snapshot) => {
@@ -97,21 +96,16 @@ export default function BookingsCalendarPage() {
             b.timeSlotId === timeSlotId
         );
 
-        if (!booking) {
-            // Regra da Jacuzzi: se o status padrão for 'fechado', ela começa fechada.
-            if (service.defaultStatus === 'closed') {
-                return { status: 'fechado' };
-            }
-            return { status: 'livre' };
+        if (booking) {
+            if (booking.status === 'confirmado') return { status: 'agendado', booking };
+            if (booking.status === 'bloqueado') return { status: 'bloqueado', booking };
+            if (booking.status === 'disponivel') return { status: 'livre', booking };
         }
 
-        if (booking.status === 'confirmado') {
-            return { status: 'agendado', booking };
+        if (service.defaultStatus === 'closed') {
+            return { status: 'fechado' };
         }
-        if (booking.status === 'bloqueado') {
-            return { status: 'bloqueado', booking };
-        }
-
+        
         return { status: 'livre' };
     };
 
@@ -121,34 +115,47 @@ export default function BookingsCalendarPage() {
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
         const existingBooking = currentStatus.booking;
 
-        // Ações possíveis
-        const actions = {
-            bloquear: async () => {
-                await firestore.addDoc(firestore.collection(db, 'bookings'), {
-                    serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
-                    timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
-                    guestName: 'Admin', cabinName: 'Bloqueado', status: 'bloqueado', 
-                    createdAt: firestore.serverTimestamp()
-                });
-                toast.success("Horário bloqueado!");
-            },
-            liberar: async () => {
-                if (existingBooking) await firestore.deleteDoc(firestore.doc(db, 'bookings', existingBooking.id));
-                toast.success("Horário liberado!");
-            },
-            cancelar: async () => {
-                if (!confirm(`Deseja cancelar a reserva de ${existingBooking?.guestName}?`)) return;
-                if (existingBooking) await firestore.deleteDoc(firestore.doc(db, 'bookings', existingBooking.id));
-                toast.success("Reserva cancelada!");
-            }
-        };
+        try {
+            switch (currentStatus.status) {
+                case 'fechado': // Ação: Liberar
+                    await firestore.addDoc(firestore.collection(db, 'bookings'), {
+                        serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
+                        timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
+                        status: 'disponivel', 
+                        createdAt: firestore.serverTimestamp()
+                    });
+                    toast.success("Horário liberado!");
+                    break;
 
-        // Lógica de decisão
-        switch (currentStatus.status) {
-            case 'livre': actions.bloquear(); break;
-            case 'fechado': actions.liberar(); break;
-            case 'bloqueado': actions.liberar(); break;
-            case 'agendado': actions.cancelar(); break;
+                case 'livre': // Ação: Bloquear
+                    if (existingBooking) { // Se existe um doc 'disponivel', atualiza ele para 'bloqueado'
+                         await firestore.updateDoc(firestore.doc(db, 'bookings', existingBooking.id), {
+                            status: 'bloqueado', guestName: 'Admin', cabinName: 'Bloqueado'
+                         });
+                    } else { // Senão, cria um novo doc 'bloqueado'
+                        await firestore.addDoc(firestore.collection(db, 'bookings'), {
+                            serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
+                            timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
+                            status: 'bloqueado', guestName: 'Admin', cabinName: 'Bloqueado',
+                            createdAt: firestore.serverTimestamp()
+                        });
+                    }
+                    toast.success("Horário bloqueado!");
+                    break;
+                
+                case 'bloqueado': // Ação: Desbloquear
+                    if (existingBooking) await firestore.deleteDoc(firestore.doc(db, 'bookings', existingBooking.id));
+                    toast.success("Horário desbloqueado!");
+                    break;
+                
+                case 'agendado': // Ação: Cancelar
+                    if (!confirm(`Deseja cancelar a reserva de ${existingBooking?.guestName}?`)) return;
+                    if (existingBooking) await firestore.deleteDoc(firestore.doc(db, 'bookings', existingBooking.id));
+                    toast.success("Reserva cancelada!");
+                    break;
+            }
+        } catch (error) {
+            toast.error("Ocorreu um erro.");
         }
     };
 
@@ -170,7 +177,7 @@ export default function BookingsCalendarPage() {
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
+                                <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(startOfDay(date))} initialFocus />
                             </PopoverContent>
                         </Popover>
                     </CardHeader>

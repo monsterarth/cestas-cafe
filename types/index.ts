@@ -219,10 +219,10 @@ export interface Booking {
     guestName: string;
     cabinName: string;
     createdAt: Timestamp;
-    status: 'confirmado' | 'cancelado_pelo_admin' | 'bloqueado';
+    status: 'confirmado' | 'cancelado_pelo_admin' | 'bloqueado' | 'disponivel'; // CORREÇÃO AQUI
 }
 
-// --- ✨ TIPO PARA ESTATÍSTICAS DE COMPRA (ADICIONADO) ✨ ---
+// --- TIPO PARA ESTATÍSTICAS DE COMPRA ---
 export interface PurchaseStatsData {
     totalPedidosCompra: number;
     totalItensComprados: number;
