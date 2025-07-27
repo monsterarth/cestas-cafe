@@ -25,7 +25,8 @@ import {
   Coffee,
   Warehouse,
   BarChart3,
-  CalendarDays
+  CalendarDays,
+  Archive
 } from 'lucide-react';
 
 const NavLink = ({ href, children, onClick }: { href: string; children: React.ReactNode; onClick?: () => void }) => {
@@ -61,15 +62,16 @@ export const navSections = [
       icon: Coffee,
       links: [
         { href: '/admin/menu', label: 'Cardápio', icon: UtensilsCrossed },
-        { href: '/admin/estoque', label: 'Estoque', icon: Warehouse },
+        { href: '/admin/estoque', label: 'Gestão de Estoque', icon: Warehouse },
+        { href: '/admin/estoque/pedidos', label: 'Pedidos de Compra', icon: Archive },
       ],
     },
     {
       title: 'Gestão',
       icon: BarChart3,
       links: [
-        { href: '/admin/surveys', label: 'Pesquisas', icon: ClipboardList },
-        { href: '/admin/pedidos/estatisticas', label: 'Estatísticas', icon: BarChart2 },
+        { href: '/admin/pedidos/estatisticas', label: 'Estatísticas de Vendas', icon: BarChart2 },
+        { href: '/admin/estoque/estatisticas', label: 'Estatísticas de Compras', icon: BarChart2 },
       ],
     },
     {

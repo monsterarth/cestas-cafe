@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import * as firestore from 'firebase/firestore';
-import { getFirebaseDb } from '@/lib/firebase';
+import { getFirebaseDb, getFirebaseAuth } from '@/lib/firebase'; // Importar getFirebaseAuth
+import { onAuthStateChanged, User } from 'firebase/auth'; // Importar User
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,7 @@ type OrderQuantities = {
 
 export default function MakeStockOrderPage() {
     const [db, setDb] = useState<firestore.Firestore | null>(null);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(true);
     const [quantities, setQuantities] = useState<OrderQuantities>({});
@@ -33,11 +35,20 @@ export default function MakeStockOrderPage() {
     const [hasCopied, setHasCopied] = useState(false);
 
     useEffect(() => {
-        async function initializeData() {
+        async function initializeApp() {
             const firestoreDb = await getFirebaseDb();
-            if (!firestoreDb) { setLoading(false); return; }
+            const auth = await getFirebaseAuth();
+            if (!firestoreDb || !auth) { 
+                setLoading(false); 
+                toast.error("Falha ao inicializar serviços.");
+                return;
+            }
             setDb(firestoreDb);
 
+            const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+                setCurrentUser(user);
+            });
+            
             const querySuppliers = firestore.query(firestore.collection(firestoreDb, "suppliers"), firestore.orderBy("posicao", "asc"));
             const unsubSuppliers = firestore.onSnapshot(querySuppliers, (snapshot) => {
                 const suppliersData = snapshot.docs.map(doc => {
@@ -66,9 +77,9 @@ export default function MakeStockOrderPage() {
                 });
             });
 
-            return () => { unsubSuppliers(); unsubItems(); };
+            return () => { unsubscribeAuth(); unsubSuppliers(); unsubItems(); };
         }
-        initializeData();
+        initializeApp();
     }, []);
 
     const handleQuantityChange = (itemId: string, field: 'inStock' | 'toOrder', value: number) => {
@@ -104,35 +115,38 @@ export default function MakeStockOrderPage() {
     }, [reviewData]);
 
     const handleSubmitOrder = async () => {
-        if (!db) return;
+        if (!db || !currentUser?.email) {
+            toast.error("Usuário não autenticado. Não é possível registrar o pedido.");
+            return;
+        }
         setIsSubmitting(true);
         const toastId = toast.loading("Registrando pedidos de compra...");
 
         try {
             const batch = firestore.writeBatch(db);
 
-            // 1. Criar os Pedidos de Compra (Purchase Orders)
             reviewData.forEach(supplier => {
                 const orderRef = firestore.doc(firestore.collection(db, "purchaseOrders"));
                 batch.set(orderRef, {
                     createdAt: firestore.serverTimestamp(),
                     supplierId: supplier.id,
                     supplierName: supplier.name,
+                    requestedBy: currentUser.email, // Salva o email do usuário
                     status: 'aberto',
                     items: supplier.items.map(item => ({
                         itemId: item.id,
                         itemName: item.name,
                         unit: item.unit,
-                        quantity: item.toOrder
+                        quantity: item.toOrder,
+                        inStock: quantities[item.id].inStock // Salva o estoque acusado
                     }))
                 });
 
-                // 2. Atualizar o estoque e zerar "a pedir" nos itens
                 supplier.items.forEach(item => {
                     const itemRef = firestore.doc(db, "stockItems", item.id);
                     batch.update(itemRef, {
                         inStock: quantities[item.id].inStock,
-                        toOrder: 0 // Zera a quantidade "a pedir"
+                        toOrder: 0
                     });
                 });
             });

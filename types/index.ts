@@ -34,7 +34,6 @@ export interface AccompanimentItem {
 
 // --- Tipos de Configuração (Unificado e Corrigido) ---
 export interface AppConfig {
-  // Aparência
   logoUrl?: string;
   nomeFazenda: string;
   subtitulo?: string;
@@ -43,15 +42,11 @@ export interface AppConfig {
   corDestaque: string;
   corDestaqueTexto: string;
   corCartao: string;
-  
-  // Mensagens Gerais
   textoBoasVindas?: string;
   textoAgradecimento: string;
   mensagemAtrasoPadrao?: string;
   mensagemDoDia?: string;
   mensagensMotivacionais?: string[];
-
-  // Mensagens Personalizáveis do Formulário de Cestas
   welcomeEmoji?: string;
   welcomeTitle?: string;
   welcomeSubtitle?: string;
@@ -59,19 +54,13 @@ export interface AppConfig {
   successSubtitle?: string;
   successGratitude?: string;
   successFooter?: string;
-
-  // Mensagens da Comanda
   comandaTitle?: string;
   comandaSubtitle?: string;
   comandaPostQr?: string;
   comandaFooter?: string;
-
-  // Mensagens da Pesquisa de Satisfação
   surveySuccessTitle?: string;
   surveySuccessSubtitle?: string;
   surveySuccessFooter?: string;
-
-  // ✨ NOVAS MENSAGENS DO PRÉ-CHECK-IN ✨
   preCheckInWelcomeMessage?: string;
   preCheckInSuccessMessage?: string;
 }
@@ -164,12 +153,13 @@ export interface StockItem {
   unit: string;
 }
 
-// --- ✨ NOVOS TIPOS PARA O PEDIDO DE COMPRA ✨ ---
+// --- ✨ NOVOS TIPOS PARA O PEDIDO DE COMPRA ATUALIZADOS ✨ ---
 export interface PurchaseOrderItem {
     itemId: string;
     itemName: string;
     unit: string;
     quantity: number;
+    inStock: number; // Estoque acusado no momento do pedido
 }
   
 export interface PurchaseOrder {
@@ -177,6 +167,7 @@ export interface PurchaseOrder {
     createdAt: Timestamp;
     supplierId: string;
     supplierName: string;
+    requestedBy: string; // Email do solicitante
     items: PurchaseOrderItem[];
     status: 'aberto' | 'concluido' | 'arquivado';
 }
@@ -199,4 +190,12 @@ export interface PreCheckIn {
   guests: Guest[];
   createdAt: string; 
   status: 'recebido' | 'concluido' | 'arquivado';
+}
+
+// --- ✨ NOVOS TIPOS PARA ESTATÍSTICAS DE COMPRA ✨ ---
+export interface PurchaseStatsData {
+    totalPedidosCompra: number;
+    totalItensComprados: number;
+    itensMaisComprados: { name: string; value: number }[];
+    fornecedoresMaisAcionados: { name: string; value: number }[];
 }
