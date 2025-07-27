@@ -38,12 +38,13 @@ export default function GuestBookingsPage() {
             if (!firestoreDb) { toast.error("Falha ao conectar ao banco."); setLoading(false); return; }
             setDb(firestoreDb);
 
-            // Fetch Cabins
             try {
-                const cabinsSnapshot = await firestore.getDocs(firestore.query(firestore.collection(firestoreDb, 'cabanas'), firestore.orderBy('posicao', 'asc')));
-                setCabins(cabinsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Cabin)));
-            } catch (error) {
-                toast.error("Não foi possível carregar a lista de cabanas.");
+                const response = await fetch('/api/cabanas');
+                if (!response.ok) throw new Error("Não foi possível carregar a lista de cabanas.");
+                const data = await response.json();
+                setCabins(data);
+            } catch (error: any) {
+                toast.error(error.message);
             }
         };
         initializeApp();
@@ -75,6 +76,10 @@ export default function GuestBookingsPage() {
             b.timeSlotId === timeSlotId
         );
         
+        if (booking?.status === 'confirmado' || booking?.status === 'bloqueado') {
+            return false;
+        }
+
         if (service.defaultStatus === 'closed') {
             return booking?.status === 'disponivel';
         }
@@ -97,7 +102,6 @@ export default function GuestBookingsPage() {
         const dateStr = format(startOfDay(new Date()), 'yyyy-MM-dd');
 
         try {
-            // Verifica se a cabana já agendou este serviço hoje
             const hasAlreadyBooked = bookings.some(b => 
                 b.serviceId === service.id && 
                 b.cabinName === cabinName && 
@@ -107,12 +111,30 @@ export default function GuestBookingsPage() {
                 throw new Error(`A cabana ${cabinName} já agendou este serviço hoje.`);
             }
             
-            await firestore.addDoc(firestore.collection(db, 'bookings'), {
-                serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
-                timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
-                guestName, cabinName, status: 'confirmado', 
-                createdAt: firestore.serverTimestamp()
-            });
+            const existingAvailableBooking = bookings.find(b => 
+                b.serviceId === service.id &&
+                b.unit === unit &&
+                b.timeSlotId === timeSlot.id &&
+                b.status === 'disponivel'
+            );
+
+            if (existingAvailableBooking) {
+                // Se o horário foi aberto manualmente, apenas atualizamos o registro
+                await firestore.updateDoc(firestore.doc(db, 'bookings', existingAvailableBooking.id), {
+                    guestName, 
+                    cabinName, 
+                    status: 'confirmado'
+                });
+            } else {
+                // Se o horário estava livre por padrão, criamos um novo registro
+                await firestore.addDoc(firestore.collection(db, 'bookings'), {
+                    serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
+                    timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
+                    guestName, cabinName, status: 'confirmado', 
+                    createdAt: firestore.serverTimestamp()
+                });
+            }
+
             toast.success("Agendamento confirmado com sucesso!");
             setBookingModal({ open: false });
             setFormValues({ guestName: '', cabinName: '' });
@@ -188,7 +210,11 @@ export default function GuestBookingsPage() {
                             <Select onValueChange={(value) => setFormValues(prev => ({...prev, cabinName: value}))}>
                                 <SelectTrigger><SelectValue placeholder="Selecione sua cabana..." /></SelectTrigger>
                                 <SelectContent>
-                                    {cabins.map(cabin => <SelectItem key={cabin.id} value={cabin.name}>{cabin.name}</SelectItem>)}
+                                    {cabins.length > 0 ? (
+                                        cabins.map(cabin => <SelectItem key={cabin.id} value={cabin.name}>{cabin.name}</SelectItem>)
+                                    ) : (
+                                        <div className="p-4 text-sm text-center text-muted-foreground">Carregando cabanas...</div>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>

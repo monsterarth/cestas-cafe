@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast, Toaster } from 'sonner';
 import { Calendar as CalendarIcon, Loader2, X, Lock, Unlock, User, Info } from 'lucide-react';
 import { format, startOfDay } from 'date-fns';
@@ -21,7 +22,7 @@ type SlotStatus = {
     booking?: Booking;
 };
 
-// --- Componente de Horário (ATUALIZADO) ---
+// --- Componente de Horário ---
 function TimeSlot({ service, unit, timeSlot, status, onSlotClick }: { service: Service, unit: string, timeSlot: any, status: SlotStatus, onSlotClick: () => void }) {
     const getStatusInfo = () => {
         switch (status.status) {
@@ -55,6 +56,12 @@ export default function BookingsCalendarPage() {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
+
+    const confirmedBookings = useMemo(() => {
+        return bookings
+            .filter(b => b.status === 'confirmado')
+            .sort((a, b) => a.timeSlotLabel.localeCompare(b.timeSlotLabel));
+    }, [bookings]);
 
     useEffect(() => {
         const initializeDb = async () => {
@@ -117,7 +124,7 @@ export default function BookingsCalendarPage() {
 
         try {
             switch (currentStatus.status) {
-                case 'fechado': // Ação: Liberar
+                case 'fechado':
                     await firestore.addDoc(firestore.collection(db, 'bookings'), {
                         serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
                         timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
@@ -127,8 +134,8 @@ export default function BookingsCalendarPage() {
                     toast.success("Horário liberado!");
                     break;
 
-                case 'livre': // Ação: Bloquear
-                    if (existingBooking) { 
+                case 'livre':
+                    if (existingBooking) {
                          await firestore.updateDoc(firestore.doc(db, 'bookings', existingBooking.id), {
                             status: 'bloqueado', guestName: 'Admin', cabinName: 'Bloqueado'
                          });
@@ -185,29 +192,64 @@ export default function BookingsCalendarPage() {
 
                 {loading ? (
                      <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>
-                ) : services.length === 0 ? (
-                    <Card><CardContent className="p-8 text-center text-muted-foreground">Nenhum serviço configurado. Vá para <Link href="/admin/settings/servicos" className="underline">Sistema &gt; Serviços</Link> para começar.</CardContent></Card>
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {services.filter(s => s.type === 'slots').map(service => (
-                            <React.Fragment key={service.id}>
-                                {service.units.map(unit => (
-                                    <Card key={unit}>
-                                        <CardHeader>
-                                            <CardTitle>{service.name}</CardTitle>
-                                            <CardDescription>{unit}</CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="space-y-2">
-                                            {(service.timeSlots || []).map(slot => {
-                                                const status = getSlotStatus(service, unit, slot.id);
-                                                return <TimeSlot key={slot.id} service={service} unit={unit} timeSlot={slot} status={status} onSlotClick={() => handleSlotClick(service, unit, slot, status)} />
-                                            })}
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </React.Fragment>
-                        ))}
-                    </div>
+                    <>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Agendamentos Confirmados do Dia</CardTitle>
+                                <CardDescription>Lista de todos os serviços agendados para a data selecionada.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Horário</TableHead>
+                                            <TableHead>Serviço</TableHead>
+                                            <TableHead>Hóspede</TableHead>
+                                            <TableHead>Cabana</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {confirmedBookings.length > 0 ? (
+                                            confirmedBookings.map(booking => (
+                                                <TableRow key={booking.id}>
+                                                    <TableCell>{booking.timeSlotLabel}</TableCell>
+                                                    <TableCell>{booking.serviceName} ({booking.unit})</TableCell>
+                                                    <TableCell className="font-medium">{booking.guestName}</TableCell>
+                                                    <TableCell>{booking.cabinName}</TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="h-24 text-center">Nenhum agendamento confirmado para este dia.</TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {services.filter(s => s.type === 'slots').map(service => (
+                                <React.Fragment key={service.id}>
+                                    {service.units.map(unit => (
+                                        <Card key={unit}>
+                                            <CardHeader>
+                                                <CardTitle>{service.name}</CardTitle>
+                                                <CardDescription>{unit}</CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-2">
+                                                {(service.timeSlots || []).map(slot => {
+                                                    const status = getSlotStatus(service, unit, slot.id);
+                                                    return <TimeSlot key={slot.id} service={service} unit={unit} timeSlot={slot} status={status} onSlotClick={() => handleSlotClick(service, unit, slot, status)} />
+                                                })}
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </>
                 )}
             </div>
         </>
