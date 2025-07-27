@@ -164,6 +164,23 @@ export interface StockItem {
   unit: string;
 }
 
+// --- ✨ NOVOS TIPOS PARA O PEDIDO DE COMPRA ✨ ---
+export interface PurchaseOrderItem {
+    itemId: string;
+    itemName: string;
+    unit: string;
+    quantity: number;
+}
+  
+export interface PurchaseOrder {
+    id: string;
+    createdAt: Timestamp;
+    supplierId: string;
+    supplierName: string;
+    items: PurchaseOrderItem[];
+    status: 'aberto' | 'concluido' | 'arquivado';
+}
+
 // --- ✨ NOVOS TIPOS PARA O PRÉ-CHECK-IN ✨ ---
 export interface Guest {
   fullName: string;
