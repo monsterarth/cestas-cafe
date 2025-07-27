@@ -50,14 +50,16 @@ export const navSections = [
       links: [
         { href: '/admin/agendamentos', label: 'Agendamentos', icon: CalendarDays },
         { href: '/admin/pre-check-ins', label: 'Pré Check-ins', icon: FileText },
+        { href: '/admin/surveys', label: 'Avaliações', icon: ClipboardList },
+        { href: '/admin/pedidos', label: 'Café em Cestas', icon: ShoppingBasket },
+        { href: '/admin/comandas/criar', label: 'Criar Comandas', icon: Ticket },
+        { href: '/admin/comandas/gerenciar', label: 'Gerenciar Comandas', icon: Ticket },
       ],
     },
     {
       title: 'Cozinha',
       icon: Coffee,
       links: [
-        { href: '/admin/pedidos', label: 'Pedidos de Café', icon: ShoppingBasket },
-        { href: '/admin/comandas/gerenciar', label: 'Comandas', icon: Ticket },
         { href: '/admin/menu', label: 'Cardápio', icon: UtensilsCrossed },
         { href: '/admin/estoque', label: 'Estoque', icon: Warehouse },
       ],

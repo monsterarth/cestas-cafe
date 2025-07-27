@@ -13,7 +13,7 @@ interface ComandaThermalReceiptProps {
 export function ComandaThermalReceipt({ comanda, config }: ComandaThermalReceiptProps) {
     if (!comanda) return null;
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fazendadorosa.com.br';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fazendadorosa.com.br/cafe';
     const qrCodeUrl = `${baseUrl}/?token=${comanda.token}`;
 
     return (

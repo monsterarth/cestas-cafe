@@ -1,4 +1,3 @@
-// cestas-cafe/types/index.ts
 import { Timestamp } from "firebase/firestore";
 
 // --- Tipos de Dados do Cardápio ---
@@ -147,17 +146,22 @@ export interface Order {
   observacoesPratosQuentes?: string;
 }
 
-// --- ✨ NOVOS TIPOS PARA GESTÃO DE ESTOQUE ✨ ---
+// --- ✨ TIPOS PARA GESTÃO DE ESTOQUE ATUALIZADOS ✨ ---
 export interface Supplier {
   id: string;
   name: string;
+  posicao: number;
+  items: StockItem[];
 }
 
 export interface StockItem {
   id: string;
-  name: string;
   supplierId: string;
-  posicao?: number;
+  name: string;
+  posicao: number;
+  inStock: number;
+  toOrder: number;
+  unit: string;
 }
 
 // --- ✨ NOVOS TIPOS PARA O PRÉ-CHECK-IN ✨ ---
@@ -176,6 +180,6 @@ export interface PreCheckIn {
   foodRestrictions?: string;
   isBringingPet: boolean;
   guests: Guest[];
-  createdAt: string; // ✨ CORRIGIDO: O tipo agora é string.
+  createdAt: string; 
   status: 'recebido' | 'concluido' | 'arquivado';
 }
