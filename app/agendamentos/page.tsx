@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast, Toaster } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 import { format, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -119,15 +119,21 @@ export default function GuestBookingsPage() {
             );
 
             if (existingAvailableBooking) {
-                await firestore.deleteDoc(firestore.doc(db, 'bookings', existingAvailableBooking.id));
+                // Se o horário foi aberto manualmente, apenas atualizamos o registro
+                await firestore.updateDoc(firestore.doc(db, 'bookings', existingAvailableBooking.id), {
+                    guestName, 
+                    cabinName, 
+                    status: 'confirmado'
+                });
+            } else {
+                // Se o horário estava livre por padrão, criamos um novo registro
+                await firestore.addDoc(firestore.collection(db, 'bookings'), {
+                    serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
+                    timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
+                    guestName, cabinName, status: 'confirmado', 
+                    createdAt: firestore.serverTimestamp()
+                });
             }
-
-            await firestore.addDoc(firestore.collection(db, 'bookings'), {
-                serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
-                timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
-                guestName, cabinName, status: 'confirmado', 
-                createdAt: firestore.serverTimestamp()
-            });
 
             toast.success("Agendamento confirmado com sucesso!");
             setBookingModal({ open: false });
