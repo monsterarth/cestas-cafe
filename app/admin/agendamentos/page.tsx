@@ -13,9 +13,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { toast, Toaster } from 'sonner';
-import { Calendar as CalendarIcon, Loader2, Lock, Unlock, User, Edit, Trash2, Wind, Dog, Sparkles } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, Lock, Unlock, User, Edit, Trash2, Wind, Dog, Sparkles, CheckSquare, XSquare } from 'lucide-react';
 import { format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ import { cn } from '@/lib/utils';
 type SlotStatusType = 'livre' | 'agendado' | 'bloqueado' | 'fechado' | 'disponivel_admin';
 
 type SlotInfo = {
+    id: string; // Unique ID for selection
     status: SlotStatusType;
     booking?: Booking;
     service: Service;
@@ -31,7 +33,13 @@ type SlotInfo = {
 };
 
 // --- Componente de Horário (Slot Visual) ---
-function TimeSlotDisplay({ slotInfo, onSlotClick }: { slotInfo: SlotInfo, onSlotClick: () => void }) {
+function TimeSlotDisplay({ slotInfo, onSlotClick, inSelectionMode, isSelected, onSelectSlot }: {
+    slotInfo: SlotInfo,
+    onSlotClick: () => void,
+    inSelectionMode: boolean,
+    isSelected: boolean,
+    onSelectSlot: () => void,
+}) {
     const getStatusVisuals = () => {
         switch (slotInfo.status) {
             case 'agendado': return { bg: 'bg-blue-100', text: 'text-blue-800', icon: <User className="h-4 w-4" />, label: `${slotInfo.booking?.guestName}` };
@@ -42,18 +50,24 @@ function TimeSlotDisplay({ slotInfo, onSlotClick }: { slotInfo: SlotInfo, onSlot
         }
     };
     const { bg, text, icon, label } = getStatusVisuals();
+    
+    const handleClick = () => {
+        if (inSelectionMode) {
+            onSelectSlot();
+        } else {
+            onSlotClick();
+        }
+    };
 
     return (
-        <button
-            onClick={onSlotClick}
-            className={cn("w-full text-left p-2 rounded-md transition-all hover:opacity-90 flex items-center justify-between text-sm", bg, text)}
-        >
-            <div className="flex items-center font-semibold">
+        <div className={cn("w-full flex items-center p-2 rounded-md transition-all cursor-pointer", bg, isSelected ? 'ring-2 ring-blue-500' : 'hover:opacity-90')} onClick={handleClick}>
+            {inSelectionMode && <Checkbox checked={isSelected} className="mr-3" />}
+            <div className={cn("flex items-center font-semibold text-sm", text)}>
                 {icon}
                 <span className="ml-2">{slotInfo.timeSlot.label}</span>
             </div>
             <span className="text-xs truncate ml-2">{label}</span>
-        </button>
+        </div>
     );
 }
 
@@ -66,9 +80,14 @@ export default function BookingsCalendarPage() {
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
     
+    // State para Modal Individual
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedSlot, setSelectedSlot] = useState<SlotInfo | null>(null);
     const [editForm, setEditForm] = useState({ guestName: '', cabinName: '' });
+
+    // State para Seleção em Massa
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedSlots, setSelectedSlots] = useState<Map<string, SlotInfo>>(new Map());
 
     useEffect(() => {
         const initializeApp = async () => {
@@ -110,7 +129,6 @@ export default function BookingsCalendarPage() {
         return () => { unsubServices(); unsubBookings(); };
     }, [db, selectedDate]);
 
-    // >> CORREÇÃO DOS ERROS DE TYPESCRIPT E LÓGICA DE ORDENAÇÃO <<
     const confirmedBookings = useMemo(() => {
         return bookings
             .filter(b => b.status === 'confirmado')
@@ -122,6 +140,7 @@ export default function BookingsCalendarPage() {
     }, [bookings]);
     
     const getSlotInfo = (service: Service, unit: string, timeSlot: { id: string; label: string; }): SlotInfo => {
+        const id = `${service.id}-${unit}-${timeSlot.id}`;
         const booking = bookings.find(b => b.serviceId === service.id && b.unit === unit && b.timeSlotId === timeSlot.id);
         let status: SlotStatusType = 'livre';
         if (booking) {
@@ -131,40 +150,163 @@ export default function BookingsCalendarPage() {
         } else {
             if (service.defaultStatus === 'closed') status = 'fechado';
         }
-        return { status, booking, service, unit, timeSlot };
+        return { id, status, booking, service, unit, timeSlot };
     };
     
-    const handleSlotClick = (slotInfo: SlotInfo) => {
+    const handleToggleSelectionMode = () => {
+        setSelectionMode(!selectionMode);
+        setSelectedSlots(new Map());
+    };
+
+    const handleSelectSlot = (slotInfo: SlotInfo) => {
+        const newSelection = new Map(selectedSlots);
+        if (newSelection.has(slotInfo.id)) {
+            newSelection.delete(slotInfo.id);
+        } else {
+            if (slotInfo.status !== 'fechado') {
+                toast.info("Apenas horários 'Fechados' podem ser liberados em massa.");
+                return;
+            }
+            newSelection.set(slotInfo.id, slotInfo);
+        }
+        setSelectedSlots(newSelection);
+    };
+    
+    const handleBulkRelease = async () => {
+        if (!db || selectedSlots.size === 0) return;
+        const toastId = toast.loading(`Liberando ${selectedSlots.size} horários...`);
+        try {
+            const batch = firestore.writeBatch(db);
+            const dateStr = format(selectedDate, 'yyyy-MM-dd');
+            selectedSlots.forEach(slotInfo => {
+                const docRef = firestore.doc(firestore.collection(db, 'bookings'));
+                batch.set(docRef, {
+                    serviceId: slotInfo.service.id, serviceName: slotInfo.service.name, unit: slotInfo.unit, 
+                    date: dateStr, timeSlotId: slotInfo.timeSlot.id, timeSlotLabel: slotInfo.timeSlot.label,
+                    status: 'disponivel', createdAt: firestore.serverTimestamp()
+                });
+            });
+            await batch.commit();
+            toast.success(`${selectedSlots.size} horários liberados!`, { id: toastId });
+            setSelectionMode(false);
+            setSelectedSlots(new Map());
+        } catch (error: any) {
+            toast.error(`Falha ao liberar horários: ${error.message}`, { id: toastId });
+        }
+    };
+
+    const handleSingleSlotClick = (slotInfo: SlotInfo) => {
+        if (selectionMode) {
+            handleSelectSlot(slotInfo);
+            return;
+        }
         setSelectedSlot(slotInfo);
         setEditForm({ guestName: slotInfo.booking?.guestName || '', cabinName: slotInfo.booking?.cabinName || '' });
         setIsModalOpen(true);
     };
 
     const handleModalAction = async (action: 'update' | 'create' | 'cancel' | 'block' | 'unblock' | 'release') => {
-        // ... (código do modal inalterado) ...
+        if (!db || !selectedSlot) return;
+        
+        const { service, unit, timeSlot, booking } = selectedSlot;
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const bookingId = booking?.id;
+        const toastId = toast.loading("Processando sua solicitação...");
+
+        try {
+            if (action === 'create' || action === 'update') {
+                if (!editForm.guestName || !editForm.cabinName) {
+                    toast.error("Nome do hóspede e cabana são obrigatórios.", { id: toastId });
+                    return;
+                }
+            }
+
+            if (action === 'create') {
+                const newBookingData = {
+                    serviceId: service.id, serviceName: service.name, unit, date: dateStr,
+                    timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
+                    guestName: editForm.guestName, cabinName: editForm.cabinName,
+                    status: 'confirmado', createdAt: firestore.serverTimestamp()
+                };
+                if (bookingId) {
+                    await firestore.updateDoc(firestore.doc(db, 'bookings', bookingId), newBookingData);
+                } else {
+                    await firestore.addDoc(firestore.collection(db, 'bookings'), newBookingData);
+                }
+                toast.success("Reserva criada com sucesso!", { id: toastId });
+            }
+            else if (action === 'update' && bookingId) {
+                await firestore.updateDoc(firestore.doc(db, 'bookings', bookingId), {
+                    guestName: editForm.guestName,
+                    cabinName: editForm.cabinName,
+                });
+                toast.success("Reserva atualizada!", { id: toastId });
+            }
+            else if (action === 'cancel' && bookingId) {
+                await firestore.deleteDoc(firestore.doc(db, 'bookings', bookingId));
+                toast.success("Reserva cancelada!", { id: toastId });
+            }
+            else if (action === 'block') {
+                const blockData = {
+                    serviceId: service.id, serviceName: service.name, unit, date: dateStr,
+                    timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
+                    status: 'bloqueado', guestName: 'Admin', cabinName: 'Bloqueado',
+                    createdAt: firestore.serverTimestamp()
+                };
+                if (bookingId) {
+                    await firestore.updateDoc(firestore.doc(db, 'bookings', bookingId), blockData);
+                } else {
+                    await firestore.addDoc(firestore.collection(db, 'bookings'), blockData);
+                }
+                toast.success("Horário bloqueado!", { id: toastId });
+            }
+            else if (action === 'unblock' && bookingId) {
+                 await firestore.deleteDoc(firestore.doc(db, 'bookings', bookingId));
+                 toast.success("Horário desbloqueado!", { id: toastId });
+            }
+            else if (action === 'release') {
+                const releaseData = {
+                    serviceId: service.id, serviceName: service.name, unit, date: dateStr,
+                    timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
+                    status: 'disponivel', createdAt: firestore.serverTimestamp()
+                };
+                await firestore.addDoc(firestore.collection(db, 'bookings'), releaseData);
+                toast.success("Horário liberado para agendamento!", { id: toastId });
+            }
+            setIsModalOpen(false);
+
+        } catch (error: any) {
+            toast.error(`Falha na operação: ${error.message}`, { id: toastId });
+        }
     };
 
     return (
-        <div className="container mx-auto p-4 md:p-6 space-y-6">
+        <div className="container mx-auto p-4 md:p-6 space-y-6 pb-24">
             <Toaster richColors position="top-center" />
             
             <Card>
                 <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
                         <CardTitle>Agenda de Serviços</CardTitle>
-                        <CardDescription>Gerencie os agendamentos e a disponibilidade.</CardDescription>
+                        <CardDescription>Gerencie agendamentos e disponibilidade.</CardDescription>
                     </div>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full md:w-[280px] justify-start text-left font-normal">
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {format(selectedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                            <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(startOfDay(date))} initialFocus />
-                        </PopoverContent>
-                    </Popover>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <Button variant={selectionMode ? "destructive" : "outline"} onClick={handleToggleSelectionMode} className="w-full md:w-auto">
+                            {selectionMode ? <XSquare className="h-4 w-4 mr-2"/> : <CheckSquare className="h-4 w-4 mr-2" />}
+                            {selectionMode ? "Cancelar Seleção" : "Liberar em Massa"}
+                        </Button>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className="w-full md:w-[280px] justify-start text-left font-normal">
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {format(selectedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(startOfDay(date))} initialFocus />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
                 </CardHeader>
             </Card>
 
@@ -172,21 +314,13 @@ export default function BookingsCalendarPage() {
                  <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>
             ) : (
                 <>
-                    {/* >> TABELA UNIFICADA DE AGENDAMENTOS E SOLICITAÇÕES << */}
                     <Card>
                          <CardHeader>
                              <CardTitle>Agendamentos e Solicitações do Dia</CardTitle>
                          </CardHeader>
                          <CardContent>
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[120px]">Horário</TableHead>
-                                        <TableHead>Serviço</TableHead>
-                                        <TableHead>Hóspede / Cabana</TableHead>
-                                        <TableHead>Detalhes</TableHead>
-                                    </TableRow>
-                                </TableHeader>
+                                <TableHeader><TableRow><TableHead className="w-[120px]">Horário</TableHead><TableHead>Serviço</TableHead><TableHead>Hóspede / Cabana</TableHead><TableHead>Detalhes</TableHead></TableRow></TableHeader>
                                 <TableBody>
                                     {confirmedBookings.length > 0 ? (
                                         confirmedBookings.map(booking => {
@@ -194,32 +328,14 @@ export default function BookingsCalendarPage() {
                                             return (
                                                 <TableRow key={booking.id}>
                                                     <TableCell className="font-medium">
-                                                        {serviceInfo?.type === 'slots' ? (
-                                                            booking.timeSlotLabel
-                                                        ) : (
-                                                            <>
-                                                                {booking.preferenceTime}
-                                                                <Badge variant="outline" className="ml-2">Pref.</Badge>
-                                                            </>
-                                                        )}
+                                                        {serviceInfo?.type === 'slots' ? (booking.timeSlotLabel) : (<>{booking.preferenceTime}<Badge variant="outline" className="ml-2">Pref.</Badge></>)}
                                                     </TableCell>
-                                                    <TableCell>
-                                                        {booking.serviceName}
-                                                        {serviceInfo?.type === 'slots' && ` (${booking.unit})`}
-                                                    </TableCell>
+                                                    <TableCell>{booking.serviceName}{serviceInfo?.type === 'slots' && ` (${booking.unit})`}</TableCell>
                                                     <TableCell>{booking.guestName} / {booking.cabinName}</TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-wrap gap-2">
-                                                            {booking.selectedOptions && booking.selectedOptions.map(opt => (
-                                                                <Badge key={opt} variant="secondary" className="flex items-center gap-1">
-                                                                    <Wind className="h-3 w-3" /> {opt}
-                                                                </Badge>
-                                                            ))}
-                                                            {booking.hasPet && (
-                                                                <Badge variant="destructive" className="flex items-center gap-1">
-                                                                    <Dog className="h-3 w-3" /> Pet na Cabana
-                                                                </Badge>
-                                                            )}
+                                                            {booking.selectedOptions?.map(opt => (<Badge key={opt} variant="secondary" className="flex items-center gap-1"><Wind className="h-3 w-3" /> {opt}</Badge>))}
+                                                            {booking.hasPet && (<Badge variant="destructive" className="flex items-center gap-1"><Dog className="h-3 w-3" /> Pet</Badge>)}
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
@@ -233,12 +349,11 @@ export default function BookingsCalendarPage() {
                          </CardContent>
                     </Card>
 
-                    {/* >> GRADE DE GERENCIAMENTO APENAS PARA SERVIÇOS DE SLOT << */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {services.filter(s => s.type === 'slots').map(service => (
                             <React.Fragment key={service.id}>
                                 {service.units.map(unit => {
-                                    const slots = (service.timeSlots || []);
+                                    const slots = (service.timeSlots || []).sort((a,b) => a.startTime.localeCompare(b.startTime));
                                     return (
                                         <Card key={`${service.id}-${unit}`}>
                                             <CardHeader>
@@ -248,7 +363,14 @@ export default function BookingsCalendarPage() {
                                             <CardContent className="space-y-2">
                                                 {slots.map(slot => {
                                                     const slotInfo = getSlotInfo(service, unit, slot);
-                                                    return <TimeSlotDisplay key={slot.id} slotInfo={slotInfo} onSlotClick={() => handleSlotClick(slotInfo)} />
+                                                    return <TimeSlotDisplay 
+                                                        key={slot.id} 
+                                                        slotInfo={slotInfo} 
+                                                        onSlotClick={() => handleSingleSlotClick(slotInfo)}
+                                                        inSelectionMode={selectionMode}
+                                                        isSelected={selectedSlots.has(slotInfo.id)}
+                                                        onSelectSlot={() => handleSelectSlot(slotInfo)}
+                                                    />
                                                 })}
                                             </CardContent>
                                         </Card>
@@ -260,7 +382,13 @@ export default function BookingsCalendarPage() {
                 </>
             )}
 
-            {/* Modal de Gerenciamento de Slot (inalterado) */}
+            {selectionMode && selectedSlots.size > 0 && (
+                <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 shadow-lg flex items-center justify-center gap-4 z-50">
+                    <span className="font-semibold">{selectedSlots.size} horário(s) selecionado(s).</span>
+                    <Button onClick={handleBulkRelease}><Unlock className="h-4 w-4 mr-2" />Liberar Selecionados</Button>
+                </div>
+            )}
+            
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogContent>
                     <DialogHeader>
