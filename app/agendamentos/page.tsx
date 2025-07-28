@@ -21,7 +21,7 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-// --- Esquema de Validação para o Modal de Preferência (Parte 2) ---
+// --- Esquema de Validação para o Modal de Preferência ---
 const preferenceSchema = z.object({
     guestName: z.string().min(2, "Seu nome é obrigatório."),
     cabinName: z.string().min(1, "Selecione sua cabana."),
@@ -39,7 +39,8 @@ const preferenceSchema = z.object({
 
 type PreferenceFormValues = z.infer<typeof preferenceSchema>;
 
-// --- PÁGINA PRINCIPAL DO HÓSPEDE (Refatorada para Parte 2) ---
+
+// --- PÁGINA PRINCIPAL DO HÓSPEDE ---
 export default function GuestBookingsPage() {
     const [db, setDb] = useState<firestore.Firestore | null>(null);
     const [services, setServices] = useState<Service[]>([]);
@@ -47,17 +48,14 @@ export default function GuestBookingsPage() {
     const [cabins, setCabins] = useState<Cabin[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Modal para horários fixos
     const [slotModal, setSlotModal] = useState<{ open: boolean; service?: Service, unit?: string, timeSlot?: TimeSlot }>({ open: false });
     const [slotFormValues, setSlotFormValues] = useState({ guestName: '', cabinName: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // Modal para serviços de preferência
     const [preferenceModal, setPreferenceModal] = useState<{ open: boolean; service?: Service }>({ open: false });
     
     const preferenceForm = useForm<PreferenceFormValues>({
         resolver: zodResolver(preferenceSchema),
-        defaultValues: { guestName: '', cabinName: '', preferenceTime: '14:00', hasPet: false, petPolicyAgreed: false }
     });
     const hasPetValue = preferenceForm.watch('hasPet');
 
@@ -110,6 +108,7 @@ export default function GuestBookingsPage() {
         return bookings.some(b => b.serviceId === serviceId && b.cabinName === cabinName && b.status === 'confirmado');
     };
     
+    // >> FUNÇÃO COMPLETA RESTAURADA <<
     const handleSlotBookingSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!db || !slotModal.service || !slotModal.unit || !slotModal.timeSlot) return;
@@ -182,6 +181,24 @@ export default function GuestBookingsPage() {
             setIsSubmitting(false);
         }
     };
+    
+    // >> FUNÇÃO CORRIGIDA PARA ABRIR O MODAL DE PREFERÊNCIA <<
+    const handleOpenPreferenceModal = (service: Service) => {
+        const defaultOptions = service.additionalOptions?.reduce((acc, option) => {
+            acc[option] = false;
+            return acc;
+        }, {} as Record<string, boolean>) || {};
+
+        preferenceForm.reset({
+            guestName: '',
+            cabinName: '',
+            preferenceTime: '14:00',
+            hasPet: false,
+            petPolicyAgreed: false,
+            additionalOptions: defaultOptions
+        });
+        setPreferenceModal({ open: true, service });
+    };
 
     const handlePreferenceSubmit: SubmitHandler<PreferenceFormValues> = async (data) => {
         if (!db || !preferenceModal.service) return;
@@ -211,12 +228,11 @@ export default function GuestBookingsPage() {
                 selectedOptions: selectedOptions,
                 hasPet: data.hasPet,
                 createdAt: firestore.serverTimestamp(),
-                unit: 'N/A',
+                unit: 'N/A', 
             });
 
             toast.success("Solicitação enviada com sucesso!", { id: toastId });
             setPreferenceModal({ open: false });
-            preferenceForm.reset();
         } catch (error: any) {
             toast.error(error.message || "Não foi possível enviar a solicitação.", { id: toastId });
         }
@@ -261,7 +277,7 @@ export default function GuestBookingsPage() {
                                 )}
                                 {service.type === 'preference' && (
                                     <div className="flex justify-start">
-                                        <Button size="lg" onClick={() => setPreferenceModal({ open: true, service })}>
+                                        <Button size="lg" onClick={() => handleOpenPreferenceModal(service)}>
                                             Solicitar {service.name}
                                         </Button>
                                     </div>
@@ -316,7 +332,7 @@ export default function GuestBookingsPage() {
                                 </Alert>
                                 {preferenceModal.service.additionalOptions && preferenceModal.service.additionalOptions.length > 0 && (
                                     <div className="space-y-2">
-                                        <Label className="font-semibold">Serviços Adicionais</Label>
+                                        <Label className="font-semibold">Serviços Adicionais (Opcional)</Label>
                                         <div className="space-y-2 rounded-md border p-4">
                                             {preferenceModal.service.additionalOptions.map(option => (
                                                 <FormField key={option} name={`additionalOptions.${option}`} control={preferenceForm.control} render={({ field }) => (
