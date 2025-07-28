@@ -219,7 +219,7 @@ export interface Booking {
     guestName: string;
     cabinName: string;
     createdAt: Timestamp;
-    status: 'confirmado' | 'cancelado_pelo_admin' | 'bloqueado' | 'disponivel'; // CORREÇÃO AQUI
+    status: 'confirmado' | 'cancelado_pelo_admin' | 'bloqueado' | 'disponivel';
 }
 
 // --- TIPO PARA ESTATÍSTICAS DE COMPRA ---

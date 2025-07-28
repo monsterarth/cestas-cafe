@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast, Toaster } from 'sonner';
-import { Loader2, Info } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { format, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -21,7 +21,6 @@ type SlotInfo = {
     timeSlot: any;
 };
 
-// --- PÁGINA PRINCIPAL ---
 export default function GuestBookingsPage() {
     const [db, setDb] = useState<firestore.Firestore | null>(null);
     const [services, setServices] = useState<Service[]>([]);
@@ -70,12 +69,12 @@ export default function GuestBookingsPage() {
     }, [db]);
 
     const isSlotAvailable = (service: Service, unit: string, timeSlotId: string): boolean => {
-        const booking = bookings.find(b => 
+        const booking = bookings.find(b =>
             b.serviceId === service.id &&
             b.unit === unit &&
             b.timeSlotId === timeSlotId
         );
-        
+
         if (booking?.status === 'confirmado' || booking?.status === 'bloqueado') {
             return false;
         }
@@ -83,10 +82,11 @@ export default function GuestBookingsPage() {
         if (service.defaultStatus === 'closed') {
             return booking?.status === 'disponivel';
         }
-        
+
         return !booking;
     };
-    
+
+    // ESTA É A FUNÇÃO CORRIGIDA
     const handleBookingSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!db || !bookingModal.slotInfo) return;
@@ -102,38 +102,66 @@ export default function GuestBookingsPage() {
         const dateStr = format(startOfDay(new Date()), 'yyyy-MM-dd');
 
         try {
-            const hasAlreadyBooked = bookings.some(b => 
-                b.serviceId === service.id && 
-                b.cabinName === cabinName && 
-                b.status === 'confirmado'
-            );
-            if (hasAlreadyBooked) {
-                throw new Error(`A cabana ${cabinName} já agendou este serviço hoje.`);
-            }
-            
-            const existingAvailableBooking = bookings.find(b => 
-                b.serviceId === service.id &&
-                b.unit === unit &&
-                b.timeSlotId === timeSlot.id &&
-                b.status === 'disponivel'
+            const bookingsRef = firestore.collection(db, 'bookings');
+
+            // 1. Checa fora da transação se a cabana já agendou este serviço hoje
+            const cabinBookingQuery = firestore.query(bookingsRef,
+                firestore.where('date', '==', dateStr),
+                firestore.where('serviceId', '==', service.id),
+                firestore.where('cabinName', '==', cabinName),
+                firestore.where('status', '==', 'confirmado')
             );
 
-            if (existingAvailableBooking) {
-                // Se o horário foi aberto manualmente, apenas atualizamos o registro
-                await firestore.updateDoc(firestore.doc(db, 'bookings', existingAvailableBooking.id), {
-                    guestName, 
-                    cabinName, 
-                    status: 'confirmado'
-                });
-            } else {
-                // Se o horário estava livre por padrão, criamos um novo registro
-                await firestore.addDoc(firestore.collection(db, 'bookings'), {
-                    serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
-                    timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
-                    guestName, cabinName, status: 'confirmado', 
-                    createdAt: firestore.serverTimestamp()
-                });
+            const cabinSnapshot = await firestore.getDocs(cabinBookingQuery);
+            if (!cabinSnapshot.empty) {
+                throw new Error(`A cabana ${cabinName} já agendou este serviço hoje.`);
             }
+
+            // 2. Roda a transação para checar e agendar o horário de forma atômica
+            await firestore.runTransaction(db, async (transaction) => {
+                const slotQuery = firestore.query(bookingsRef,
+                    firestore.where('date', '==', dateStr),
+                    firestore.where('serviceId', '==', service.id),
+                    firestore.where('unit', '==', unit),
+                    firestore.where('timeSlotId', '==', timeSlot.id)
+                );
+                
+                // Usa getDocs para executar a query. Não se pode passar uma query para transaction.get
+                const slotSnapshot = await firestore.getDocs(slotQuery);
+                const existingBookingDoc = slotSnapshot.docs.length > 0 ? slotSnapshot.docs[0] : null;
+
+                if (existingBookingDoc) {
+                    // Se um documento para o slot existe, obtemos sua referência para usar na transação
+                    const existingBookingRef = firestore.doc(db, 'bookings', existingBookingDoc.id);
+                    // Re-lê o documento DENTRO da transação para garantir que não houve alteração
+                    const freshBookingSnap = await transaction.get(existingBookingRef);
+
+                    if (!freshBookingSnap.exists()) {
+                         throw new Error("O horário que você tenta agendar foi removido. Por favor, atualize a página.");
+                    }
+
+                    const existingBooking = freshBookingSnap.data() as Booking;
+                    if (existingBooking.status === 'disponivel') {
+                        // O horário estava disponível, então o confirmamos
+                        transaction.update(existingBookingRef, { guestName, cabinName, status: 'confirmado', createdAt: firestore.serverTimestamp() });
+                    } else {
+                        // O horário foi preenchido ou bloqueado por outra transação
+                        throw new Error("Desculpe, este horário acabou de ser preenchido. Por favor, escolha outro.");
+                    }
+                } else {
+                    // Se não há documento para o horário, podemos criar um
+                    if (service.defaultStatus === 'closed') {
+                        throw new Error("Este horário não foi liberado pela recepção.");
+                    }
+                    const newBookingRef = firestore.doc(firestore.collection(db, 'bookings'));
+                    transaction.set(newBookingRef, {
+                        serviceId: service.id, serviceName: service.name, unit, date: dateStr, 
+                        timeSlotId: timeSlot.id, timeSlotLabel: timeSlot.label,
+                        guestName, cabinName, status: 'confirmado', 
+                        createdAt: firestore.serverTimestamp()
+                    });
+                }
+            });
 
             toast.success("Agendamento confirmado com sucesso!");
             setBookingModal({ open: false });
@@ -149,84 +177,97 @@ export default function GuestBookingsPage() {
         return <div className="flex items-center justify-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-gray-400" /></div>;
     }
 
+    // O JSX da página é renderizado abaixo
     return (
-        <>
+        <div className="container mx-auto p-4">
             <Toaster richColors position="top-center" />
-            <div className="min-h-screen bg-gray-50 p-4 sm:p-8">
-                <div className="max-w-4xl mx-auto space-y-8">
-                    <header className="text-center">
-                        <h1 className="text-4xl font-bold text-gray-800">Agendamento de Serviços</h1>
-                        <p className="text-muted-foreground mt-2">Escolha um serviço e um horário disponível para hoje.</p>
-                    </header>
-
-                    {services.map(service => (
-                        <Card key={service.id}>
-                            <CardHeader>
-                                <CardTitle>{service.name}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <header className="mb-8">
+                <h1 className="text-4xl font-bold text-center text-gray-800">Nossos Serviços</h1>
+                <p className="text-center text-lg text-gray-500 mt-2">Escolha um serviço e agende seu horário.</p>
+            </header>
+            
+            <div className="space-y-8">
+                {services.map(service => (
+                    <Card key={service.id} className="overflow-hidden">
+                        <CardHeader>
+                            <CardTitle>{service.name}</CardTitle>
+                            <CardDescription>
+                                {service.type === 'slots' ? 'Agende um horário específico' : 'Defina sua preferência'}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {service.units.map(unit => (
-                                    <div key={unit}>
-                                        <h3 className="font-semibold mb-3">{unit}</h3>
-                                        <div className="space-y-2">
-                                            {(service.timeSlots || []).map(slot => {
-                                                const available = isSlotAvailable(service, unit, slot.id);
+                                    <div key={unit} className="border rounded-lg p-4">
+                                        <h4 className="font-semibold text-lg mb-3">{unit}</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {service.timeSlots.map(timeSlot => {
+                                                const available = isSlotAvailable(service, unit, timeSlot.id);
                                                 return (
-                                                    <Button 
-                                                        key={slot.id}
+                                                    <Button
+                                                        key={timeSlot.id}
                                                         variant={available ? 'outline' : 'secondary'}
                                                         disabled={!available}
-                                                        onClick={() => setBookingModal({ open: true, slotInfo: { service, unit, timeSlot: slot }})}
-                                                        className="w-full justify-start"
+                                                        onClick={() => setBookingModal({ open: true, slotInfo: { service, unit, timeSlot } })}
+                                                        className={cn("w-full justify-center", !available && "cursor-not-allowed line-through")}
                                                     >
-                                                        {slot.label}
+                                                        {timeSlot.label}
                                                     </Button>
                                                 );
                                             })}
                                         </div>
                                     </div>
                                 ))}
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
 
-            <Dialog open={bookingModal.open} onOpenChange={(open) => !open && setBookingModal({ open: false })}>
+            <Dialog open={bookingModal.open} onOpenChange={(open) => setBookingModal({ open })}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Confirmar Agendamento</DialogTitle>
                         <DialogDescription>
-                            Você está agendando: <strong>{bookingModal.slotInfo?.service.name} ({bookingModal.slotInfo?.unit})</strong> para o horário das <strong>{bookingModal.slotInfo?.timeSlot.label}</strong>.
+                            Serviço: {bookingModal.slotInfo?.service.name} <br />
+                            Unidade: {bookingModal.slotInfo?.unit} <br />
+                            Horário: {bookingModal.slotInfo?.timeSlot.label}
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={handleBookingSubmit} className="space-y-4 pt-4">
-                        <div>
-                            <Label htmlFor="guestName">Seu Nome</Label>
-                            <Input id="guestName" value={formValues.guestName} onChange={(e) => setFormValues(prev => ({...prev, guestName: e.target.value}))} />
-                        </div>
-                        <div>
-                            <Label htmlFor="cabinName">Sua Cabana</Label>
-                            <Select onValueChange={(value) => setFormValues(prev => ({...prev, cabinName: value}))}>
-                                <SelectTrigger><SelectValue placeholder="Selecione sua cabana..." /></SelectTrigger>
-                                <SelectContent>
-                                    {cabins.length > 0 ? (
-                                        cabins.map(cabin => <SelectItem key={cabin.id} value={cabin.name}>{cabin.name}</SelectItem>)
-                                    ) : (
-                                        <div className="p-4 text-sm text-center text-muted-foreground">Carregando cabanas...</div>
-                                    )}
-                                </SelectContent>
-                            </Select>
+                    <form onSubmit={handleBookingSubmit}>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="guestName" className="text-right">Seu Nome</Label>
+                                <Input
+                                    id="guestName"
+                                    value={formValues.guestName}
+                                    onChange={(e) => setFormValues(prev => ({ ...prev, guestName: e.target.value }))}
+                                    className="col-span-3"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="cabinName" className="text-right">Cabana</Label>
+                                <Select onValueChange={(value) => setFormValues(prev => ({ ...prev, cabinName: value }))}>
+                                    <SelectTrigger className="col-span-3">
+                                        <SelectValue placeholder="Selecione sua cabana" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {cabins.sort((a, b) => (a.posicao || 0) - (b.posicao || 0)).map(cabin => (
+                                            <SelectItem key={cabin.id} value={cabin.name}>{cabin.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                         <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setBookingModal({ open: false })}>Cancelar</Button>
                             <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Confirmar Agendamento
+                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Confirmar"}
                             </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
             </Dialog>
-        </>
+        </div>
     );
 }
