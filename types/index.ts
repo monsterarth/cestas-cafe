@@ -191,7 +191,7 @@ export interface PreCheckIn {
   status: 'recebido' | 'concluido' | 'arquivado';
 }
 
-// --- TIPOS PARA AGENDAMENTO DE SERVIÇOS ---
+// --- TIPOS PARA AGENDAMENTO DE SERVIÇOS (ATUALIZADO) ---
 export interface TimeSlot {
   id: string;
   startTime: string;
@@ -206,16 +206,20 @@ export interface Service {
   defaultStatus: 'closed' | 'open';
   units: string[];
   timeSlots: TimeSlot[];
+  additionalOptions?: string[]; // <--- NOVO CAMPO
 }
 
 export interface Booking {
     id: string;
     serviceId: string;
     serviceName: string;
-    unit: string;
+    unit: string; // Para serviços de slot
     date: string;
-    timeSlotId: string;
-    timeSlotLabel: string;
+    timeSlotId?: string; // Para serviços de slot
+    timeSlotLabel?: string; // Para serviços de slot
+    preferenceTime?: string; // <--- NOVO CAMPO para 'preference'
+    selectedOptions?: string[]; // <--- NOVO CAMPO para 'preference'
+    hasPet?: boolean; // <--- NOVO CAMPO para 'preference'
     guestName: string;
     cabinName: string;
     createdAt: Timestamp;
