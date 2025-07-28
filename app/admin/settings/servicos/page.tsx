@@ -6,208 +6,209 @@ import { getFirebaseDb } from '@/lib/firebase';
 import { Service, TimeSlot } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/ui/label'; // <<-- ERRO CORRIGIDO AQUI
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { toast, Toaster } from 'sonner';
-import { PlusCircle, Edit, Trash2, Loader2, ConciergeBell, Clock } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, ConciergeBell, Clock, ArrowRight, Sparkles, Wand2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useForm, SubmitHandler, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { addMinutes, format as formatTime, parse } from 'date-fns';
 
-// --- FORMULÁRIOS E MODAIS ---
+// --- Esquema de Validação com Zod (Atualizado) ---
+const timeSlotSchema = z.object({
+    id: z.string().optional(),
+    startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato HH:mm inválido"),
+    endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato HH:mm inválido"),
+    label: z.string().min(1, "O rótulo é obrigatório"),
+});
 
 const serviceFormSchema = z.object({
-    name: z.string().min(2, "O nome é obrigatório."),
-    type: z.enum(['slots', 'preference']),
-    defaultStatus: z.enum(['open', 'closed']),
-    unitsString: z.string().min(1, "Pelo menos uma unidade é necessária."),
+    name: z.string().min(2, "O nome do serviço é obrigatório."),
+    type: z.enum(['slots', 'preference'], { required_error: "Selecione um tipo." }),
+    defaultStatus: z.enum(['open', 'closed'], { required_error: "Selecione um status." }),
+    units: z.array(z.object({ name: z.string().min(1, "O nome da unidade não pode ser vazio.") })).min(1, "Adicione pelo menos uma unidade."),
+    timeSlots: z.array(timeSlotSchema),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
 
-// Formulário para Criar/Editar um Serviço
-function ServiceForm({ service, onFinished }: { service?: Service; onFinished: () => void }) {
+// --- FORMULÁRIO UNIFICADO EM ETAPAS ---
+function ServiceFormWizard({ service, onFinished }: { service?: Service; onFinished: () => void }) {
+    const [step, setStep] = useState(1);
+
     const form = useForm<ServiceFormValues>({
         resolver: zodResolver(serviceFormSchema),
         defaultValues: {
             name: service?.name || '',
             type: service?.type || 'slots',
             defaultStatus: service?.defaultStatus || 'open',
-            unitsString: service?.units.join(', ') || '',
+            units: service?.units.map(u => ({ name: u })) || [{ name: '' }],
+            timeSlots: service?.timeSlots || [],
         }
     });
 
-    const onSubmit: SubmitHandler<ServiceFormValues> = async (data) => {
-        const db = await getFirebaseDb();
-        if (!db) return toast.error("Banco de dados indisponível.");
-        
-        const units = data.unitsString.split(',').map(u => u.trim()).filter(Boolean);
-        if (units.length === 0) {
-            toast.error("É necessário pelo menos uma unidade.");
+    const { fields: unitFields, append: appendUnit, remove: removeUnit } = useFieldArray({ control: form.control, name: "units" });
+    const { fields: slotFields, append: appendSlot, remove: removeSlot, replace: replaceSlots } = useFieldArray({ control: form.control, name: "timeSlots" });
+    
+    const [generator, setGenerator] = useState({ start: '09:00', end: '18:00', duration: '60', interval: '0' });
+    const handleGenerateSlots = () => {
+        const slots: TimeSlot[] = [];
+        let currentTime = parse(generator.start, 'HH:mm', new Date());
+        const endTime = parse(generator.end, 'HH:mm', new Date());
+        const duration = parseInt(generator.duration, 10);
+        const interval = parseInt(generator.interval, 10);
+
+        if (isNaN(duration) || duration <= 0) {
+            toast.error("A duração deve ser um número positivo.");
             return;
         }
 
+        while (currentTime < endTime) {
+            const slotEnd = addMinutes(currentTime, duration);
+            if(slotEnd > endTime) break;
+
+            slots.push({
+                startTime: formatTime(currentTime, 'HH:mm'),
+                endTime: formatTime(slotEnd, 'HH:mm'),
+                label: `${formatTime(currentTime, 'HH:mm')} às ${formatTime(slotEnd, 'HH:mm')}`,
+                id: `${formatTime(currentTime, 'HH:mm')}-${formatTime(slotEnd, 'HH:mm')}`
+            });
+            currentTime = addMinutes(slotEnd, interval);
+        }
+        replaceSlots(slots);
+        toast.success(`${slots.length} horários gerados com sucesso!`);
+    };
+
+    const processSubmit: SubmitHandler<ServiceFormValues> = async (data) => {
+        const db = await getFirebaseDb();
+        if (!db) return toast.error("Banco de dados indisponível.");
+        
         const serviceData = {
-            name: data.name,
-            type: data.type,
-            defaultStatus: data.defaultStatus,
-            units: units,
+            ...data,
+            units: data.units.map(u => u.name),
         };
 
+        const toastId = toast.loading(service?.id ? "Atualizando serviço..." : "Criando serviço...");
         try {
             if (service?.id) {
                 await firestore.updateDoc(firestore.doc(db, "services", service.id), serviceData);
-                toast.success("Serviço atualizado com sucesso!");
+                toast.success("Serviço atualizado com sucesso!", { id: toastId });
             } else {
-                await firestore.addDoc(firestore.collection(db, "services"), { ...serviceData, timeSlots: [] });
-                toast.success("Serviço criado com sucesso!");
+                await firestore.addDoc(firestore.collection(db, "services"), serviceData);
+                toast.success("Serviço criado com sucesso!", { id: toastId });
             }
             onFinished();
-        } catch (error) {
-            toast.error("Ocorreu um erro ao salvar o serviço.");
+        } catch (error: any) {
+            toast.error(`Ocorreu um erro: ${error.message}`, { id: toastId });
+        }
+    };
+    
+    const nextStep = async () => {
+        const fieldsToValidate: (keyof ServiceFormValues)[] = step === 1 ? ['name', 'type', 'defaultStatus'] : ['units'];
+        const isValid = await form.trigger(fieldsToValidate);
+        if (isValid) {
+            if (step === 2 && form.getValues('type') === 'preference') {
+                form.handleSubmit(processSubmit)();
+            } else {
+                setStep(s => s + 1);
+            }
         }
     };
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Nome do Serviço</FormLabel>
-                            <FormControl><Input placeholder="Ex: Jacuzzi" {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
+            <form onSubmit={form.handleSubmit(processSubmit)} className="flex flex-col h-full">
+                <div className="flex-grow p-1">
+                    {step === 1 && (
+                        <div className="space-y-4">
+                            <FormField name="name" control={form.control} render={({ field }) => (
+                                <FormItem><FormLabel>Nome do Serviço</FormLabel><FormControl><Input placeholder="Ex: Jacuzzi com Hidromassagem" {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField name="type" control={form.control} render={({ field }) => (
+                                    <FormItem><FormLabel>Tipo de Agendamento</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="slots">Horários Fixos</SelectItem><SelectItem value="preference">Preferência de Horário</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                                )} />
+                                <FormField name="defaultStatus" control={form.control} render={({ field }) => (
+                                    <FormItem><FormLabel>Status Padrão Diário</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="open">Aberto</SelectItem><SelectItem value="closed">Fechado (liberação manual)</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                                )} />
+                            </div>
+                        </div>
                     )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="type"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Tipo de Agendamento</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="slots">Horários Fixos</SelectItem>
-                                        <SelectItem value="preference">Preferência de Horário</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="defaultStatus"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Status Diário Padrão</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="open">Aberto</SelectItem>
-                                        <SelectItem value="closed">Fechado (Abertura manual)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+
+                    {step === 2 && (
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">Unidades do Serviço</h3>
+                            <p className="text-sm text-muted-foreground">Adicione as unidades disponíveis para este serviço, como "Jacuzzi 1" e "Jacuzzi 2", ou apenas "Única" se houver só uma.</p>
+                            {unitFields.map((field, index) => (
+                                <div key={field.id} className="flex items-center gap-2">
+                                    <FormField name={`units.${index}.name`} control={form.control} render={({ field }) => (
+                                        <FormItem className="flex-grow"><FormControl><Input placeholder={`Unidade ${index + 1}`} {...field} /></FormControl><FormMessage /></FormItem>
+                                    )} />
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeUnit(index)} disabled={unitFields.length <= 1}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                </div>
+                            ))}
+                            <Button type="button" variant="outline" size="sm" onClick={() => appendUnit({ name: '' })}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Unidade</Button>
+                        </div>
+                    )}
+                    
+                    {step === 3 && form.getValues('type') === 'slots' && (
+                        <div className="space-y-4">
+                             <Card className="bg-muted/50">
+                                <CardHeader><CardTitle className="flex items-center text-base"><Wand2 className="mr-2 h-5 w-5 text-primary"/>Gerador de Horários em Lote</CardTitle></CardHeader>
+                                <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+                                    <div className="space-y-1"><Label htmlFor="gen-start">Início</Label><Input id="gen-start" type="time" value={generator.start} onChange={e => setGenerator(g => ({...g, start: e.target.value}))}/></div>
+                                    <div className="space-y-1"><Label htmlFor="gen-end">Fim</Label><Input id="gen-end" type="time" value={generator.end} onChange={e => setGenerator(g => ({...g, end: e.target.value}))}/></div>
+                                    <div className="space-y-1"><Label htmlFor="gen-duration">Duração (min)</Label><Input id="gen-duration" type="number" value={generator.duration} onChange={e => setGenerator(g => ({...g, duration: e.target.value}))}/></div>
+                                    <div className="space-y-1"><Label htmlFor="gen-interval">Intervalo (min)</Label><Input id="gen-interval" type="number" value={generator.interval} onChange={e => setGenerator(g => ({...g, interval: e.target.value}))}/></div>
+                                    <Button type="button" onClick={handleGenerateSlots} className="w-full">Gerar</Button>
+                                </CardContent>
+                            </Card>
+                            <div className="max-h-[300px] overflow-y-auto pr-2 space-y-3">
+                                {/* <<-- ERRO CORRIGIDO AQUI: Usando FormField para cada input -->> */}
+                                {slotFields.map((field, index) => (
+                                     <div key={field.id} className="flex items-center gap-2">
+                                         <FormField name={`timeSlots.${index}.startTime`} control={form.control} render={({ field }) => <FormItem className="flex-1"><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem>}/>
+                                         <FormField name={`timeSlots.${index}.endTime`} control={form.control} render={({ field }) => <FormItem className="flex-1"><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem>}/>
+                                         <FormField name={`timeSlots.${index}.label`} control={form.control} render={({ field }) => <FormItem className="flex-1"><FormControl><Input placeholder="Rótulo (Ex: 09h às 10h)" {...field} /></FormControl><FormMessage /></FormItem>}/>
+                                         <Button type="button" variant="ghost" size="icon" onClick={() => removeSlot(index)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                     </div>
+                                ))}
+                            </div>
+                             <Button type="button" variant="outline" size="sm" onClick={() => appendSlot({ startTime: '', endTime: '', label: '' })}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Horário Manualmente</Button>
+                        </div>
+                    )}
                 </div>
-                 <FormField
-                    control={form.control}
-                    name="unitsString"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Unidades (separadas por vírgula)</FormLabel>
-                            <FormControl><Input placeholder="Ex: Azul clara, Azul escura" {...field} /></FormControl>
-                            <FormMessage />
-                            <p className="text-xs text-muted-foreground">Se houver apenas uma, digite "Única".</p>
-                        </FormItem>
-                    )}
-                />
-                <DialogFooter>
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {service ? "Salvar Alterações" : "Criar Serviço"}
-                    </Button>
+
+                <DialogFooter className="border-t pt-4 mt-4 flex justify-between">
+                    <div>{step > 1 && <Button type="button" variant="ghost" onClick={() => setStep(s => s - 1)}>Voltar</Button>}</div>
+                    <div>
+                        {step < 3 && <Button type="button" onClick={nextStep}>Avançar <ArrowRight className="ml-2 h-4 w-4"/></Button>}
+                        {(step === 3 || (step === 2 && form.getValues('type') === 'preference')) && (
+                            <Button type="submit" disabled={form.formState.isSubmitting}>
+                                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4"/>}
+                                {service ? "Salvar Alterações" : "Concluir e Criar Serviço"}
+                            </Button>
+                        )}
+                    </div>
                 </DialogFooter>
             </form>
         </Form>
     );
 }
 
-// Modal para Gerenciar Horários
-function TimeSlotsManager({ service, onFinished }: { service: Service; onFinished: () => void }) {
-    const { register, handleSubmit, control, formState: { isSubmitting } } = useForm<{ slots: TimeSlot[] }>({
-        defaultValues: {
-            slots: service.timeSlots || []
-        }
-    });
-
-    const { fields, append, remove } = useFieldArray({ control, name: "slots" });
-
-    const onSubmit: SubmitHandler<{ slots: TimeSlot[] }> = async (data) => {
-        const db = await getFirebaseDb();
-        if (!db) return toast.error("Banco de dados indisponível.");
-        
-        const formattedSlots = data.slots.map(slot => ({
-            ...slot,
-            id: `${slot.startTime}-${slot.endTime}`
-        }));
-
-        try {
-            await firestore.updateDoc(firestore.doc(db, "services", service.id), {
-                timeSlots: formattedSlots
-            });
-            toast.success("Horários salvos com sucesso!");
-            onFinished();
-        } catch (error) {
-            toast.error("Ocorreu um erro ao salvar os horários.");
-        }
-    };
-    
-    return (
-        <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="max-h-[400px] overflow-y-auto pr-4 space-y-4">
-                {fields.map((field, index) => (
-                    <div key={field.id} className="flex items-center gap-2 p-2 border rounded-lg">
-                        <div className="flex-1 grid grid-cols-3 gap-2">
-                            <Input placeholder="Ex: 11:00" {...register(`slots.${index}.startTime`, { required: true })} />
-                            <Input placeholder="Ex: 12:00" {...register(`slots.${index}.endTime`, { required: true })} />
-                            <Input placeholder="Ex: 11h às 12h" {...register(`slots.${index}.label`, { required: true })} />
-                        </div>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                    </div>
-                ))}
-            </div>
-            <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ id: '', startTime: '', endTime: '', label: '' })}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Horário
-            </Button>
-            <DialogFooter className="mt-6">
-                <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Salvar Horários
-                </Button>
-            </DialogFooter>
-        </form>
-    );
-}
 
 // --- PÁGINA PRINCIPAL ---
 export default function ManageServicesPage() {
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
-    const [serviceModal, setServiceModal] = useState<{ open: boolean; service?: Service }>({ open: false });
-    const [slotsModal, setSlotsModal] = useState<{ open: boolean; service?: Service }>({ open: false });
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingService, setEditingService] = useState<Service | undefined>(undefined);
 
     useEffect(() => {
         const initializeListener = async () => {
@@ -219,104 +220,119 @@ export default function ManageServicesPage() {
                 const servicesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
                 setServices(servicesData);
                 setLoading(false);
-            }, (err) => {
-                toast.error("Falha ao carregar serviços.");
-                setLoading(false);
-            });
+            }, () => { toast.error("Falha ao carregar serviços."); setLoading(false); });
             return () => unsubscribe();
         };
         initializeListener();
     }, []);
 
-    const handleDeleteService = async (serviceId: string) => {
-        if (!confirm("Tem certeza que deseja excluir este serviço? Todos os horários associados serão perdidos.")) return;
+    const openModalForNew = () => {
+        setEditingService(undefined);
+        setIsModalOpen(true);
+    };
+
+    const openModalForEdit = (service: Service) => {
+        setEditingService(service);
+        setIsModalOpen(true);
+    };
+
+    const handleDeleteService = async (serviceId: string, serviceName: string) => {
+        if (!confirm(`Tem certeza que deseja excluir o serviço "${serviceName}"? Esta ação é irreversível.`)) return;
+        
         const db = await getFirebaseDb();
         if (!db) return;
+        const toastId = toast.loading(`Excluindo ${serviceName}...`);
         try {
             await firestore.deleteDoc(firestore.doc(db, "services", serviceId));
-            toast.success("Serviço excluído com sucesso!");
+            toast.success("Serviço excluído com sucesso!", { id: toastId });
         } catch (error) {
-            toast.error("Ocorreu um erro ao excluir o serviço.");
+            toast.error("Ocorreu um erro ao excluir o serviço.", { id: toastId });
         }
     };
     
     if (loading) {
-        return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>;
+        return <div className="flex items-center justify-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-gray-400" /></div>;
     }
 
     return (
-        <>
+        <div className="container mx-auto p-4 md:p-6 space-y-6">
             <Toaster richColors position="top-center" />
-            <div className="space-y-6">
-                <Card>
-                    <CardHeader>
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <CardTitle className="flex items-center gap-2"><ConciergeBell />Gerenciar Serviços Agendáveis</CardTitle>
-                                <CardDescription>Crie e configure os serviços que seus hóspedes podem agendar.</CardDescription>
-                            </div>
-                            <Button onClick={() => setServiceModal({ open: true })}><PlusCircle className="mr-2 h-4 w-4" />Adicionar Serviço</Button>
-                        </div>
-                    </CardHeader>
-                </Card>
+            <Card>
+                <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <CardTitle className="flex items-center gap-2"><ConciergeBell />Gerenciar Serviços</CardTitle>
+                        <CardDescription>Crie e configure os serviços que seus hóspedes podem agendar.</CardDescription>
+                    </div>
+                    <Button onClick={openModalForNew}><PlusCircle className="mr-2 h-4 w-4" />Adicionar Novo Serviço</Button>
+                </CardHeader>
+            </Card>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {services.length > 0 ? (
+                <Accordion type="single" collapsible className="w-full">
                     {services.map(service => (
-                        <Card key={service.id}>
-                            <CardHeader>
-                                <CardTitle>{service.name}</CardTitle>
-                                <div className="flex gap-2 pt-1">
-                                    <Badge variant="secondary">{service.type === 'slots' ? 'Horários Fixos' : 'Preferência'}</Badge>
-                                    <Badge variant={service.defaultStatus === 'open' ? 'default' : 'destructive'}>{service.defaultStatus === 'open' ? 'Abre Aberto' : 'Abre Fechado'}</Badge>
+                        <AccordionItem value={service.id} key={service.id}>
+                            <AccordionTrigger className="hover:no-underline">
+                                <div className='flex justify-between items-center w-full pr-4'>
+                                    <div className='flex flex-col text-left'>
+                                        <span className="text-lg font-semibold">{service.name}</span>
+                                        <div className="flex gap-2 pt-1">
+                                            <Badge variant="secondary">{service.type === 'slots' ? 'Horários Fixos' : 'Preferência'}</Badge>
+                                            <Badge variant={service.defaultStatus === 'open' ? 'default' : 'destructive'}>{service.defaultStatus === 'open' ? 'Aberto' : 'Fechado'}</Badge>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openModalForEdit(service); }}><Edit className="h-4 w-4"/></Button>
+                                        <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeleteService(service.id, service.name); }}><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                                    </div>
                                 </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                <div className="p-4 bg-muted/50 rounded-b-md space-y-4">
                                     <div>
                                         <h4 className="font-semibold text-sm mb-2">Unidades</h4>
                                         <div className="flex flex-wrap gap-2">
                                             {service.units.map(unit => <Badge key={unit} variant="outline">{unit}</Badge>)}
                                         </div>
                                     </div>
-                                    <div>
-                                        <h4 className="font-semibold text-sm mb-2">Horários Definidos</h4>
-                                        <p className="text-sm text-muted-foreground">{service.timeSlots?.length || 0} horários</p>
-                                    </div>
+                                    {service.type === 'slots' && (
+                                        <div>
+                                            <h4 className="font-semibold text-sm mb-2">Horários</h4>
+                                            {service.timeSlots && service.timeSlots.length > 0 ? (
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                                                    {service.timeSlots.sort((a,b) => a.startTime.localeCompare(b.startTime)).map(slot => (
+                                                        <Badge key={slot.id || slot.label} variant="outline" className="flex justify-center items-center gap-2">
+                                                            <Clock className="h-3 w-3" /> {slot.label}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">Nenhum horário definido.</p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                            </CardContent>
-                            <DialogFooter className="p-4 border-t gap-2">
-                                <Button size="sm" variant="outline" onClick={() => setSlotsModal({ open: true, service: service })} disabled={service.type !== 'slots'}><Clock className="mr-2 h-4 w-4"/> Horários</Button>
-                                <Button size="sm" variant="outline" onClick={() => setServiceModal({ open: true, service: service })}><Edit className="mr-2 h-4 w-4"/> Editar</Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleDeleteService(service.id)}><Trash2 className="mr-2 h-4 w-4"/> Excluir</Button>
-                            </DialogFooter>
-                        </Card>
+                            </AccordionContent>
+                        </AccordionItem>
                     ))}
-                </div>
-            </div>
+                </Accordion>
+            ) : (
+                <Card className="text-center p-12">
+                    <CardDescription>Nenhum serviço foi criado ainda. Clique em "Adicionar Novo Serviço" para começar.</CardDescription>
+                </Card>
+            )}
 
-            {/* Modal para Criar/Editar Serviço */}
-            <Dialog open={serviceModal.open} onOpenChange={(open) => !open && setServiceModal({ open: false })}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{serviceModal.service ? "Editar Serviço" : "Criar Novo Serviço"}</DialogTitle>
-                        <DialogDescription>Defina as regras e informações principais deste serviço.</DialogDescription>
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+                    <DialogHeader className="p-6">
+                        <DialogTitle className="text-2xl">{editingService ? "Editar Serviço" : "Criar Novo Serviço"}</DialogTitle>
+                        <DialogDescription>
+                            {editingService ? `Editando "${editingService.name}".` : "Siga as etapas para configurar um novo serviço do zero."}
+                        </DialogDescription>
                     </DialogHeader>
-                    <ServiceForm service={serviceModal.service} onFinished={() => setServiceModal({ open: false })} />
+                    {/* Renderiza o formulário no modal, passando a key para forçar a remontagem ao mudar de serviço */}
+                    <ServiceFormWizard key={editingService?.id || 'new'} service={editingService} onFinished={() => setIsModalOpen(false)} />
                 </DialogContent>
             </Dialog>
-
-            {/* Modal para Gerenciar Horários */}
-            {slotsModal.service && (
-                 <Dialog open={slotsModal.open} onOpenChange={(open) => !open && setSlotsModal({ open: false })}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Gerenciar Horários de: {slotsModal.service.name}</DialogTitle>
-                            <DialogDescription>Adicione ou remova os blocos de horário disponíveis para este serviço.</DialogDescription>
-                        </DialogHeader>
-                        <TimeSlotsManager service={slotsModal.service} onFinished={() => setSlotsModal({ open: false })} />
-                    </DialogContent>
-                </Dialog>
-            )}
-        </>
+        </div>
     );
 }
